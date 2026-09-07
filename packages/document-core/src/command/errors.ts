@@ -80,7 +80,7 @@ export class AnimationDurationError extends Error {
   ) {
     super(
       `cannot set animation "${animationId}" duration to ${requestedDuration}; ` +
-        `it is below the last keyframe time ${lastKeyframeTime}`,
+        `it must be finite and at least the last keyframe time ${lastKeyframeTime}`,
     );
   }
 }

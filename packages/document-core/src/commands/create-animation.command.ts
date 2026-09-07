@@ -1,4 +1,5 @@
 import type { Command, CommandContext } from '../command/command';
+import { AnimationDurationError } from '../command/errors';
 import type { AnimationEntity } from '../model/doc-state';
 import { emptyAnimationConstraintTimelines } from '../model/doc-state';
 import type { AnimationId } from '../model/ids';
@@ -20,6 +21,9 @@ export class CreateAnimationCommand implements Command {
   ) {}
 
   do(ctx: CommandContext): void {
+    if (!Number.isFinite(this.duration) || this.duration < 0) {
+      throw new AnimationDurationError(this.animId, this.duration, 0);
+    }
     const entity: AnimationEntity = {
       id: this.animId,
       name: this.name,
