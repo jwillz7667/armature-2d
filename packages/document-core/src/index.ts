@@ -239,6 +239,7 @@ export {
   RemoveLayerCommand,
   ReorderLayersCommand,
   SetLayerFieldCommand,
+  SetEmitterTrailCommand,
   SetLayerBlendModeCommand,
   AddLifeStopCommand,
   RemoveLifeStopCommand,

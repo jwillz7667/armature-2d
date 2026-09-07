@@ -1510,6 +1510,37 @@
     }
   },
   {
+    "name": "effect.layer.setTrail",
+    "title": "Set emitter particle trail",
+    "description": "Enable, edit, or disable an emitter particle trail and its width/alpha curves atomically. Existing stop identities are preserved; null disables the trail.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "layerId": { "type": "string", "minLength": 1 },
+        "trail": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "region": { "type": "string", "minLength": 1 },
+                "maxSegments": { "type": "integer", "minimum": 1 },
+                "segmentSpacing": { "type": "number", "exclusiveMinimum": 0 }
+              },
+              "required": ["region", "maxSegments", "segmentSpacing"],
+              "additionalProperties": false
+            },
+            { "type": "null" }
+          ]
+        }
+      },
+      "required": ["documentId", "effectId", "layerId", "trail"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
     "name": "effect.lifeStop.add",
     "title": "Add life-curve stop",
     "description": "Insert an interior stop (t in (0,1)) into a layer life curve, keeping t strictly ascending. `value` is a scalar or an {r,g,b} matching the curve field.",
@@ -1771,10 +1802,11 @@
   {
     "name": "effect.setMeta",
     "title": "Set effect meta",
-    "description": "Set an effect duration (null = endless), deterministic flag, and/or simulationDt (must be > 0). Only the provided fields change.",
+    "description": "Set an effect duration (null = endless), deterministic flag, and/or simulationDt (must be > 0). Only the provided fields change, including optional default blendMode.",
     "inputSchema": {
       "type": "object",
       "properties": {
+        "blendMode": { "type": "string", "enum": ["normal", "additive", "multiply", "screen"] },
         "documentId": { "type": "string", "minLength": 1 },
         "effectId": { "type": "string", "minLength": 1 },
         "duration": { "anyOf": [{ "type": "number" }, { "type": "null" }] },

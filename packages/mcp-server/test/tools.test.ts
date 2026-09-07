@@ -2045,6 +2045,69 @@ function atlasWith(regions: readonly string[]): unknown {
 // Effects (VFX / particles, Phase 3) tools: an LLM authors a particle effect through the SAME command
 // spine the GUI uses (LAW 2). Covers a full authoring flow, undo, and the typed failure modes (LAW 3).
 describe('MCP effects tools', () => {
+  it('keeps trail structure and lifetime curves valid through both authoring tools and undo', async () => {
+    const deps = makeDeps();
+    const { documentId } = asRecord(await call(deps, 'document.new', { name: 'trails' }));
+    await call(deps, 'effect.setAtlas', { documentId, atlas: atlasWith(['coin']) });
+    const { effectId } = asRecord(await call(deps, 'effect.create', { documentId, name: 'Spark' }));
+    const { layerId } = asRecord(
+      await call(deps, 'effect.layer.add', {
+        documentId,
+        effectId,
+        kind: 'emitter',
+        region: 'coin',
+      }),
+    );
+    const read = async () => {
+      const result = asRecord(await call(deps, 'effect.get', { documentId, effectId }));
+      return (
+        asRecord(result.effect).layers as Array<{ body: Record<string, unknown>; curves: unknown }>
+      )[0]!;
+    };
+    const original = await read();
+    const trail = { region: 'coin', maxSegments: 12, segmentSpacing: 2 };
+    await call(deps, 'effect.layer.setTrail', { documentId, effectId, layerId, trail });
+    const enabled = await read();
+    expect(enabled.body.trail).toEqual(trail);
+    expect(enabled.curves).not.toEqual(original.curves);
+    await call(deps, 'history.undo', { documentId });
+    expect(await read()).toEqual(original);
+    await call(deps, 'effect.layer.setField', {
+      documentId,
+      effectId,
+      layerId,
+      field: 'trail',
+      body: { ...original.body, trail },
+    });
+    const enabledByBody = await read();
+    expect(enabledByBody.body.trail).toEqual(trail);
+    await call(deps, 'effect.layer.setField', {
+      documentId,
+      effectId,
+      layerId,
+      field: 'trail',
+      body: { ...enabledByBody.body, trail: null },
+    });
+    expect((await read()).curves).toEqual(original.curves);
+    await call(deps, 'history.undo', { documentId });
+    expect(await read()).toEqual(enabledByBody);
+    await expectToolError(
+      call(deps, 'effect.layer.setTrail', {
+        documentId,
+        effectId,
+        layerId,
+        trail: { ...trail, maxSegments: 0 },
+      }),
+      'INVALID_INPUT',
+    );
+    expect(await read()).toEqual(enabledByBody);
+    await call(deps, 'effect.setMeta', { documentId, effectId, blendMode: 'screen' });
+    const effect = asRecord(
+      asRecord(await call(deps, 'effect.get', { documentId, effectId })).effect,
+    );
+    expect(effect.blendMode).toBe('screen');
+  });
+
   it('lets an AI author a particle effect, layer, life curve, and bundle end to end', async () => {
     const deps = makeDeps();
     const { documentId } = asRecord(await call(deps, 'document.new', { name: 'bigwin' }));

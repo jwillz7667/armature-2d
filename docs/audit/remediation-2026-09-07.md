@@ -14,7 +14,8 @@ presentation boundaries. Work proceeds in verified subsystem changes.
 | F08, F10-F13, F15 | Displayed pose, video startup, physics/export/native skin context | Implemented; pixel/player/worker checks pass; engine and WebCodecs acceptance pending |
 | F20 | Complete MCP solved-pose/deform feedback and generated reference | Implemented; command and MCP integration checks pass |
 | F17 | Constraint creation, parameters, target handles, and timeline authoring | Implemented; command/workflow tests pass; desktop acceptance pending |
-| F14, F16, F18-F19, F29 | Native pixels, import capability, effect/slot UI, deform mixing | Pending |
+| F18 | Full effects controls, lifetime graphs, bundles, seeded textured preview | Implemented; 67 core, 77 MCP, and 3 workflow tests pass; desktop acceptance pending |
+| F14, F16, F19, F29 | Native pixels, import capability, slot UI, deform mixing | Pending |
 | F01, F22-F28 | Repository, dependencies, CI, release, docs, performance, acceptance | Pending |
 
 ## Evidence and environment
@@ -61,3 +62,12 @@ because an unsupported-feature label or a plan exists.
   save/reopen, undo/redo, and rollback when a compound path creation fails its final validation.
 - Editor production build, type checks, and changed-source lint pass. Native desktop interaction remains
   an acceptance task, not evidence provided by these headless tests.
+
+## Effects designer verification
+
+- Full emitter, sprite, and ribbon parameter controls dispatch reversible commands. Trails and their lifetime curves change atomically.
+- Bundles have editable items, order, offsets, anchors, and seed salts. Texture imports feed the effects preview resolver.
+- Fixed-clock preview tests prove identical moving-anchor bundle states at 30/60 Hz, fresh restarts, and different-seed variation.
+- A blank-project authoring test creates effects, curves, trails, and a bundle, then verifies complete save/reopen including PNG pixels.
+- Regression tests cover invalid reorders, duplicate bundle names, multi-field coalescing redo, and both MCP trail editing paths.
+- Built editor and type/lint checks are required; actual desktop rendering is still not claimed by these headless tests.

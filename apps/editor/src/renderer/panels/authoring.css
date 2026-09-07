@@ -43,3 +43,31 @@
   color: #a8b6c9;
   line-height: 1.5;
 }
+
+.authoring-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-block: 6px;
+}
+.authoring-field > :is(input, select) {
+  width: 48%;
+  min-width: 0;
+}
+.authoring-field > input[type='checkbox'] {
+  width: 18px;
+}
+.authoring-group {
+  margin-block: 8px;
+  border: 1px solid #39414d;
+  border-radius: 4px;
+}
+.authoring-group > summary {
+  cursor: pointer;
+  padding: 8px;
+  color: #a8caff;
+}
+.authoring-group > div {
+  padding: 0 8px 8px;
+}

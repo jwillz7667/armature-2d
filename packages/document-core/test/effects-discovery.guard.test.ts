@@ -45,8 +45,8 @@ describe('effects command discovery guard', () => {
     expect(new Set(kinds).size).toBe(kinds.length);
   });
 
-  it('registers the full section-10 command table (21 commands)', () => {
+  it('registers the section-10 commands plus particle trail authoring (22 commands)', () => {
     // WP-3.7 section 10: 5 effect-level + 5 layer + 5 life-curve + 6 bundle commands = 21.
-    expect(effectsCommandRegistry.length).toBe(21);
+    expect(effectsCommandRegistry.length).toBe(22);
   });
 });

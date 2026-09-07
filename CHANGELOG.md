@@ -1,5 +1,12 @@
 # Changelog
 
+## Audit effects designer
+
+- Add full layer parameters, lifetime-curve graphs and easing, bundle editing, textured previews, seeded restarts, and moving anchors.
+- Keep particle trails and their curves atomic; fix duplicate reorder entries, duplicate bundle names, and bundle edit coalescing.
+- Add MCP particle-trail editing and default effect blending controls.
+
+
 ## Audit constraint authoring
 
 - Add GUI creation for IK, transform, and editable path followers with target handles and complete parameter controls.

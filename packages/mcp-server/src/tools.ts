@@ -130,6 +130,8 @@ import {
   RemoveLayerCommand,
   ReorderLayersCommand,
   SetLayerFieldCommand,
+  SetEmitterTrailCommand,
+  CompositeCommand,
   SetLayerBlendModeCommand,
   AddLifeStopCommand,
   RemoveLifeStopCommand,
@@ -1784,9 +1786,10 @@ const effectsTools: readonly ToolDefinition[] = [
       title: 'Set effect meta',
       description:
         'Set an effect duration (null = endless), deterministic flag, and/or simulationDt (must be > 0). ' +
-        'Only the provided fields change.',
+        'Only the provided fields change, including optional default blendMode.',
       input: z
         .object({
+          blendMode: blendModeSchema.optional(),
           documentId,
           effectId,
           duration: z.number().finite().nullable().optional(),
@@ -1799,6 +1802,7 @@ const effectsTools: readonly ToolDefinition[] = [
       const session = deps.sessions.get(input.documentId);
       requireEffect(session, input.effectId);
       const patch: EffectMetaPatch = {
+        ...(input.blendMode !== undefined ? { blendMode: input.blendMode } : {}),
         ...(input.duration !== undefined ? { duration: input.duration } : {}),
         ...(input.deterministic !== undefined ? { deterministic: input.deterministic } : {}),
         ...(input.simulationDt !== undefined ? { simulationDt: input.simulationDt } : {}),
@@ -1923,14 +1927,55 @@ const effectsTools: readonly ToolDefinition[] = [
         );
       }
       const body: EffectLayerBody = input.body;
+      const edit = new SetLayerFieldCommand(
+        asEffectId(input.effectId),
+        asEffectLayerId(input.layerId),
+        input.field,
+        body,
+      );
+      const changedTrail =
+        body.type === 'emitter' &&
+        layer.body.type === 'emitter' &&
+        (body.trail === null) !== (layer.body.trail === null);
+      const command =
+        changedTrail && body.type === 'emitter'
+          ? new CompositeCommand('Set Emitter Layer', [
+              edit,
+              new SetEmitterTrailCommand(
+                asEffectId(input.effectId),
+                asEffectLayerId(input.layerId),
+                body.trail,
+              ),
+            ])
+          : edit;
+      return { revision: executeEffectEdit(session, command) };
+    },
+  ),
+  defineTool(
+    {
+      name: 'effect.layer.setTrail',
+      title: 'Set emitter particle trail',
+      description:
+        'Enable, edit, or disable an emitter particle trail and its width/alpha curves atomically. Existing stop identities are preserved; null disables the trail.',
+      input: z
+        .object({
+          documentId,
+          effectId,
+          layerId: effectLayerId,
+          trail: emitterTrailBodySchema.nullable(),
+        })
+        .strict(),
+    },
+    (deps, input) => {
+      const session = deps.sessions.get(input.documentId);
+      requireLayer(session, input.effectId, input.layerId);
       return {
         revision: executeEffectEdit(
           session,
-          new SetLayerFieldCommand(
+          new SetEmitterTrailCommand(
             asEffectId(input.effectId),
             asEffectLayerId(input.layerId),
-            input.field,
-            body,
+            input.trail,
           ),
         ),
       };
