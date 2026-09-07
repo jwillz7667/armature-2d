@@ -11,6 +11,7 @@ import { findAnimationSnapshot, type CommandSpec } from './spec';
 // strictly time-sorted. On insert the new frame takes `insertCurve` (default 'linear'). before/after are
 // whole-channel mementos, so undo is bit-exact. Does NOT coalesce (per plan: IK keyframe edits are
 // discrete, like an attachment swap, not a continuous scrub).
+// Existing-key curves are preserved unless options.replaceCurve explicitly replaces the easing.
 export class SetIkKeyframeCommand implements Command {
   readonly kind = 'ik.setKeyframe';
   readonly label = 'Set IK Keyframe';
@@ -24,6 +25,12 @@ export class SetIkKeyframeCommand implements Command {
     private readonly mix: number,
     private readonly bendPositive: boolean,
     private readonly insertCurve: CurveType = 'linear',
+    private readonly options: {
+      readonly replaceCurve?: CurveType;
+      readonly softness?: number;
+      readonly stretch?: boolean;
+      readonly compress?: boolean;
+    } = {},
   ) {}
 
   do(ctx: CommandContext): void {
@@ -39,7 +46,12 @@ export class SetIkKeyframeCommand implements Command {
           existing.time,
           this.mix,
           this.bendPositive,
-          existing.curve,
+          this.options.replaceCurve ?? existing.curve,
+          {
+            softness: this.options.softness ?? existing.softness,
+            stretch: this.options.stretch ?? existing.stretch,
+            compress: this.options.compress ?? existing.compress,
+          },
         );
         this.after = channel.map((kf) => (kf.id === existing.id ? updated : kf));
       } else {
@@ -48,7 +60,8 @@ export class SetIkKeyframeCommand implements Command {
           this.time,
           this.mix,
           this.bendPositive,
-          this.insertCurve,
+          this.options.replaceCurve ?? this.insertCurve,
+          this.options,
         );
         this.after = [...channel, inserted].sort((a, b) => a.time - b.time);
       }

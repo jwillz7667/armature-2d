@@ -4931,7 +4931,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       description:
         'Insert or update an IK keyframe at a time on a constraint IK channel (mix + bendPositive). ' +
         'Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` ' +
-        '(default linear).',
+        '(default linear). `replaceCurve` explicitly replaces existing easing. IK depth fields preserve omitted values.',
       input: z
         .object({
           documentId,
@@ -4941,6 +4941,10 @@ export const TOOLS: readonly ToolDefinition[] = [
           mix: ikMixSchema,
           bendPositive: z.boolean(),
           curve: curveSchema.optional(),
+          replaceCurve: curveSchema.optional(),
+          softness: z.number().finite().nonnegative().optional(),
+          stretch: z.boolean().optional(),
+          compress: z.boolean().optional(),
         })
         .strict(),
     },
@@ -4949,22 +4953,20 @@ export const TOOLS: readonly ToolDefinition[] = [
       requireAnimation(session, input.animationId);
       requireIkConstraint(session, input.ikConstraintId);
       session.document.history.execute(
-        input.curve === undefined
-          ? new SetIkKeyframeCommand(
-              asAnimationId(input.animationId),
-              asIkConstraintId(input.ikConstraintId),
-              input.time,
-              input.mix,
-              input.bendPositive,
-            )
-          : new SetIkKeyframeCommand(
-              asAnimationId(input.animationId),
-              asIkConstraintId(input.ikConstraintId),
-              input.time,
-              input.mix,
-              input.bendPositive,
-              input.curve,
-            ),
+        new SetIkKeyframeCommand(
+          asAnimationId(input.animationId),
+          asIkConstraintId(input.ikConstraintId),
+          input.time,
+          input.mix,
+          input.bendPositive,
+          input.curve ?? 'linear',
+          {
+            ...(input.replaceCurve !== undefined ? { replaceCurve: input.replaceCurve } : {}),
+            ...(input.softness !== undefined ? { softness: input.softness } : {}),
+            ...(input.stretch !== undefined ? { stretch: input.stretch } : {}),
+            ...(input.compress !== undefined ? { compress: input.compress } : {}),
+          },
+        ),
       );
       return { revision: session.document.model.revision };
     },
@@ -5199,7 +5201,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       description:
         'Insert or update a transform keyframe at a time on a constraint channel. `mix` carries the six ' +
         'per-channel factors; an omitted channel keeps its base value at solve time. Updating an existing ' +
-        'time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).',
+        'time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing.',
       input: z
         .object({
           documentId,
@@ -5208,6 +5210,7 @@ export const TOOLS: readonly ToolDefinition[] = [
           time: z.number().finite().nonnegative(),
           mix: transformKeyframeMixSchema,
           curve: curveSchema.optional(),
+          replaceCurve: curveSchema.optional(),
         })
         .strict(),
     },
@@ -5225,20 +5228,14 @@ export const TOOLS: readonly ToolDefinition[] = [
         mixShearY: input.mix.mixShearY,
       };
       session.document.history.execute(
-        input.curve === undefined
-          ? new SetTransformKeyframeCommand(
-              asAnimationId(input.animationId),
-              asTransformConstraintId(input.transformConstraintId),
-              input.time,
-              mix,
-            )
-          : new SetTransformKeyframeCommand(
-              asAnimationId(input.animationId),
-              asTransformConstraintId(input.transformConstraintId),
-              input.time,
-              mix,
-              input.curve,
-            ),
+        new SetTransformKeyframeCommand(
+          asAnimationId(input.animationId),
+          asTransformConstraintId(input.transformConstraintId),
+          input.time,
+          mix,
+          input.curve ?? 'linear',
+          { ...(input.replaceCurve !== undefined ? { replaceCurve: input.replaceCurve } : {}) },
+        ),
       );
       return { revision: session.document.model.revision };
     },
@@ -5495,7 +5492,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       description:
         'Insert or update a path-constraint keyframe at a time. Each channel (position/spacing/mixRotate/' +
         'mixX/mixY) is optional; an omitted channel keeps its base value at solve time. Updating an existing ' +
-        'time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).',
+        'time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing.',
       input: z
         .object({
           documentId,
@@ -5508,6 +5505,7 @@ export const TOOLS: readonly ToolDefinition[] = [
           mixX: pathMixSchema.optional(),
           mixY: pathMixSchema.optional(),
           curve: curveSchema.optional(),
+          replaceCurve: curveSchema.optional(),
         })
         .strict(),
     },
@@ -5523,20 +5521,14 @@ export const TOOLS: readonly ToolDefinition[] = [
         mixY: input.mixY,
       };
       session.document.history.execute(
-        input.curve === undefined
-          ? new SetPathKeyframeCommand(
-              asAnimationId(input.animationId),
-              asPathConstraintId(input.pathConstraintId),
-              input.time,
-              channels,
-            )
-          : new SetPathKeyframeCommand(
-              asAnimationId(input.animationId),
-              asPathConstraintId(input.pathConstraintId),
-              input.time,
-              channels,
-              input.curve,
-            ),
+        new SetPathKeyframeCommand(
+          asAnimationId(input.animationId),
+          asPathConstraintId(input.pathConstraintId),
+          input.time,
+          channels,
+          input.curve ?? 'linear',
+          { ...(input.replaceCurve !== undefined ? { replaceCurve: input.replaceCurve } : {}) },
+        ),
       );
       return { revision: session.document.model.revision };
     },

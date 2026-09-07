@@ -1,5 +1,11 @@
 # Changelog
 
+## Audit constraint authoring
+
+- Add GUI creation for IK, transform, and editable path followers with target handles and complete parameter controls.
+- Add constraint timeline editing, IK depth keys, curve replacement, key navigation/deletion, and MCP options.
+- Roll back completed children when a compound command fails validation.
+
 ## Audit authoring feedback
 
 - Add constrained pose and weighted/linked-mesh sampling with revision, skin, time, and physics context.

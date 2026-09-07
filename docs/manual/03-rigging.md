@@ -166,8 +166,8 @@ text-on-a-curve baseline, a motion guide). The constraint names the SLOT that ca
 
 Author it in two parts:
 
-- **The rail (a path attachment).** Add a path attachment to a slot (the inspector, the viewport
-  Path tool, or `attach.path.add`). It is a chain of cubic curves stored as control points laid
+- **The rail (a path attachment).** In Constraints, open Create constraint, choose Path follower,
+  and select Create an editable path (or use the `attach.path.add` tool). It is a chain of cubic curves stored as control points laid
   out anchor, handle, handle, anchor: drag the anchors to shape the rail and the handles to bend
   each curve. Add or drop a curve to lengthen or shorten it, and toggle **Closed** to make it a
   loop. The editor recomputes the rail's arc-length table on every edit; you never enter it.
@@ -281,3 +281,26 @@ For a typical character:
 5. Convert only the parts that must bend into meshes; bind and paint weights joint by joint.
 6. Add IK last (legs, sometimes arms), then transform constraints for mechanics.
 7. Validate (`document.validate`) and render a setup-pose frame before animating.
+
+
+## 3.12 Create and animate constraints in the editor
+
+1. Create a root, an upper limb bone, its child lower limb bone, and a target bone under the root.
+   Give the limb bones nonzero lengths. The target must be outside the constrained chain.
+2. Open Constraints, expand **Create constraint**, choose **IK limb**, enter a name, and check the
+   upper and lower bones. **Use viewport selection** copies the selected bones into this list.
+   Choose the target bone and create the constraint. Invalid chains are rejected without changes.
+3. Select **Edit target in viewport** to move the target with the normal gizmo. Create and select an
+   animation in the Animations panel to preview the constrained motion.
+4. The constraint key editor shows the active clip and frame time. Enter mix, bend, softness,
+   stretch, and compress values, choose linear, stepped, or Bezier easing, and press **Set key at
+   playhead**. Scrub to another frame and repeat. Time buttons jump to existing keys; keys can be
+   replaced or deleted without changing their identity. The fields below the key editor edit setup values.
+5. For a transform follow, choose **Transform follow**, select follower bones, and choose a target.
+   The detail panel exposes all rotation, translation, scale, and shear mixes and offsets, plus local
+   and relative modes. The key editor animates the six mix channels.
+6. For a path follower, select the rider bones, choose **Create an editable path**, and choose its
+   anchor bone. Creation adds the rail, slot, and constraint in one undo step. Drag the rail points in
+   the viewport or Shift-click to add a curve. Key position, spacing, and mixes in the key editor.
+7. Change dependency order in the solve-order list. Use the Skins panel for costume-specific activation.
+   Save the project, reopen it, and continue editing. Creation, parameter edits, keys, and deletion all undo.

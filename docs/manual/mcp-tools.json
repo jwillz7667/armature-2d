@@ -2170,7 +2170,7 @@
   {
     "name": "ik.setKeyframe",
     "title": "Set IK keyframe",
-    "description": "Insert or update an IK keyframe at a time on a constraint IK channel (mix + bendPositive). Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).",
+    "description": "Insert or update an IK keyframe at a time on a constraint IK channel (mix + bendPositive). Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing. IK depth fields preserve omitted values.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -2197,7 +2197,11 @@
               "additionalProperties": false
             }
           ]
-        }
+        },
+        "replaceCurve": { "$ref": "#/properties/curve" },
+        "softness": { "type": "number", "minimum": 0 },
+        "stretch": { "type": "boolean" },
+        "compress": { "type": "boolean" }
       },
       "required": ["documentId", "animationId", "ikConstraintId", "time", "mix", "bendPositive"],
       "additionalProperties": false,
@@ -3246,7 +3250,7 @@
   {
     "name": "path.setKeyframe",
     "title": "Set path keyframe",
-    "description": "Insert or update a path-constraint keyframe at a time. Each channel (position/spacing/mixRotate/mixX/mixY) is optional; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).",
+    "description": "Insert or update a path-constraint keyframe at a time. Each channel (position/spacing/mixRotate/mixX/mixY) is optional; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3276,7 +3280,8 @@
               "additionalProperties": false
             }
           ]
-        }
+        },
+        "replaceCurve": { "$ref": "#/properties/curve" }
       },
       "required": ["documentId", "animationId", "pathConstraintId", "time"],
       "additionalProperties": false,
@@ -4649,7 +4654,7 @@
   {
     "name": "transform.setKeyframe",
     "title": "Set transform keyframe",
-    "description": "Insert or update a transform keyframe at a time on a constraint channel. `mix` carries the six per-channel factors; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).",
+    "description": "Insert or update a transform keyframe at a time on a constraint channel. `mix` carries the six per-channel factors; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -4686,7 +4691,8 @@
               "additionalProperties": false
             }
           ]
-        }
+        },
+        "replaceCurve": { "$ref": "#/properties/curve" }
       },
       "required": ["documentId", "animationId", "transformConstraintId", "time", "mix"],
       "additionalProperties": false,

@@ -13,7 +13,8 @@ presentation boundaries. Work proceeds in verified subsystem changes.
 | F02-F05, F09 | Project persistence, asset history, recovery, document identity | Implemented; 91 targeted core and 66 editor integration tests pass; desktop acceptance pending |
 | F08, F10-F13, F15 | Displayed pose, video startup, physics/export/native skin context | Implemented; pixel/player/worker checks pass; engine and WebCodecs acceptance pending |
 | F20 | Complete MCP solved-pose/deform feedback and generated reference | Implemented; command and MCP integration checks pass |
-| F16-F19, F29 | Import capability, constraint/effect/slot UI, MCP, deform policy | Pending |
+| F17 | Constraint creation, parameters, target handles, and timeline authoring | Implemented; command/workflow tests pass; desktop acceptance pending |
+| F14, F16, F18-F19, F29 | Native pixels, import capability, effect/slot UI, deform mixing | Pending |
 | F01, F22-F28 | Repository, dependencies, CI, release, docs, performance, acceptance | Pending |
 
 ## Evidence and environment
@@ -50,3 +51,13 @@ because an unsupported-feature label or a plan exists.
 - Native wrappers forward the selected skin to the sampler; actual engine verification remains pending.
 - The complete project includes effects and slot authoring; the media dialog still exports a skeletal clip.
   A composed scene/effects media workflow remains part of the authoring completeness work.
+
+
+## Constraint authoring verification
+
+- 2,332 document-core tests pass, including the registered command round-trip harness, key identity,
+  imported IK depth preservation, and explicit easing replacement.
+- Four editor workflow tests cover IK, transform, and editable path creation, keys, solve, project
+  save/reopen, undo/redo, and rollback when a compound path creation fails its final validation.
+- Editor production build, type checks, and changed-source lint pass. Native desktop interaction remains
+  an acceptance task, not evidence provided by these headless tests.

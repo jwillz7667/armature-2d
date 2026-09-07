@@ -807,9 +807,9 @@ Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools
 
 ## ik.setKeyframe
 
-Insert or update an IK keyframe at a time on a constraint IK channel (mix + bendPositive). Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).
+Insert or update an IK keyframe at a time on a constraint IK channel (mix + bendPositive). Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing. IK depth fields preserve omitted values.
 
-Inputs: `documentId`, `animationId`, `ikConstraintId`, `time`, `mix`, `bendPositive`, `curve`.
+Inputs: `documentId`, `animationId`, `ikConstraintId`, `time`, `mix`, `bendPositive`, `curve`, `replaceCurve`, `softness`, `stretch`, `compress`.
 
 Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 100.
 
@@ -1119,9 +1119,9 @@ Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools
 
 ## path.setKeyframe
 
-Insert or update a path-constraint keyframe at a time. Each channel (position/spacing/mixRotate/mixX/mixY) is optional; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).
+Insert or update a path-constraint keyframe at a time. Each channel (position/spacing/mixRotate/mixX/mixY) is optional; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing.
 
-Inputs: `documentId`, `animationId`, `pathConstraintId`, `time`, `position`, `spacing`, `mixRotate`, `mixX`, `mixY`, `curve`.
+Inputs: `documentId`, `animationId`, `pathConstraintId`, `time`, `position`, `spacing`, `mixRotate`, `mixX`, `mixY`, `curve`, `replaceCurve`.
 
 Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 139.
 
@@ -1615,9 +1615,9 @@ Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools
 
 ## transform.setKeyframe
 
-Insert or update a transform keyframe at a time on a constraint channel. `mix` carries the six per-channel factors; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).
+Insert or update a transform keyframe at a time on a constraint channel. `mix` carries the six per-channel factors; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing.
 
-Inputs: `documentId`, `animationId`, `transformConstraintId`, `time`, `mix`, `curve`.
+Inputs: `documentId`, `animationId`, `transformConstraintId`, `time`, `mix`, `curve`, `replaceCurve`.
 
 Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 201.
 

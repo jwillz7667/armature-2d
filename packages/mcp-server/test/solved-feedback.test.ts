@@ -91,6 +91,29 @@ describe('complete MCP solved feedback', () => {
     expect(output.context).toMatchObject({ skin: 'gold' });
   });
 
+  it('authors IK depth and replaces easing through validated MCP options', async () => {
+    const { session, call } = setup('rig-ik-depth');
+    const animationId = session.document.model.animations()[0]!.id;
+    const ikConstraintId = session.document.model.ikConstraints()[0]!.id;
+    const params = { animationId, ikConstraintId, time: 0.25, mix: 0.6, bendPositive: true };
+    await call('ik.setKeyframe', { ...params, softness: 8, stretch: true, compress: true });
+    const before = session.document.model.snapshot();
+    const read = () =>
+      session.document.model
+        .getAnimation(animationId)!
+        .ik.get(ikConstraintId)!
+        .find((k) => k.time === 0.25)!;
+    const first = read();
+    await call('ik.setKeyframe', { ...params, replaceCurve: 'stepped', stretch: false });
+    expect(read()).toEqual({ ...first, curve: 'stepped', stretch: false });
+    await call('history.undo');
+    expect(session.document.model.snapshot()).toEqual(before);
+    await expect(call('ik.setKeyframe', { ...params, softness: -1 })).rejects.toMatchObject({
+      code: 'INVALID_INPUT',
+    });
+    expect(session.document.model.snapshot()).toEqual(before);
+  });
+
   it('returns deform keys and edits easing in place with exact undo', async () => {
     const { session, call } = setup('rig-deform');
     const animation = session.document.model.animations()[0]!;

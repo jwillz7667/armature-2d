@@ -1,3 +1,4 @@
+import './authoring.css';
 import type { IDockviewPanelProps } from 'dockview';
 import { useEffect, useMemo, type CSSProperties, type ReactElement } from 'react';
 import {
@@ -23,6 +24,9 @@ import {
   type TransformConstraintEntity,
   type TransformConstraintId,
 } from '../document';
+import { ConstraintCreator } from './constraint-creator';
+import { ConstraintTimelineEditor } from './constraint-timeline-editor';
+import { SetTransformConstraintParamsCommand } from '../document';
 import type { PhysicsChannel } from '@marionette/format/types';
 import { useDocumentRevision } from '../editor-state/use-document-revision';
 import { useSelectionStore } from '../editor-state/selection-store';
@@ -61,7 +65,7 @@ const ACCENT = '#5aa0ff';
 // fields softness/stretch/compress/uniform) over their document-core commands on the live History (LAW 2);
 // the panel never mutates the document. The EDITED constraint is ephemeral EDITOR state (the
 // constraint-selection store, the document/editor wall, LAW 1), reconciled through the pure reconciler when an
-// undo removes the selected constraint. The panel polls model.revision (like the other panels) so it refreshes
+// undo removes the selected constraint. The panel subscribes to shared document revisions so it refreshes
 // after any command, undo/redo, or external change. Transform-constraint editing (local/relative variants and
 // the cross-array solve order) extends this same panel in the following PP-D10 slices.
 export function ConstraintsPanel(_props: IDockviewPanelProps): ReactElement {
@@ -151,7 +155,7 @@ export function ConstraintsPanel(_props: IDockviewPanelProps): ReactElement {
     physicsConstraints.length;
 
   return (
-    <div style={rootStyle}>
+    <div style={rootStyle} className="authoring">
       <div style={toolbarStyle}>
         <span style={headerStyle}>Constraints</span>
         <button
@@ -172,11 +176,12 @@ export function ConstraintsPanel(_props: IDockviewPanelProps): ReactElement {
         </span>
       </div>
 
+      <ConstraintCreator key={documentHost.identity()} />
       <div style={listStyle}>
         {total === 0 && (
           <div style={emptyStyle}>
-            No constraints. Create a physics constraint above, or an IK/transform/path constraint
-            from the viewport tools or the MCP surface.
+            No constraints. Open Create constraint to add IK, transform follow, or an editable path
+            follower. Use New Physics for secondary motion.
           </div>
         )}
         {ikConstraints.map((c) => (
@@ -187,6 +192,14 @@ export function ConstraintsPanel(_props: IDockviewPanelProps): ReactElement {
                 ? { ...rowStyle, ...rowActiveStyle }
                 : rowStyle
             }
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                selectConstraint({ kind: 'ik', id: c.id });
+              }
+            }}
             onClick={() => selectConstraint({ kind: 'ik', id: c.id })}
           >
             <span style={nameStyle}>{c.name}</span>
@@ -201,6 +214,14 @@ export function ConstraintsPanel(_props: IDockviewPanelProps): ReactElement {
                 ? { ...rowStyle, ...rowActiveStyle }
                 : rowStyle
             }
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                selectConstraint({ kind: 'transform', id: c.id });
+              }
+            }}
             onClick={() => selectConstraint({ kind: 'transform', id: c.id })}
           >
             <span style={nameStyle}>{c.name}</span>
@@ -215,6 +236,14 @@ export function ConstraintsPanel(_props: IDockviewPanelProps): ReactElement {
                 ? { ...rowStyle, ...rowActiveStyle }
                 : rowStyle
             }
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                selectConstraint({ kind: 'path', id: c.id });
+              }
+            }}
             onClick={() => selectConstraint({ kind: 'path', id: c.id })}
           >
             <span style={nameStyle}>{c.name}</span>
@@ -229,6 +258,14 @@ export function ConstraintsPanel(_props: IDockviewPanelProps): ReactElement {
                 ? { ...rowStyle, ...rowActiveStyle }
                 : rowStyle
             }
+            role="button"
+            tabIndex={0}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                selectConstraint({ kind: 'physics', id: c.id });
+              }
+            }}
             onClick={() => selectConstraint({ kind: 'physics', id: c.id })}
           >
             <span style={nameStyle}>{c.name}</span>
@@ -237,6 +274,9 @@ export function ConstraintsPanel(_props: IDockviewPanelProps): ReactElement {
         ))}
       </div>
 
+      {selection !== null && selection.kind !== 'physics' && (
+        <ConstraintTimelineEditor selection={selection} />
+      )}
       <div style={detailStyle}>
         {selectedIk !== undefined ? (
           <IkConstraintDetail constraint={selectedIk} />
@@ -504,7 +544,7 @@ function TransformConstraintDetail(props: {
     <div style={detailBodyStyle}>
       <div style={subHeaderStyle}>{c.name}</div>
 
-      <div style={sectionLabelStyle}>Variants (Stage F2)</div>
+      <div style={sectionLabelStyle}>Transform space</div>
 
       <label style={checkRowStyle}>
         <input
@@ -524,9 +564,35 @@ function TransformConstraintDetail(props: {
         <span>Relative (offset from the bone current value)</span>
       </label>
 
-      <div style={noteStyle}>
-        Mix and offset channels are authored over the MCP transform.setParams surface.
-      </div>
+      {(
+        [
+          'mixRotate',
+          'mixX',
+          'mixY',
+          'mixScaleX',
+          'mixScaleY',
+          'mixShearY',
+          'offsetRotation',
+          'offsetX',
+          'offsetY',
+          'offsetScaleX',
+          'offsetScaleY',
+          'offsetShearY',
+        ] as const
+      ).map((field) => (
+        <PathNumberField
+          key={field}
+          label={field}
+          value={c[field]}
+          step={0.05}
+          clamp01={field.startsWith('mix')}
+          commit={(value) =>
+            documentHost
+              .current()
+              .history.execute(new SetTransformConstraintParamsCommand(c.id, { [field]: value }))
+          }
+        />
+      ))}
     </div>
   );
 }
@@ -672,7 +738,8 @@ function PathConstraintDetail(props: { readonly constraint: PathConstraintEntity
       />
 
       <div style={noteStyle}>
-        Path timeline keys are authored in the dopesheet and the MCP path.* surface.
+        Use the key editor above to animate position, spacing, and mix. Select a key time to edit
+        its values or curve.
       </div>
     </div>
   );
@@ -750,6 +817,7 @@ const rootStyle: CSSProperties = {
   background: '#1b1b1b',
   color: '#dddddd',
   fontSize: 12,
+  overflowY: 'auto',
 };
 
 const toolbarStyle: CSSProperties = {
@@ -766,9 +834,7 @@ const countStyle: CSSProperties = { marginLeft: 'auto', color: '#888888' };
 const listStyle: CSSProperties = { flex: '0 0 auto', maxHeight: '40%', overflowY: 'auto' };
 
 const detailStyle: CSSProperties = {
-  flex: '1 1 auto',
-  minHeight: 0,
-  overflowY: 'auto',
+  flex: '0 0 auto',
   borderTop: '1px solid #333333',
 };
 

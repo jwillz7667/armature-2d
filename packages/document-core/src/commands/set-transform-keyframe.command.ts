@@ -28,6 +28,7 @@ function sortByTime(
 // MIX is updated (its KeyframeId, time, and curve are kept); otherwise a new keyframe is minted with
 // `insertCurve` and inserted, keeping the channel time-sorted. before/after are whole-channel mementos, so
 // undo is bit-exact. NOT coalescing (a discrete keyframe edit, not a drag).
+// Existing-key curves are preserved unless options.replaceCurve explicitly replaces the easing.
 export class SetTransformKeyframeCommand implements Command {
   readonly kind = 'transform.setKeyframe';
   readonly label = 'Set Transform Keyframe';
@@ -40,6 +41,7 @@ export class SetTransformKeyframeCommand implements Command {
     private readonly time: number,
     private readonly mix: TransformKeyframeMix,
     private readonly insertCurve: CurveType = 'linear',
+    private readonly options: { readonly replaceCurve?: CurveType } = {},
   ) {}
 
   do(ctx: CommandContext): void {
@@ -50,11 +52,21 @@ export class SetTransformKeyframeCommand implements Command {
       this.before = channel;
       const existing = channel.find((kf) => kf.time === this.time);
       if (existing) {
-        const updated = makeTransformKeyframe(existing.id, existing.time, this.mix, existing.curve);
+        const updated = makeTransformKeyframe(
+          existing.id,
+          existing.time,
+          this.mix,
+          this.options.replaceCurve ?? existing.curve,
+        );
         this.after = channel.map((kf) => (kf.id === existing.id ? updated : kf));
       } else {
         const id = ctx.ids.mint('keyframe');
-        const inserted = makeTransformKeyframe(id, this.time, this.mix, this.insertCurve);
+        const inserted = makeTransformKeyframe(
+          id,
+          this.time,
+          this.mix,
+          this.options.replaceCurve ?? this.insertCurve,
+        );
         this.after = sortByTime([...channel, inserted]);
       }
     }
