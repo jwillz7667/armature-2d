@@ -16,7 +16,8 @@ presentation boundaries. Work proceeds in verified subsystem changes.
 | F17 | Constraint creation, parameters, target handles, and timeline authoring | Implemented; command/workflow tests pass; desktop acceptance pending |
 | F18 | Full effects controls, lifetime graphs, bundles, seeded textured preview | Implemented; 67 core, 77 MCP, and 3 workflow tests pass; desktop acceptance pending |
 | F19 | Slot controls, bindings, feature graph, and composed scenario preview | Implemented; command/workflow/timing tests pass; desktop acceptance pending |
-| F14, F16, F29 | Native pixels, import capability, deform mixing | Pending |
+| F16 | Explicit import profiles, sibling atlas transaction, loss reports, worker budgets | Implemented safeguards and JSON asset workflow; real-export binary profile/corpus and desktop fidelity acceptance pending |
+| F14, F29 | Native pixels, deform mixing | Pending |
 | F01, F22-F28 | Repository, dependencies, CI, release, docs, performance, acceptance | Pending |
 
 ## Evidence and environment
@@ -82,3 +83,14 @@ because an unsupported-feature label or a plan exists.
 - Slot golden fixtures changed intentionally for timing fixes. Generation used the documented integer-only off-pin override on Node 24.19.0 because the local Node differs from the repository pin; installed/native verification is not claimed.
 - GitHub CI inspection exposed a stale format public-export allowlist from the project addition and two unformatted effects files. This change repairs both and reruns the broader checks.
 - Full workspace run: 4,792 tests passed and one stale import-confirmation test failed. Its corrected file now passes all five tests, including a new cancel-preserves-dirty-work regression (4,794 passing tests across the run and targeted rerun). Editor build, type checking, formatting, and changed-source lint pass.
+
+
+## Import and image-boundary verification
+
+- Importer: 86 tests pass, including strict minor/syntax gates, draw-order preservation, escaped loss paths, prototype/cycle rejection, and binary decoder negative cases.
+- Editor: 26 focused import/media tests pass, including asymmetric quarter-turn pixels, trim offsets, real PNG bytes, missing/unsafe assets, and cancellation preserving dirty work.
+- PNG preflight rejects oversized dimensions and duplicate headers before allocation. Atlas-pack's 66 tests and six budget/public-surface checks pass.
+- Real binary import is gated because the existing binary tests use synthetic streams. The new capability matrix does not label them as actual export verification. A permitted real-export corpus remains needed before enabling a production binary profile.
+- Source deformation uses a different coordinate space from Armature. It is now explicitly reported and omitted instead of truncating deltas into an incorrect animation; faithful deform conversion remains a format/runtime interoperability task.
+- The built Spine worker imports a rig, sibling atlas, and PNG. Built video startup and PNG/GIF/APNG worker smoke checks pass. Installed desktop acceptance remains pending.
+- Full editor run: 657 tests passed; one preflight error-message regression was corrected to preserve the existing ATLAS_DECODE_FAILED contract. Its nine-test file is rerun separately. Additional atlas/IPC/file-action coverage passes 56 tests. No real-export binary or source-animation fidelity claim is made.

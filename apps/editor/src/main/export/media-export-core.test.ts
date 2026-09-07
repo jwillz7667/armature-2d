@@ -33,6 +33,18 @@ function options(overrides: Partial<MediaExportOptions>): MediaExportOptions {
 }
 
 describe('runMediaExport', () => {
+  it('fails before writing frames when supplied artwork cannot decode', async () => {
+    const { sink, frames } = collectingSink();
+    await expect(
+      runMediaExport({
+        document: validSpinDocument(),
+        pages: [{ file: 'broken.png', data: new Uint8Array([1, 2, 3]) }],
+        options: options({}),
+        sink,
+      }),
+    ).rejects.toThrow('PNG');
+    expect(frames).toEqual([]);
+  });
   it('streams a PNG sequence frame by frame and reports progress for each', async () => {
     const { sink, frames } = collectingSink();
     const onProgress = vi.fn();

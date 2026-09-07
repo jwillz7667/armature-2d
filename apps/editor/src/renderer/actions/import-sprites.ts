@@ -9,6 +9,7 @@ import {
 } from '../editor-state/atlas-texture-store';
 import { mergeAtlases } from './merge-atlas';
 import { bridge } from '../ipc-bridge';
+import { reportProblem } from '../editor-state/problems-store';
 import type {
   AtlasImportGridRequest,
   AtlasImportImagesRequest,
@@ -111,6 +112,8 @@ async function applyImportedAtlas(
   } catch (error) {
     return { kind: 'error', message: messageOf(error, 'failed to load atlas page textures') };
   }
+  for (const warning of response.warnings ?? [])
+    reportProblem(`${warning.path}: ${warning.why}`, 'warning');
   return { kind: 'imported', regionCount: countRegions(atlas) };
 }
 

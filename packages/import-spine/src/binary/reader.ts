@@ -35,7 +35,7 @@ export class SkelReader {
   private readonly view: DataView;
   private readonly bytes: Uint8Array;
   private cursor = 0;
-  private readonly decoder = new TextDecoder('utf-8', { fatal: false });
+  private readonly decoder = new TextDecoder('utf-8', { fatal: true });
 
   constructor(bytes: Uint8Array) {
     this.bytes = bytes;
@@ -69,7 +69,10 @@ export class SkelReader {
   }
 
   bool(path: string, what = 'boolean'): boolean {
-    return this.byte(path, what) !== 0;
+    const value = this.byte(path, what);
+    if (value > 1)
+      throw new SpineBinaryError('SPINE_BINARY_INVALID', path, 'boolean must be 0 or 1');
+    return value === 1;
   }
 
   // A signed 8-bit value (used where the format stores a small signed constant such as a bend direction).
@@ -96,6 +99,8 @@ export class SkelReader {
     this.require(4, path, what);
     const value = this.view.getFloat32(this.cursor, false);
     this.cursor += 4;
+    if (!Number.isFinite(value))
+      throw new SpineBinaryError('SPINE_BINARY_INVALID', path, 'float must be finite');
     return value;
   }
 
@@ -106,6 +111,8 @@ export class SkelReader {
     let shift = 0;
     for (let i = 0; i < 5; i += 1) {
       const b = this.byte(path, what);
+      if (i === 4 && (b & 0xf0) !== 0)
+        throw new SpineBinaryError('SPINE_BINARY_INVALID', path, 'varint exceeds 32 bits');
       raw |= (b & 0x7f) << shift;
       if ((b & 0x80) === 0) {
         const unsigned = raw >>> 0;
@@ -125,7 +132,7 @@ export class SkelReader {
   // corrupt stream); such an absurd length is rejected so callers never allocate or loop on it.
   count(path: string, what = 'count'): number {
     const value = this.varint(path, true, what);
-    if (value < 0 || value > 0x7fffffff) {
+    if (value < 0 || value > 1_000_000) {
       throw new SpineBinaryError('SPINE_BINARY_INVALID', path, `invalid ${what} ${value}`, {
         value,
       });
@@ -142,7 +149,11 @@ export class SkelReader {
     this.require(byteLength, path, what);
     const slice = this.bytes.subarray(this.cursor, this.cursor + byteLength);
     this.cursor += byteLength;
-    return this.decoder.decode(slice);
+    try {
+      return this.decoder.decode(slice);
+    } catch {
+      throw new SpineBinaryError('SPINE_BINARY_INVALID', path, 'string is not valid UTF-8');
+    }
   }
 
   // A reference into the shared string table: varint+ index, 0 => null, else table[index - 1]. An index

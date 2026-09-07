@@ -28,6 +28,8 @@ export const SPINE_IMPORT_ERROR_CODES = [
   // or bone/slot/constraint reference, an unknown enum constant, an absurd (negative or huge) count, a
   // malformed varint, or a non-binary input value. Distinct from SPINE_SCHEMA (which is JSON-shaped).
   'SPINE_BINARY_INVALID',
+  'SPINE_BINARY_UNVERIFIED',
+  'SPINE_FEATURE_UNSUPPORTED',
 ] as const;
 
 export type SpineImportErrorCode = (typeof SPINE_IMPORT_ERROR_CODES)[number];
@@ -52,10 +54,6 @@ export const SPINE_IMPORT_WARNING_FEATURES = [
   // importer was built from, so physics constraints and their timelines are not converted.
   'physics-constraint',
   'physics-timeline',
-  // Draw-order timelines: reconstructing Spine's offset-shift permutation is a runtime algorithm not
-  // specified in the published format documentation, so it cannot be re-encoded into our offset model
-  // without guessing. The timeline is dropped rather than approximated.
-  'draw-order-timeline',
   // Frame-sequence attachment playback: the `sequence` attachment sub-block is not part of the
   // published documentation the importer was built from, so it is stripped from the attachment.
   'sequence-attachment',
@@ -70,6 +68,9 @@ export const SPINE_IMPORT_WARNING_FEATURES = [
   // Spine JSON carries no atlas region geometry (that lives in the sibling .atlas file); the importer
   // synthesizes placeholder atlas regions so attachment paths resolve and the document validates.
   'atlas-synthesized',
+  'unknown-field',
+  'deform-coordinate-space',
+  'static-animation-duration',
 ] as const;
 
 export type SpineImportWarningFeature = (typeof SPINE_IMPORT_WARNING_FEATURES)[number];
@@ -101,6 +102,8 @@ export type SpineImportResult =
 // one; it defaults to DEFAULT_SKELETON_NAME. Everything else about the conversion is deterministic.
 export interface SpineImportOptions {
   readonly name?: string;
+  /** Development-only access to the synthetic binary codec. No real-export compatibility claim. */
+  readonly allowUnverifiedBinary?: boolean;
 }
 
 export const DEFAULT_SKELETON_NAME = 'imported-skeleton';

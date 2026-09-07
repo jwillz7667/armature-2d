@@ -114,12 +114,11 @@ describe('constraint mapping conventions', () => {
     expect(mesh).toMatchObject({ type: 'mesh', bones: [0, 1] });
   });
 
-  it('pads a deform key to the full 2 * V offsets array', () => {
-    const document = expectOk(importSpineJson(weightedMeshFixture));
-
-    const frames = document.animations['wobble']?.deform['default']?.['meshslot']?.['mesh1'];
-    // V = 4 (uvs.length / 2), so offsets length is 8. The second key had offset 2 and deltas [3, -3].
-    expect(frames?.[1]?.value.offsets).toEqual([0, 0, 3, -3, 0, 0, 0, 0]);
+  it('reports incompatible deform coordinate space instead of truncating offsets', () => {
+    const result = importSpineJson(weightedMeshFixture);
+    const document = expectOk(result);
+    expect(document.animations['wobble']?.deform).toEqual({});
+    expect(result.warnings.some((w) => w.feature === 'deform-coordinate-space')).toBe(true);
   });
 });
 
@@ -144,7 +143,6 @@ describe('unsupported-feature warnings (never a silent drop)', () => {
       new Set([
         'physics-constraint',
         'physics-timeline',
-        'draw-order-timeline',
         'sequence-attachment',
         'two-color-synthesized-dark',
         'event-audio-override',
@@ -153,7 +151,15 @@ describe('unsupported-feature warnings (never a silent drop)', () => {
     );
     // The document still validates and drops nothing without a note: physics is empty, draw order empty.
     expect(document.physicsConstraints).toEqual([]);
-    expect(document.animations['go']?.drawOrder).toEqual([]);
+    expect(document.animations['go']?.drawOrder).toEqual([
+      {
+        time: 0.5,
+        offsets: [
+          { slot: 's2', offset: -1 },
+          { slot: 's1', offset: 1 },
+        ],
+      },
+    ]);
     expect(document.animations['go']?.physics).toEqual({});
   });
 

@@ -18,11 +18,21 @@ export function nameFromPath(path: string): string {
 // Strip the importer's typed diagnostics to the transport shapes (dropping the free-form `detail`, which
 // the human-readable message already conveys), so editor-shared never depends on the importer package.
 function toWarnings(warnings: SpineImportResult['warnings']): SpineImportWarning[] {
-  return warnings.map((w) => ({ feature: w.feature, path: w.path, why: w.why }));
+  return warnings.map((w) => ({
+    feature: w.feature,
+    path: w.path,
+    why: w.why,
+    ...(w.detail ? { detail: w.detail } : {}),
+  }));
 }
 
 function toErrors(result: Extract<SpineImportResult, { ok: false }>): SpineImportError[] {
-  return result.errors.map((e) => ({ code: e.code, path: e.path, message: e.message }));
+  return result.errors.map((e) => ({
+    code: e.code,
+    path: e.path,
+    message: e.message,
+    ...(e.detail ? { detail: e.detail } : {}),
+  }));
 }
 
 // The file contents to convert: a JSON export (read as text) or a .skel binary export (read as bytes).

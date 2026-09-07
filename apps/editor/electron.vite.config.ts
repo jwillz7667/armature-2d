@@ -56,6 +56,7 @@ export default defineConfig(({ command }) => {
           input: {
             main: resolve(dir, 'src/main/main.ts'),
             'media-export-worker': resolve(dir, 'src/main/export/media-export.worker.ts'),
+            'spine-import-worker': resolve(dir, 'src/main/spine-import.worker.ts'),
           },
           output: { entryFileNames: '[name].js' },
         },

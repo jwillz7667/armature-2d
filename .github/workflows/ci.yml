@@ -69,6 +69,7 @@ jobs:
         run: |
           node tools/smoke-video-worker.mjs
           node tools/smoke-media-worker.mjs
+          node tools/smoke-spine-worker.mjs
 
   format-semver:
     runs-on: ubuntu-latest

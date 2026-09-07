@@ -200,13 +200,23 @@ export const confirmUnsavedResponseSchema = z.enum(['save', 'discard', 'cancel']
 // result into these shapes. `document` is opaque at the transport layer (z.unknown), exactly like
 // file:open: the importer already validated it and the renderer re-validates via loadDocument (LAW 3).
 export const spineImportWarningSchema = z
-  .object({ feature: z.string().min(1), path: z.string(), why: z.string().min(1) })
+  .object({
+    feature: z.string().min(1),
+    path: z.string(),
+    why: z.string().min(1),
+    detail: z.record(z.union([z.string(), z.number().finite(), z.boolean()])).optional(),
+  })
   .strict();
 
 export type SpineImportWarning = z.infer<typeof spineImportWarningSchema>;
 
 export const spineImportErrorSchema = z
-  .object({ code: z.string().min(1), path: z.string(), message: z.string().min(1) })
+  .object({
+    code: z.string().min(1),
+    path: z.string(),
+    message: z.string().min(1),
+    detail: z.record(z.union([z.string(), z.number().finite(), z.boolean()])).optional(),
+  })
   .strict();
 
 export type SpineImportError = z.infer<typeof spineImportErrorSchema>;
@@ -219,6 +229,7 @@ export const spineImportResponseSchema = z.discriminatedUnion('status', [
       name: z.string().min(1),
       document: z.unknown(),
       warnings: z.array(spineImportWarningSchema),
+      pages: z.array(atlasImportPageSchema).max(4096).optional(),
     })
     .strict(),
   z
@@ -248,6 +259,7 @@ export const atlasImportResponseSchema = z.discriminatedUnion('status', [
       status: z.literal('imported'),
       atlas: z.unknown(),
       pages: z.array(atlasImportPageSchema),
+      warnings: z.array(spineImportWarningSchema).optional(),
     })
     .strict(),
   z.object({ status: z.literal('canceled') }).strict(),
