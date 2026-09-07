@@ -35,9 +35,9 @@ export type WinTargetRule = z.infer<typeof winTargetRuleSchema>;
 // cell or at the grid center), start the single line-win counter rollup on a named curve, or show an
 // escalation banner. The `preset` name is checked against refs.vfxPresets by the semantic validator. The
 // `curve` is the closed rollup CurveType (reused from tumble-choreography so the format has ONE closed
-// curve enum; the evaluation function lives in runtime-core). An escalationBanner action records authoring
-// intent; the timeline's escalation directives are driven by the threshold table at sequence time
-// (runtime-core stage 6), so the tier here is documentation of the authored placement.
+// curve enum; the evaluation function lives in runtime-core). A crossed escalation tier uses the first
+// authored banner placement in the selected sequence, with time zero as the fallback. Eligibility
+// comes from the threshold table and the engine outcome; the author controls presentation timing.
 export const winStepActionSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('animateWin') }).strict(),
   z

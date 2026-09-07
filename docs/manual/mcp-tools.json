@@ -4126,6 +4126,74 @@
     }
   },
   {
+    "name": "slot.flow.setGraph",
+    "title": "Set complete feature flow",
+    "description": "Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "graph": {
+          "type": "object",
+          "properties": {
+            "states": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "cinematic": {
+                    "type": "object",
+                    "properties": {
+                      "vfxPreset": { "type": "string", "minLength": 1 },
+                      "animation": { "type": "string", "minLength": 1 }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "transitions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": { "type": "string", "minLength": 1 },
+                  "on": {
+                    "type": "object",
+                    "properties": {
+                      "type": { "type": "string", "minLength": 1 },
+                      "dataEquals": {
+                        "type": "object",
+                        "properties": {
+                          "field": { "type": "string", "minLength": 1 },
+                          "equals": { "type": ["number", "string", "boolean"] }
+                        },
+                        "required": ["field", "equals"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": ["type"],
+                    "additionalProperties": false
+                  },
+                  "to": { "type": "string", "minLength": 1 }
+                },
+                "required": ["from", "on", "to"],
+                "additionalProperties": false
+              }
+            },
+            "entry": { "type": "string", "minLength": 1 }
+          },
+          "required": ["states", "transitions", "entry"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "graph"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
     "name": "slot.get",
     "title": "Get slot",
     "description": "Get one slot (and its attachment names) by id.",
@@ -4271,6 +4339,43 @@
       "type": "object",
       "properties": { "documentId": { "type": "string", "minLength": 1 } },
       "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.scene.setRefs",
+    "title": "Set scene artifact references",
+    "description": "Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "refs": {
+          "type": "object",
+          "properties": {
+            "skeletons": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "minLength": 1 },
+                  "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                },
+                "required": ["name", "hash"],
+                "additionalProperties": false
+              }
+            },
+            "vfxPresets": {
+              "type": "array",
+              "items": { "$ref": "#/properties/refs/properties/skeletons/items" }
+            }
+          },
+          "required": ["skeletons", "vfxPresets"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "refs"],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     }
@@ -4436,6 +4541,133 @@
         "order": { "type": "array", "items": { "type": "integer", "minimum": 0 } }
       },
       "required": ["documentId", "sequenceName", "order"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.winseq.setConfig",
+    "title": "Set complete win sequencer",
+    "description": "Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "config": {
+          "type": "object",
+          "properties": {
+            "sequences": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "steps": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "atMs": { "type": "integer", "minimum": 0 },
+                        "target": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": { "type": "string", "const": "allWinningCells" }
+                              },
+                              "required": ["kind"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": { "type": "string", "const": "byLine" },
+                                "index": { "type": "integer", "minimum": 0 }
+                              },
+                              "required": ["kind", "index"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": { "type": "string", "const": "bySymbol" },
+                                "symbol": { "type": "string", "minLength": 1 }
+                              },
+                              "required": ["kind", "symbol"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "action": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": { "kind": { "type": "string", "const": "animateWin" } },
+                              "required": ["kind"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": { "type": "string", "const": "vfx" },
+                                "preset": { "type": "string", "minLength": 1 },
+                                "anchorRule": {
+                                  "type": "string",
+                                  "enum": ["eachCell", "gridCenter"]
+                                }
+                              },
+                              "required": ["kind", "preset", "anchorRule"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": { "type": "string", "const": "rollupStart" },
+                                "curve": {
+                                  "type": "string",
+                                  "enum": ["linear", "easeInQuad", "easeOutQuad", "easeInOutCubic"]
+                                }
+                              },
+                              "required": ["kind", "curve"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": { "type": "string", "const": "escalationBanner" },
+                                "tier": { "type": "string", "enum": ["big", "mega", "epic"] }
+                              },
+                              "required": ["kind", "tier"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["atMs", "target", "action"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["steps"],
+                "additionalProperties": false
+              }
+            },
+            "thresholds": {
+              "type": "object",
+              "properties": {
+                "big": { "type": "number", "minimum": 0 },
+                "mega": { "type": "number", "minimum": 0 },
+                "epic": { "type": "number", "minimum": 0 }
+              },
+              "required": ["big", "mega", "epic"],
+              "additionalProperties": false
+            },
+            "defaultSequence": { "type": "string", "minLength": 1 }
+          },
+          "required": ["sequences", "thresholds", "defaultSequence"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "config"],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     }

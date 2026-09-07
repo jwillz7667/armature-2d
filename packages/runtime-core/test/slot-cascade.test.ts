@@ -173,23 +173,31 @@ describe('cascade stage (WP-4.10 TASK-4.10.3)', () => {
     expect(refills.map((r) => ({ col: r.col, symbols: [...r.symbols] }))).toEqual(expected);
   });
 
-  it('accumulates atMs by explodeMs + dropMs + settleMs + stepGapMs per step (within a step explode/win/drop/refill share the step start)', () => {
+  it('honors explode, drop, refill stagger, reel landing, and contiguous counter completion', () => {
     const result = tumbleResult();
-    const t = tumble();
-    const tl = sequence(result, cascadeScene(t));
-    const span = t.explodeMs + t.dropMs + t.settleMs + t.stepGapMs;
+    const scene = cascadeScene();
+    scene.grid.reelStopStaggerMs = 40;
+    const tl = sequence(result, scene);
     const explodes = tl.directives.filter((d) => d.kind === 'cascadeExplode');
-    for (let k = 0; k < explodes.length; k += 1) {
-      expect(explodes[k]!.atMs).toBe(k * span);
-    }
-    // Each step's rollup link spans [stepStart, stepStart + dropMs].
+    const drops = tl.directives.filter((d) => d.kind === 'cascadeDrop');
     const links = tl.directives.filter((d) => d.kind === 'counterRollup');
-    for (let k = 0; k < links.length; k += 1) {
+    expect(links[0]!.startMs).toBe(200); // all six reels have landed
+    expect(explodes[0]!.atMs).toBe(300); // 100 ms of win animation before removal
+    expect(drops[0]!.atMs).toBe(300);
+    const firstRefill = tl.directives.find((d) => d.kind === 'cascadeRefill')!;
+    expect(firstRefill.atMs).toBe(500); // drop completes before refill
+    for (let k = 0; k < links.length; k++) {
       const link = links[k]!;
-      if (link.kind !== 'counterRollup') throw new Error('narrowing');
-      expect(link.startMs).toBe(k * span);
-      expect(link.endMs).toBe(k * span + t.dropMs);
+      if (k > 0) expect(link.startMs).toBe(links[k - 1]!.endMs);
+      const refills = tl.directives.filter(
+        (d) => d.kind === 'cascadeRefill' && d.atMs >= link.startMs && d.atMs < link.endMs,
+      );
+      for (let i = 1; i < refills.length; i++)
+        expect(refills[i]!.atMs - refills[i - 1]!.atMs).toBe(30);
+      expect(link.endMs - refills.at(-1)!.atMs).toBe(120); // settle plus gap
+      expect(link.toUnits).toBe(result.cascades![k]!.cumulativeWin);
     }
+    expect(tl.durationMs).toBe(links.at(-1)!.endMs);
   });
 
   it('the WP-4.8 single line-win rollup is absent for the cascade spin (only the chain links appear)', () => {

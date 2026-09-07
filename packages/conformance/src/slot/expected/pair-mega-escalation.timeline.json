@@ -18,7 +18,7 @@
   ],
   "timeline": {
     "spinId": "mock-mega-escalation",
-    "durationMs": 600,
+    "durationMs": 1600,
     "directives": [
       {
         "kind": "reelStop",
@@ -151,12 +151,6 @@
         "tier": "big",
         "atMs": 0,
         "seq": 73
-      },
-      {
-        "kind": "escalation",
-        "tier": "mega",
-        "atMs": 0,
-        "seq": 74
       },
       {
         "kind": "reelStop",
@@ -608,6 +602,12 @@
         "curve": "easeOutQuad",
         "atMs": 600,
         "seq": 72
+      },
+      {
+        "kind": "escalation",
+        "tier": "mega",
+        "atMs": 600,
+        "seq": 74
       }
     ]
   },

@@ -1,3 +1,6 @@
+import { setSceneRefsSpec } from './set-scene-refs.command';
+import { setFeatureFlowGraphSpec } from './set-feature-flow-graph.command';
+import { setWinSequencerSpec } from './set-win-sequencer.command';
 import { addBoneToMeshBindingSpec } from './add-bone-to-mesh-binding.command';
 import { addMeshVertexSpec } from './add-mesh-vertex.command';
 import { clearAttachmentDeformSpec } from './clear-attachment-deform.command';
@@ -139,6 +142,9 @@ import type { CommandSpec } from './spec';
 // The discovery guard globs *.command.ts and fails CI if any command kind is missing from this list or
 // any entry lacks its file, so the mandatory do/undo round-trip cannot be silently skipped.
 export const commandRegistry: readonly CommandSpec[] = [
+  setSceneRefsSpec,
+  setFeatureFlowGraphSpec,
+  setWinSequencerSpec,
   createBoneSpec,
   moveBoneSpec,
   rotateBoneSpec,

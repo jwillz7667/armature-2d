@@ -2,7 +2,7 @@
 
 Generated from the live registry. Run `pnpm --filter @marionette/mcp-server reference` to update.
 
-205 tools. All inputs are validated before execution. Document mutations use command history.
+208 tools. All inputs are validated before execution. Document mutations use command history.
 The machine-readable companion is `mcp-tools.json`. The artist UI exposes its own documented subset.
 
 ## anim.create
@@ -1421,13 +1421,21 @@ Inputs: `documentId`, `from`, `to`.
 
 Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 176.
 
+## slot.flow.setGraph
+
+Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.
+
+Inputs: `documentId`, `graph`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 177.
+
 ## slot.get
 
 Get one slot (and its attachment names) by id.
 
 Inputs: `documentId`, `slotId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 177.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 178.
 
 ## slot.grid.get
 
@@ -1435,7 +1443,7 @@ Return the current slot grid config.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 178.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 179.
 
 ## slot.grid.preset
 
@@ -1443,7 +1451,7 @@ Apply a canonical grid preset in one call: reelStrip5x3, scatterPay6x5, or clust
 
 Inputs: `documentId`, `preset`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 179.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 180.
 
 ## slot.grid.set
 
@@ -1451,7 +1459,7 @@ Set the slot grid config (topology + dimensions + gravity, optional anticipation
 
 Inputs: `documentId`, `grid`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 180.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 181.
 
 ## slot.list
 
@@ -1459,7 +1467,7 @@ List the slots in setup-pose draw order.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 181.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 182.
 
 ## slot.rename
 
@@ -1467,7 +1475,7 @@ Rename a slot (identity is the id, so references are unaffected).
 
 Inputs: `documentId`, `slotId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 182.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 183.
 
 ## slot.reorder
 
@@ -1475,7 +1483,7 @@ Move a slot to a new index in the setup-pose draw order.
 
 Inputs: `documentId`, `slotId`, `toIndex`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 183.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 184.
 
 ## slot.scene.get
 
@@ -1483,7 +1491,15 @@ Return the whole slot-scene snapshot (grid, symbol library, win sequencer, featu
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 184.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 185.
+
+## slot.scene.setRefs
+
+Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.
+
+Inputs: `documentId`, `refs`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 186.
 
 ## slot.symbol.get
 
@@ -1491,7 +1507,7 @@ Return the anim set mapped to one SymbolId, or null when the symbol is unmapped.
 
 Inputs: `documentId`, `symbolId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 185.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 187.
 
 ## slot.symbol.list
 
@@ -1499,7 +1515,7 @@ List the mapped symbols (SymbolId + anim set) in id order.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 186.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 188.
 
 ## slot.symbol.map
 
@@ -1507,7 +1523,7 @@ Map a SymbolId to a skeleton + idle/land/win(/anticipation) animation set, addin
 
 Inputs: `documentId`, `symbolId`, `animSet`, `skeletonAnimationNames`, `skeletonHash`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 187.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 189.
 
 ## slot.symbol.unmap
 
@@ -1515,7 +1531,7 @@ Remove a SymbolId mapping, pruning its skeletonRef when no remaining symbol refe
 
 Inputs: `documentId`, `symbolId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 188.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 190.
 
 ## slot.tumble.get
 
@@ -1523,7 +1539,7 @@ Return the tumble/cascade choreography.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 189.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 191.
 
 ## slot.tumble.set
 
@@ -1531,7 +1547,7 @@ Set the tumble/cascade timing (explode/drop/refill/settle/step ms as non-negativ
 
 Inputs: `documentId`, `tumble`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 190.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 192.
 
 ## slot.winseq.create
 
@@ -1539,7 +1555,7 @@ Create a new, empty, named win sequence. Rejects a duplicate name (SLOT_EDIT).
 
 Inputs: `documentId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 191.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 193.
 
 ## slot.winseq.get
 
@@ -1547,7 +1563,7 @@ Return the win-sequencer config (sequences, thresholds, default sequence).
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 192.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 194.
 
 ## slot.winseq.reorderSteps
 
@@ -1555,7 +1571,15 @@ Reorder a sequence steps by an explicit new-order array of current step indices 
 
 Inputs: `documentId`, `sequenceName`, `order`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 193.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 195.
+
+## slot.winseq.setConfig
+
+Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.
+
+Inputs: `documentId`, `config`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 196.
 
 ## slot.winseq.setStep
 
@@ -1563,7 +1587,7 @@ Set or append a step (atMs + target + action) at an index in a named sequence. A
 
 Inputs: `documentId`, `sequenceName`, `index`, `step`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 194.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 197.
 
 ## slot.winseq.setThresholds
 
@@ -1571,7 +1595,7 @@ Set the big/mega/epic win escalation thresholds (finite, non-negative). Coalesce
 
 Inputs: `documentId`, `thresholds`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 195.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 198.
 
 ## transform.createConstraint
 
@@ -1579,7 +1603,7 @@ Create a transform constraint that drives a set of bones from a target with per-
 
 Inputs: `documentId`, `name`, `boneIds`, `targetId`, `params`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 196.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 199.
 
 ## transform.deleteConstraint
 
@@ -1587,7 +1611,7 @@ Delete a transform constraint, cascading every animation transform timeline keye
 
 Inputs: `documentId`, `transformConstraintId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 197.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 200.
 
 ## transform.deleteKeyframe
 
@@ -1595,7 +1619,7 @@ Delete a transform keyframe (by id) from a constraint channel.
 
 Inputs: `documentId`, `animationId`, `transformConstraintId`, `keyframeId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 198.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 201.
 
 ## transform.get
 
@@ -1603,7 +1627,7 @@ Get one transform constraint by id.
 
 Inputs: `documentId`, `transformConstraintId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 199.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 202.
 
 ## transform.list
 
@@ -1611,7 +1635,7 @@ List the transform constraints in solve order (after all IK).
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 200.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 203.
 
 ## transform.moveKeyframe
 
@@ -1619,7 +1643,7 @@ Move a transform keyframe (by id) to a new time on a constraint channel (times a
 
 Inputs: `documentId`, `animationId`, `transformConstraintId`, `keyframeId`, `time`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 201.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 204.
 
 ## transform.setKeyframe
 
@@ -1627,7 +1651,7 @@ Insert or update a transform keyframe at a time on a constraint channel. `mix` c
 
 Inputs: `documentId`, `animationId`, `transformConstraintId`, `time`, `mix`, `curve`, `replaceCurve`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 202.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 205.
 
 ## transform.setParams
 
@@ -1635,7 +1659,7 @@ Patch a transform constraint mix/offset channels (only the named channels change
 
 Inputs: `documentId`, `transformConstraintId`, `patch`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 203.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 206.
 
 ## transform.setVariants
 
@@ -1643,4 +1667,4 @@ Patch a transform constraint Stage F2 variant flag: `local` (local-space read/wr
 
 Inputs: `documentId`, `transformConstraintId`, `local`, `relative`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 204.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 207.

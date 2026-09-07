@@ -1,5 +1,13 @@
 # Changelog
 
+## Audit slot composer
+
+- Add full grid, symbol, win-step, flow-graph, and tumble controls with typed recorded-result previews.
+- Render project artwork, effects, and cinematics; preserve internal reference hashes on save.
+- Honor cascade phase timings, refill staggering, banner placement, and final counter completion.
+- Fix win-step reorder redo, replaced symbol references, and premature scheduled sprites.
+
+
 ## Audit effects designer
 
 - Add full layer parameters, lifetime-curve graphs and easing, bundle editing, textured previews, seeded restarts, and moving anchors.

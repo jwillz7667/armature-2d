@@ -258,6 +258,10 @@ export class SkeletonView {
     this.root.addChild(this.attachmentsLayer, this.bonesLayer, this.masksLayer);
   }
 
+  setBoneChromeVisible(visible: boolean): void {
+    this.bonesLayer.visible = visible;
+  }
+
   // Inject (or clear) the host's region -> Texture resolver. Region textures are resolved once when the
   // scene is built, so this invalidates the cached scene: the next sync / syncAnimated rebuilds the
   // attachment bindings against the new resolver (re-slicing nothing, just re-binding textures and
@@ -343,10 +347,15 @@ export class SkeletonView {
   // render that frame. A thin wrapper over loopTime + syncAnimated that reads the authored duration; it
   // owns no clock (the caller supplies `elapsed` from its own transport, TASK-1.6.6), so it stays
   // deterministic and testable. Throws AnimationNotFoundError for an unknown id, matching sampleSkeleton.
-  syncAnimatedLoop(document: SkeletonDocument, animationId: string, elapsed: number): void {
+  syncAnimatedLoop(
+    document: SkeletonDocument,
+    animationId: string,
+    elapsed: number,
+    frameDt = 0,
+  ): void {
     const animation = document.animations[animationId];
     if (animation === undefined) throw new AnimationNotFoundError(animationId);
-    this.syncAnimated(document, animationId, loopTime(elapsed, animation.duration));
+    this.syncAnimated(document, animationId, loopTime(elapsed, animation.duration), frameDt);
   }
 
   // Solve and render a multi-track AnimationState (ADR-0005) through the SAME render-from-pose path the
