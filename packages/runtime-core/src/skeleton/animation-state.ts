@@ -40,6 +40,8 @@ export interface TrackEntry {
   readonly trackTime: number;
   alpha: number;
   additive: boolean;
+  /** Null includes every slot; an empty array suppresses this entry's deformation only. */
+  deformSlots: readonly string[] | null;
   readonly mixDuration: number;
   readonly mixTime: number;
   readonly mixFrom: TrackEntry | null;
@@ -60,6 +62,7 @@ export interface InternalEntry {
   elapsed: number;
   alpha: number;
   additive: boolean;
+  deformSlots: readonly string[] | null;
   mixDuration: number;
   mixTime: number;
   mixFrom: InternalEntry | null;
@@ -117,6 +120,7 @@ function makeEntry(state: AnimationState, animationId: string, loop: boolean): I
     elapsed: 0,
     alpha: 1,
     additive: false,
+    deformSlots: null,
     mixDuration: 0,
     mixTime: 0,
     mixFrom: null,

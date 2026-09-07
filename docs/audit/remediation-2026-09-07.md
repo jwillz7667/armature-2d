@@ -17,7 +17,8 @@ presentation boundaries. Work proceeds in verified subsystem changes.
 | F18 | Full effects controls, lifetime graphs, bundles, seeded textured preview | Implemented; 67 core, 77 MCP, and 3 workflow tests pass; desktop acceptance pending |
 | F19 | Slot controls, bindings, feature graph, and composed scenario preview | Implemented; command/workflow/timing tests pass; desktop acceptance pending |
 | F16 | Explicit import profiles, sibling atlas transaction, loss reports, worker budgets | Implemented safeguards and JSON asset workflow; real-export binary profile/corpus and desktop fidelity acceptance pending |
-| F14, F29 | Native pixels, deform mixing | Pending |
+| F29 | Deform crossfades, additive layers, masks, linked-skin resolution | Implemented in TS state playback; native AnimationState API not present |
+| F14 | Native pixels | Pending |
 | F01, F22-F28 | Repository, dependencies, CI, release, docs, performance, acceptance | Pending |
 
 ## Evidence and environment
@@ -94,3 +95,11 @@ because an unsupported-feature label or a plan exists.
 - Source deformation uses a different coordinate space from Armature. It is now explicitly reported and omitted instead of truncating deltas into an incorrect animation; faithful deform conversion remains a format/runtime interoperability task.
 - The built Spine worker imports a rig, sibling atlas, and PNG. Built video startup and PNG/GIF/APNG worker smoke checks pass. Installed desktop acceptance remains pending.
 - Full editor run: 657 tests passed; one preflight error-message regression was corrected to preserve the existing ATLAS_DECODE_FAILED contract. Its nine-test file is rerun separately. Additional atlas/IPC/file-action coverage passes 56 tests. No real-export binary or source-animation fidelity claim is made.
+
+
+## Deformation mixing verification
+
+- ADR-0016 defines common-reference deformation crossfades, missing-channel behavior, additive layers and runtime slot masks without changing persisted formats.
+- Live web meshes and software exports call the same state deformation sampler. Linked meshes resolve their timeline-sharing source before blending.
+- 407 runtime-core, 163 runtime-web, and 110 render-preview tests pass, including identical-clip continuity, sparse-track pixels, outgoing alpha/masks, and scratch reuse.
+- Native wrappers still expose single-clip playback; native multi-track equivalence is not claimed.
