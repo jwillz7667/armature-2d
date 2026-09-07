@@ -374,3 +374,5 @@ export {
   findAttachmentSnapshot,
   findAnimationSnapshot,
 } from './spec';
+
+export { SetDeformCurveCommand } from './set-deform-curve.command';

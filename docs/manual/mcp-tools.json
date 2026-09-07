@@ -1,0 +1,4746 @@
+[
+  {
+    "name": "anim.create",
+    "title": "Create animation",
+    "description": "Create a new, empty animation with a duration and return its id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "duration": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "name", "duration"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "anim.delete",
+    "title": "Delete animation",
+    "description": "Delete an animation and all its timelines (one undo step).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "animationId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "anim.duplicate",
+    "title": "Duplicate animation",
+    "description": "Duplicate an animation under a new name and return the new id (one undo step).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "animationId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "anim.duration",
+    "title": "Set animation duration",
+    "description": "Set an animation duration (seconds). Rejects shrinking below the last keyframe time as ANIMATION_DURATION.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "duration": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "animationId", "duration"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "anim.get",
+    "title": "Get animation",
+    "description": "Get one animation with all its timelines and keyframes by id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "animationId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "anim.list",
+    "title": "List animations",
+    "description": "List the animations (id, name, duration, track counts).",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "anim.rename",
+    "title": "Rename animation",
+    "description": "Rename an animation (identity is the id, so timelines are unaffected).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "animationId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "anim.sequence.delete",
+    "title": "Delete sequence keyframe",
+    "description": "Delete a slot frame-sequence keyframe (by id). A missing key is a typed KEYFRAME_NOT_FOUND.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "animationId", "slotId", "keyframeId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "anim.sequence.move",
+    "title": "Move sequence keyframe",
+    "description": "Move a slot frame-sequence keyframe (by id) to a new time (strict-ascending). Landing on an occupied time is a typed KEYFRAME_COLLISION; a missing key is a typed KEYFRAME_NOT_FOUND.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "animationId", "slotId", "keyframeId", "time"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "anim.sequence.set",
+    "title": "Set sequence keyframe",
+    "description": "Insert or update a slot frame-sequence keyframe at a time (Stage F2): `mode` playback, starting `index`, and `delay` seconds per frame. Updating an existing time keeps its id. The timeline stays strict-ascending in time.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "hold",
+            "once",
+            "loop",
+            "pingpong",
+            "onceReverse",
+            "loopReverse",
+            "pingpongReverse"
+          ]
+        },
+        "index": { "type": "integer", "minimum": 0 },
+        "delay": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "animationId", "slotId", "time", "mode", "index", "delay"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "atlas.get",
+    "title": "Get atlas",
+    "description": "Return the document current atlas ref (packed pages + regions).",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "atlas.pack",
+    "title": "Pack atlas",
+    "description": "Pack the source PNGs in a project directory into a deterministic atlas (import -> alpha-trim -> maxrects pack -> emit, ADR-0007) and install it through the command history (LAW 2). `sourceDir` and `outputDir` are project-relative and confined to the project root; page PNGs are written under `outputDir` and the returned AtlasRef records each page path project-relative so render_frame can read it back. Region names are the source file base names; region/mesh attachment `path` resolves against them.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "sourceDir": { "type": "string", "minLength": 1 },
+        "outputDir": { "type": "string", "minLength": 1 },
+        "maxPageSize": { "type": "integer", "minimum": 1, "maximum": 4096 },
+        "padding": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["documentId", "sourceDir", "outputDir"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "atlas.set",
+    "title": "Set atlas",
+    "description": "Install the document atlas (packed pages + regions) through the command history (LAW 2). The editor atlas-pack pipeline produces the AtlasRef; this is the only legal path that sets it. Region/mesh attachment `path` references resolve against the region names installed here.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "atlas": {
+          "type": "object",
+          "properties": {
+            "pages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string" },
+                  "width": { "type": "number" },
+                  "height": { "type": "number" },
+                  "regions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": { "type": "string" },
+                        "x": { "type": "number" },
+                        "y": { "type": "number" },
+                        "w": { "type": "number" },
+                        "h": { "type": "number" },
+                        "rotated": { "type": "boolean" },
+                        "offsetX": { "type": "number" },
+                        "offsetY": { "type": "number" },
+                        "originalW": { "type": "number" },
+                        "originalH": { "type": "number" }
+                      },
+                      "required": [
+                        "name",
+                        "x",
+                        "y",
+                        "w",
+                        "h",
+                        "rotated",
+                        "offsetX",
+                        "offsetY",
+                        "originalW",
+                        "originalH"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["file", "width", "height", "regions"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["pages"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "atlas"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "attach.linkedmesh.create",
+    "title": "Create linked mesh",
+    "description": "Add a linked mesh (Stage F2) to a slot default skin: it reuses the geometry of a PARENT mesh on the SAME slot (in `skin`, default the default skin) while carrying its own atlas `path`, size, and color. `timelines` shares the parent deform timelines. The parent chain is resolved and cycle-checked (LINKED_MESH with reason parentMissing / parentInvalid / cycle / duplicateName).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "parent": { "type": "string", "minLength": 1 },
+        "skin": { "type": "string", "minLength": 1 },
+        "timelines": { "type": "boolean", "default": false },
+        "width": { "type": "number", "default": 0 },
+        "height": { "type": "number", "default": 0 },
+        "color": {
+          "type": "object",
+          "properties": {
+            "r": { "type": "number", "minimum": 0, "maximum": 1 },
+            "g": { "$ref": "#/properties/color/properties/r" },
+            "b": { "$ref": "#/properties/color/properties/r" },
+            "a": { "$ref": "#/properties/color/properties/r" }
+          },
+          "required": ["r", "g", "b", "a"],
+          "additionalProperties": false,
+          "default": { "r": 1, "g": 1, "b": 1, "a": 1 }
+        }
+      },
+      "required": ["documentId", "slotId", "name", "path", "parent"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "attach.linkedmesh.unlink",
+    "title": "Unlink mesh",
+    "description": "Bake a linked mesh to a plain mesh: it takes the resolved root geometry and keeps its own atlas path, size, and color. A target that is not a linked mesh is LINKED_MESH with reason notFound.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "slotId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "attach.path.add",
+    "title": "Add path attachment",
+    "description": "Add a path attachment (a cubic Bezier rail) to a slot. Omitting `vertices` lays down the default two-curve open path. `vertices` is the flat [x0,y0,x1,y1,...] control-point stream; the arc-length table is computed from it. A path renders no pixels (no atlas region).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "closed": { "type": "boolean", "default": false },
+        "constantSpeed": { "type": "boolean", "default": true },
+        "vertices": { "type": "array", "items": { "type": "number" } }
+      },
+      "required": ["documentId", "slotId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "attach.region.add",
+    "title": "Add region attachment",
+    "description": "Add a region attachment to a slot. `path` references an atlas region; width/height/offset are caller-supplied (derived from the region by the editor).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 },
+        "x": { "type": "number", "default": 0 },
+        "y": { "type": "number", "default": 0 },
+        "rotation": { "type": "number", "default": 0 },
+        "scaleX": { "type": "number", "default": 1 },
+        "scaleY": { "type": "number", "default": 1 },
+        "width": { "type": "number", "default": 0 },
+        "height": { "type": "number", "default": 0 },
+        "color": {
+          "type": "object",
+          "properties": {
+            "r": { "type": "number", "minimum": 0, "maximum": 1 },
+            "g": { "$ref": "#/properties/color/properties/r" },
+            "b": { "$ref": "#/properties/color/properties/r" },
+            "a": { "$ref": "#/properties/color/properties/r" }
+          },
+          "required": ["r", "g", "b", "a"],
+          "additionalProperties": false,
+          "default": { "r": 1, "g": 1, "b": 1, "a": 1 }
+        }
+      },
+      "required": ["documentId", "slotId", "name", "path"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "attach.region.transform",
+    "title": "Set region attachment transform",
+    "description": "Set a region attachment placement/size. Omitted fields keep their current value.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "x": { "type": "number" },
+        "y": { "type": "number" },
+        "rotation": { "type": "number" },
+        "scaleX": { "type": "number" },
+        "scaleY": { "type": "number" },
+        "width": { "type": "number" },
+        "height": { "type": "number" }
+      },
+      "required": ["documentId", "slotId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "attach.remove",
+    "title": "Remove attachment",
+    "description": "Remove an attachment from a slot (clears the slot active attachment if it was it).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "slotId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "attach.sequence.set",
+    "title": "Set attachment sequence",
+    "description": "Set or clear the Stage F2 frame-sequence on a region or mesh attachment. Provide `sequence` (count >= 1, non-negative integer start/digits/setupIndex, setupIndex in [0, count)) to set it, or `sequence: null` to clear it. A bad shape/setupIndex or a non-region/mesh target is SEQUENCE (reason shape / setupRange / notFound).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "sequence": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "count": { "type": "integer", "exclusiveMinimum": 0 },
+                "start": { "type": "integer", "minimum": 0 },
+                "digits": { "type": "integer", "minimum": 0 },
+                "setupIndex": { "type": "integer", "minimum": 0 }
+              },
+              "required": ["count", "start", "digits", "setupIndex"],
+              "additionalProperties": false
+            },
+            { "type": "null" }
+          ]
+        }
+      },
+      "required": ["documentId", "slotId", "name", "sequence"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bone.create",
+    "title": "Create bone",
+    "description": "Create a bone (optionally parented) and return its id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "parentId": { "type": ["string", "null"], "default": null },
+        "name": { "type": "string", "minLength": 1 },
+        "x": { "type": "number", "default": 0 },
+        "y": { "type": "number", "default": 0 },
+        "rotation": { "type": "number", "default": 0 },
+        "length": { "type": "number", "minimum": 0, "default": 0 },
+        "scaleX": { "type": "number", "default": 1 },
+        "scaleY": { "type": "number", "default": 1 },
+        "shearX": { "type": "number", "default": 0 },
+        "shearY": { "type": "number", "default": 0 },
+        "transformMode": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "onlyTranslation",
+            "noRotationOrReflection",
+            "noScale",
+            "noScaleOrReflection"
+          ],
+          "default": "normal"
+        }
+      },
+      "required": ["documentId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bone.delete",
+    "title": "Delete bone",
+    "description": "Delete a bone and its descendant bones (one undo step).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "boneId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bone.get",
+    "title": "Get bone",
+    "description": "Get one bone by id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "boneId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bone.list",
+    "title": "List bones",
+    "description": "List the bones in document order.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bone.move",
+    "title": "Move bone",
+    "description": "Set a bone local translation (x, y).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 },
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "required": ["documentId", "boneId", "x", "y"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bone.rename",
+    "title": "Rename bone",
+    "description": "Rename a bone (identity is the id, so references are unaffected).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "boneId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bone.reparent",
+    "title": "Reparent bone",
+    "description": "Move a bone under a new parent (null for a root), holding its world transform fixed. Rejects a cycle (reparenting under itself or a descendant) as REPARENT_CYCLE.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 },
+        "newParentId": { "type": ["string", "null"] }
+      },
+      "required": ["documentId", "boneId", "newParentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bone.rotate",
+    "title": "Rotate bone",
+    "description": "Set a bone local rotation in degrees.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 },
+        "rotation": { "type": "number" }
+      },
+      "required": ["documentId", "boneId", "rotation"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bone.scale",
+    "title": "Scale bone",
+    "description": "Set a bone local scale (scaleX, scaleY).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 },
+        "scaleX": { "type": "number" },
+        "scaleY": { "type": "number" }
+      },
+      "required": ["documentId", "boneId", "scaleX", "scaleY"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bone.setLength",
+    "title": "Set bone length",
+    "description": "Set a bone length.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 },
+        "length": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "boneId", "length"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bone.shear",
+    "title": "Shear bone",
+    "description": "Set a bone local shear in degrees (shearX, shearY).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 },
+        "shearX": { "type": "number" },
+        "shearY": { "type": "number" }
+      },
+      "required": ["documentId", "boneId", "shearX", "shearY"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bone.transformMode",
+    "title": "Set bone transform mode",
+    "description": "Set how a bone inherits its parent transform (the format TransformMode enum).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "onlyTranslation",
+            "noRotationOrReflection",
+            "noScale",
+            "noScaleOrReflection"
+          ]
+        }
+      },
+      "required": ["documentId", "boneId", "mode"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bundle.create",
+    "title": "Create bundle",
+    "description": "Create a new, empty, named effect bundle.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bundle.delete",
+    "title": "Delete bundle",
+    "description": "Delete a named bundle and all its items (one undo step).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bundle.get",
+    "title": "Get bundle",
+    "description": "Get one bundle with all its items by name.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bundle.item.add",
+    "title": "Add bundle item",
+    "description": "Append an item (a referenced effect + startOffset + anchorRole + seedSalt) to a bundle. The referenced effect must exist (EFFECT_EDIT bundleEffectMissing).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "item": {
+          "type": "object",
+          "properties": {
+            "effect": { "type": "string", "minLength": 1 },
+            "startOffset": { "type": "number" },
+            "anchorRole": { "type": "string", "minLength": 1 },
+            "seedSalt": { "type": "integer" }
+          },
+          "required": ["effect", "startOffset", "anchorRole", "seedSalt"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "name", "item"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bundle.item.remove",
+    "title": "Remove bundle item",
+    "description": "Remove an item from a bundle by its item id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "itemId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "name", "itemId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bundle.item.reorder",
+    "title": "Reorder bundle items",
+    "description": "Reorder a bundle items by an explicit ordered item-id list (a permutation).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "order": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+      },
+      "required": ["documentId", "name", "order"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bundle.item.set",
+    "title": "Set bundle item",
+    "description": "Patch a bundle item fields (effect / startOffset / anchorRole / seedSalt). Only the provided fields change; a new effect reference must exist.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "itemId": { "type": "string", "minLength": 1 },
+        "effect": { "type": "string", "minLength": 1 },
+        "startOffset": { "type": "number" },
+        "anchorRole": { "type": "string", "minLength": 1 },
+        "seedSalt": { "type": "integer" }
+      },
+      "required": ["documentId", "name", "itemId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "bundle.list",
+    "title": "List bundles",
+    "description": "List the effect bundles (name, item count) in bundle order.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "constraints.reorder",
+    "title": "Reorder constraints",
+    "description": "Set the explicit cross-array constraint solve order (ADR-0009/ADR-0011): `order` is the combined IK-then-transform-then-path constraint ids in the desired solve order, a dense unique cover of the current set (a wrong length, duplicate, or unknown id is CONSTRAINT with reason orderInvalid). Pass `order: null` to CLEAR the explicit order and restore the default (all IK, then transform, then path).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "order": {
+          "anyOf": [
+            { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            { "type": "null" }
+          ]
+        }
+      },
+      "required": ["documentId", "order"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "deform.clearAttachment",
+    "title": "Clear attachment deform",
+    "description": "Remove every deform keyframe for one (slot, attachment) across all animations and all skins (one undo step). The prerequisite for re-topologizing a deformed mesh.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "slotId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "deform.deleteKeyframe",
+    "title": "Delete deform keyframe",
+    "description": "Delete a deform keyframe (by id) from a (skin, slot, attachment) mesh channel. `skin` is \"default\" or a named SkinId.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "skin": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "animationId", "skin", "slotId", "name", "keyframeId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "deform.moveKeyframe",
+    "title": "Move deform keyframe",
+    "description": "Move a deform keyframe (by id) to a new time on its (skin, slot, attachment) channel. `skin` is \"default\" or a named SkinId. Rejects landing on an occupied time as KEYFRAME_COLLISION.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "skin": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "animationId", "skin", "slotId", "name", "keyframeId", "time"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "deform.setCurve",
+    "title": "Set deform keyframe curve",
+    "description": "Set the outgoing interpolation curve (linear / stepped / bezier) of an EXISTING deform keyframe by id, keeping its time and offsets. The in-place complement to deform.setKeyframe (whose update path keeps the old curve); kf.curve covers only bone/slot channels. `skin` is \"default\" or a named SkinId.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "skin": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 },
+        "curve": {
+          "anyOf": [
+            { "type": "string", "const": "linear" },
+            { "type": "string", "const": "stepped" },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "const": "bezier" },
+                "cx1": { "type": "number" },
+                "cy1": { "type": "number" },
+                "cx2": { "type": "number" },
+                "cy2": { "type": "number" }
+              },
+              "required": ["type", "cx1", "cy1", "cx2", "cy2"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["documentId", "animationId", "skin", "slotId", "name", "keyframeId", "curve"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "deform.setKeyframe",
+    "title": "Set deform keyframe",
+    "description": "Insert or update a deform keyframe at a time on a (skin, slot, attachment) mesh channel. `skin` is \"default\" or a named SkinId. `offsets` is the flat per-LOGICAL-vertex [dx, dy, ...] array and its length must equal the mesh uvs length. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). Rejected as DEFORM (reason notMesh or offsetLength).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "skin": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 },
+        "offsets": { "type": "array", "items": { "type": "number" } },
+        "curve": {
+          "anyOf": [
+            { "type": "string", "const": "linear" },
+            { "type": "string", "const": "stepped" },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "const": "bezier" },
+                "cx1": { "type": "number" },
+                "cy1": { "type": "number" },
+                "cx2": { "type": "number" },
+                "cy2": { "type": "number" }
+              },
+              "required": ["type", "cx1", "cy1", "cx2", "cy2"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["documentId", "animationId", "skin", "slotId", "name", "time", "offsets"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "document.close",
+    "title": "Close document",
+    "description": "Discard an open document session.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "document.export",
+    "title": "Export document",
+    "description": "Project the document to the portable format JSON (validated and hashed).",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "document.getSnapshot",
+    "title": "Get document snapshot",
+    "description": "Return the internal snapshot (bones, order) of an open document.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "document.getWorldTransforms",
+    "title": "Get solved world transforms",
+    "description": "Read bone matrices from setup or a fully constrained animated pose. Physics is replayed from rest at 60 Hz; times clamp to the clip duration. Returns revision and resolved context.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0, "maximum": 1800, "default": 0 },
+        "skin": { "type": "string", "minLength": 1, "default": "default" }
+      },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "document.new",
+    "title": "New document",
+    "description": "Create a new, empty skeleton document and return its id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "name": { "type": "string", "minLength": 1 } },
+      "required": ["name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "document.open",
+    "title": "Open document",
+    "description": "Read and validate a document from a path, returning a new document id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "path": { "type": "string", "minLength": 1 } },
+      "required": ["path"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "document.save",
+    "title": "Save document",
+    "description": "Export the document and write it to a path through the host file store.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "path": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "path"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "document.setMetadata",
+    "title": "Set document metadata",
+    "description": "Set the optional skeleton metadata block (authoring fps and the project-relative imagesPath / audioPath source directories). Replaced wholesale; when every field is absent the block is cleared. Drives the Stage F1 command on the shared History (LAW 2).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "fps": { "type": "number", "exclusiveMinimum": 0 },
+        "imagesPath": { "type": "string", "minLength": 1 },
+        "audioPath": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "document.validate",
+    "title": "Validate document",
+    "description": "Validate the current document against the format. Returns ok plus any errors.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "draworder.key.delete",
+    "title": "Delete draw-order key",
+    "description": "Delete a draw-order key (by id) from an animation. A missing key is a typed KEYFRAME_NOT_FOUND.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "animationId", "keyframeId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "draworder.key.move",
+    "title": "Move draw-order key",
+    "description": "Move a draw-order key (by id) to a new time (draw-order times are strictly ascending). Landing on an occupied time is a typed KEYFRAME_COLLISION; a missing key is a typed KEYFRAME_NOT_FOUND.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "animationId", "keyframeId", "time"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "draworder.key.set",
+    "title": "Set draw-order key",
+    "description": "Insert or update a draw-order key at a time: a compact list of per-slot signed offsets from the setup draw order (an empty list restores the setup order). Each slot must exist and target a distinct in-range index (DRAW_ORDER otherwise). Updating an existing key at the same time keeps its id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 },
+        "offsets": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "slot": { "type": "string", "minLength": 1 },
+              "offset": { "type": "integer" }
+            },
+            "required": ["slot", "offset"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["documentId", "animationId", "time", "offsets"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.create",
+    "title": "Create effect",
+    "description": "Create a new, layer-less effect in the VFX library and return its id. Add layers with effect.layer.add.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "duration": { "anyOf": [{ "type": "number" }, { "type": "null" }], "default": null },
+        "deterministic": { "type": "boolean", "default": true },
+        "simulationDt": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "default": 0.016666666666666666
+        },
+        "blendMode": {
+          "type": "string",
+          "enum": ["normal", "additive", "multiply", "screen"],
+          "default": "normal"
+        }
+      },
+      "required": ["documentId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.delete",
+    "title": "Delete effect",
+    "description": "Delete an effect and cascade-remove every bundle item that references it (one undo step).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "effectId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.get",
+    "title": "Get effect",
+    "description": "Get one effect with all its layers, bodies, and life curves by id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "effectId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.getAtlas",
+    "title": "Get effects atlas",
+    "description": "Return the current VFX atlas (pages and regions).",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.getSnapshot",
+    "title": "Get effects snapshot",
+    "description": "Return the deterministic snapshot of the whole effects library (effects, atlas, bundles).",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.layer.add",
+    "title": "Add effect layer",
+    "description": "Append a default layer (emitter / spriteAnimator / ribbonTrail) to an effect and return its id. `region` must resolve in the effects atlas or export will fail.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "kind": { "type": "string", "enum": ["emitter", "spriteAnimator", "ribbonTrail"] },
+        "blendMode": {
+          "type": "string",
+          "enum": ["normal", "additive", "multiply", "screen"],
+          "default": "additive"
+        },
+        "region": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "effectId", "kind", "region"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.layer.remove",
+    "title": "Remove effect layer",
+    "description": "Remove a layer from an effect (one undo step restores it at its prior z position).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "layerId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "effectId", "layerId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.layer.reorder",
+    "title": "Reorder effect layers",
+    "description": "Reorder an effect layers by an explicit ordered layer-id list (a permutation of the current layer ids; z order, first is bottom).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "order": { "type": "array", "items": { "type": "string", "minLength": 1 }, "minItems": 1 }
+      },
+      "required": ["documentId", "effectId", "order"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.layer.setBlendMode",
+    "title": "Set effect layer blend mode",
+    "description": "Set a layer per-layer blend mode.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "layerId": { "type": "string", "minLength": 1 },
+        "blendMode": { "type": "string", "enum": ["normal", "additive", "multiply", "screen"] }
+      },
+      "required": ["documentId", "effectId", "layerId", "blendMode"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.layer.setField",
+    "title": "Set effect layer field",
+    "description": "Replace a layer body with a full rebuilt body (the caller patches one field and passes the whole body). `field` is the coalesce key. The body `type` must match the existing layer type.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "layerId": { "type": "string", "minLength": 1 },
+        "field": { "type": "string", "minLength": 1 },
+        "body": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "const": "emitter" },
+                "name": { "type": "string", "minLength": 1 },
+                "maxParticles": { "type": "integer", "minimum": 1 },
+                "spawn": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": { "type": "string", "const": "rate" },
+                        "particlesPerSecond": { "type": "number", "minimum": 0 }
+                      },
+                      "required": ["mode", "particlesPerSecond"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": { "type": "string", "const": "burst" },
+                        "count": { "type": "integer", "minimum": 0 },
+                        "atTime": { "type": "number", "minimum": 0 }
+                      },
+                      "required": ["mode", "count", "atTime"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "mode": { "type": "string", "const": "bursts" },
+                        "bursts": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "atTime": { "type": "number", "minimum": 0 },
+                              "count": { "type": "integer", "minimum": 0 }
+                            },
+                            "required": ["atTime", "count"],
+                            "additionalProperties": false
+                          },
+                          "minItems": 1
+                        }
+                      },
+                      "required": ["mode", "bursts"],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "shape": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": { "kind": { "type": "string", "const": "point" } },
+                      "required": ["kind"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": { "type": "string", "const": "line" },
+                        "x1": { "type": "number" },
+                        "y1": { "type": "number" },
+                        "x2": { "type": "number" },
+                        "y2": { "type": "number" }
+                      },
+                      "required": ["kind", "x1", "y1", "x2", "y2"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": { "type": "string", "const": "circle" },
+                        "radius": { "type": "number", "minimum": 0 },
+                        "edgeOnly": { "type": "boolean" }
+                      },
+                      "required": ["kind", "radius", "edgeOnly"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": { "type": "string", "const": "rect" },
+                        "width": { "type": "number", "minimum": 0 },
+                        "height": { "type": "number", "minimum": 0 }
+                      },
+                      "required": ["kind", "width", "height"],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "lifetime": {
+                  "type": "object",
+                  "properties": { "min": { "type": "number" }, "max": { "type": "number" } },
+                  "required": ["min", "max"],
+                  "additionalProperties": false
+                },
+                "startSpeed": { "$ref": "#/properties/body/anyOf/0/properties/lifetime" },
+                "emissionAngle": { "$ref": "#/properties/body/anyOf/0/properties/lifetime" },
+                "startRotation": { "$ref": "#/properties/body/anyOf/0/properties/lifetime" },
+                "angularVelocity": { "$ref": "#/properties/body/anyOf/0/properties/lifetime" },
+                "startScale": { "$ref": "#/properties/body/anyOf/0/properties/lifetime" },
+                "gravity": {
+                  "type": "object",
+                  "properties": { "x": { "type": "number" }, "y": { "type": "number" } },
+                  "required": ["x", "y"],
+                  "additionalProperties": false
+                },
+                "acceleration": { "$ref": "#/properties/body/anyOf/0/properties/gravity" },
+                "drag": { "type": "number", "minimum": 0 },
+                "texture": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": { "type": "string", "const": "static" },
+                        "region": { "type": "string", "minLength": 1 }
+                      },
+                      "required": ["kind", "region"],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": { "type": "string", "const": "animated" },
+                        "regions": {
+                          "type": "array",
+                          "items": { "type": "string", "minLength": 1 },
+                          "minItems": 1
+                        },
+                        "fps": { "type": "number", "exclusiveMinimum": 0 },
+                        "mode": { "type": "string", "enum": ["loop", "overLife", "once"] }
+                      },
+                      "required": ["kind", "regions", "fps", "mode"],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "trail": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "region": { "type": "string", "minLength": 1 },
+                        "maxSegments": { "type": "integer", "minimum": 1 },
+                        "segmentSpacing": { "type": "number", "exclusiveMinimum": 0 }
+                      },
+                      "required": ["region", "maxSegments", "segmentSpacing"],
+                      "additionalProperties": false
+                    },
+                    { "type": "null" }
+                  ]
+                }
+              },
+              "required": [
+                "type",
+                "name",
+                "maxParticles",
+                "spawn",
+                "shape",
+                "lifetime",
+                "startSpeed",
+                "emissionAngle",
+                "startRotation",
+                "angularVelocity",
+                "startScale",
+                "gravity",
+                "acceleration",
+                "drag",
+                "texture",
+                "trail"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "const": "spriteAnimator" },
+                "name": { "type": "string", "minLength": 1 },
+                "region": { "type": "string", "minLength": 1 },
+                "anchorSpace": { "type": "string", "enum": ["world", "screen"] },
+                "rotationDegPerSec": { "type": "number" },
+                "loop": { "type": "boolean" },
+                "layerDuration": { "type": "number", "exclusiveMinimum": 0 }
+              },
+              "required": [
+                "type",
+                "name",
+                "region",
+                "anchorSpace",
+                "rotationDegPerSec",
+                "loop",
+                "layerDuration"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "const": "ribbonTrail" },
+                "name": { "type": "string", "minLength": 1 },
+                "region": { "type": "string", "minLength": 1 },
+                "anchorRef": { "type": "string", "minLength": 1 },
+                "maxSegments": { "type": "integer", "minimum": 1 },
+                "segmentSpacing": { "type": "number", "exclusiveMinimum": 0 }
+              },
+              "required": ["type", "name", "region", "anchorRef", "maxSegments", "segmentSpacing"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["documentId", "effectId", "layerId", "field", "body"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.lifeStop.add",
+    "title": "Add life-curve stop",
+    "description": "Insert an interior stop (t in (0,1)) into a layer life curve, keeping t strictly ascending. `value` is a scalar or an {r,g,b} matching the curve field.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "layerId": { "type": "string", "minLength": 1 },
+        "field": {
+          "type": "string",
+          "enum": [
+            "scaleOverLife",
+            "colorOverLife",
+            "alphaOverLife",
+            "widthOverLength",
+            "colorOverLength",
+            "alphaOverLength",
+            "trailWidthOverLength",
+            "trailAlphaOverLength"
+          ]
+        },
+        "t": { "type": "number" },
+        "value": {
+          "anyOf": [
+            { "type": "number" },
+            {
+              "type": "object",
+              "properties": {
+                "r": { "type": "number", "minimum": 0, "maximum": 1 },
+                "g": { "$ref": "#/properties/value/anyOf/1/properties/r" },
+                "b": { "$ref": "#/properties/value/anyOf/1/properties/r" }
+              },
+              "required": ["r", "g", "b"],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "curve": {
+          "anyOf": [
+            { "type": "string", "const": "linear" },
+            { "type": "string", "const": "stepped" },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "const": "bezier" },
+                "cx1": { "type": "number" },
+                "cy1": { "type": "number" },
+                "cx2": { "type": "number" },
+                "cy2": { "type": "number" }
+              },
+              "required": ["type", "cx1", "cy1", "cx2", "cy2"],
+              "additionalProperties": false
+            }
+          ],
+          "default": "linear"
+        }
+      },
+      "required": ["documentId", "effectId", "layerId", "field", "t", "value"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.lifeStop.move",
+    "title": "Move life-curve stop",
+    "description": "Move a stop to a new t, keeping strict-ascending order and the t=0 / t=1 anchor positions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "layerId": { "type": "string", "minLength": 1 },
+        "stopId": { "type": "string", "minLength": 1 },
+        "t": { "type": "number" }
+      },
+      "required": ["documentId", "effectId", "layerId", "stopId", "t"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.lifeStop.remove",
+    "title": "Remove life-curve stop",
+    "description": "Remove an interior stop from a layer life curve. The t=0 / t=1 anchors and the two-stop floor are protected (EFFECT_EDIT lifeCurveMinStops).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "layerId": { "type": "string", "minLength": 1 },
+        "stopId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "effectId", "layerId", "stopId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.lifeStop.setCurve",
+    "title": "Set life-curve stop easing",
+    "description": "Set a stop outgoing easing (linear / stepped / a cubic bezier).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "layerId": { "type": "string", "minLength": 1 },
+        "stopId": { "type": "string", "minLength": 1 },
+        "curve": {
+          "anyOf": [
+            { "type": "string", "const": "linear" },
+            { "type": "string", "const": "stepped" },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "const": "bezier" },
+                "cx1": { "type": "number" },
+                "cy1": { "type": "number" },
+                "cx2": { "type": "number" },
+                "cy2": { "type": "number" }
+              },
+              "required": ["type", "cx1", "cy1", "cx2", "cy2"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["documentId", "effectId", "layerId", "stopId", "curve"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.lifeStop.setValue",
+    "title": "Set life-curve stop value",
+    "description": "Set a stop value (a scalar or an {r,g,b} matching the curve field shape).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "layerId": { "type": "string", "minLength": 1 },
+        "stopId": { "type": "string", "minLength": 1 },
+        "value": {
+          "anyOf": [
+            { "type": "number" },
+            {
+              "type": "object",
+              "properties": {
+                "r": { "type": "number", "minimum": 0, "maximum": 1 },
+                "g": { "$ref": "#/properties/value/anyOf/1/properties/r" },
+                "b": { "$ref": "#/properties/value/anyOf/1/properties/r" }
+              },
+              "required": ["r", "g", "b"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["documentId", "effectId", "layerId", "stopId", "value"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.list",
+    "title": "List effects",
+    "description": "List the effects (id, name, meta, layer count) in library order.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.rename",
+    "title": "Rename effect",
+    "description": "Rename an effect (identity is the id, so bundle-item references are unaffected).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "effectId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.setAtlas",
+    "title": "Set effects atlas",
+    "description": "Replace the VFX atlas. Rejects (EFFECTS_ATLAS_DANGLING_REGION) any swap that drops a region a layer still references.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "atlas": {
+          "type": "object",
+          "properties": {
+            "pages": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "file": { "type": "string" },
+                  "width": { "type": "number" },
+                  "height": { "type": "number" },
+                  "regions": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "name": { "type": "string" },
+                        "x": { "type": "number" },
+                        "y": { "type": "number" },
+                        "w": { "type": "number" },
+                        "h": { "type": "number" },
+                        "rotated": { "type": "boolean" },
+                        "offsetX": { "type": "number" },
+                        "offsetY": { "type": "number" },
+                        "originalW": { "type": "number" },
+                        "originalH": { "type": "number" }
+                      },
+                      "required": [
+                        "name",
+                        "x",
+                        "y",
+                        "w",
+                        "h",
+                        "rotated",
+                        "offsetX",
+                        "offsetY",
+                        "originalW",
+                        "originalH"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["file", "width", "height", "regions"],
+                "additionalProperties": false
+              }
+            }
+          },
+          "required": ["pages"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "atlas"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "effect.setMeta",
+    "title": "Set effect meta",
+    "description": "Set an effect duration (null = endless), deterministic flag, and/or simulationDt (must be > 0). Only the provided fields change.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "duration": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
+        "deterministic": { "type": "boolean" },
+        "simulationDt": { "type": "number", "exclusiveMinimum": 0 }
+      },
+      "required": ["documentId", "effectId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "event.define",
+    "title": "Define event",
+    "description": "Create a document-level event definition (its int/float/string payload defaults and an optional audio hint) and return its id. The name must be unique across event definitions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "int": { "type": "number" },
+        "float": { "type": "number" },
+        "string": { "type": "string" },
+        "audio": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "volume": { "type": "number" },
+            "balance": { "type": "number" }
+          },
+          "required": ["path", "volume", "balance"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "event.delete",
+    "title": "Delete event",
+    "description": "Delete an event definition and cascade-remove every animation event key that fires it (one undo step).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "eventId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "eventId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "event.get",
+    "title": "Get event",
+    "description": "Get one document-level event definition by id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "eventId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "eventId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "event.key.delete",
+    "title": "Delete event key",
+    "description": "Delete an event-timeline key (by id) from an animation. A missing key is a typed KEYFRAME_NOT_FOUND.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "animationId", "keyframeId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "event.key.move",
+    "title": "Move event key",
+    "description": "Move an event-timeline key (by id) to a new time, keeping the timeline non-decreasing in time (coincident event firings are legal). A time with no such key is a typed KEYFRAME_NOT_FOUND.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "animationId", "keyframeId", "time"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "event.key.set",
+    "title": "Set event key",
+    "description": "Insert or update an event-timeline key that fires an event definition at a time, optionally overriding its int/float/string payload defaults (an absent override defers to the definition). Updating an existing key that fires the same event at the same time keeps its id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "eventId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 },
+        "int": { "type": "number" },
+        "float": { "type": "number" },
+        "string": { "type": "string" }
+      },
+      "required": ["documentId", "animationId", "eventId", "time"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "event.list",
+    "title": "List events",
+    "description": "List the document-level event definitions (id, name, payload defaults, audio hint).",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "event.rename",
+    "title": "Rename event",
+    "description": "Rename an event definition (identity is the id, so an animation event key never re-binds). The new name must be unique across event definitions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "eventId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "eventId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "event.setAudio",
+    "title": "Set event audio",
+    "description": "Set (or, when audio is absent, clear) an event definition audio hint. `volume` must be in [0, 1] and `balance` in [-1, 1] (EVENT_EDIT audioRange otherwise).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "eventId": { "type": "string", "minLength": 1 },
+        "audio": {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string", "minLength": 1 },
+            "volume": { "type": "number" },
+            "balance": { "type": "number" }
+          },
+          "required": ["path", "volume", "balance"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "eventId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "event.setDefaults",
+    "title": "Set event defaults",
+    "description": "Replace an event definition int/float/string payload defaults wholesale (an absent field clears that default). The audio hint is left untouched.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "eventId": { "type": "string", "minLength": 1 },
+        "int": { "type": "number" },
+        "float": { "type": "number" },
+        "string": { "type": "string" }
+      },
+      "required": ["documentId", "eventId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "history.beginInteraction",
+    "title": "Begin interaction",
+    "description": "Start a coalescing interaction; subsequent edits collapse into one undo step.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "history.endInteraction",
+    "title": "End interaction",
+    "description": "Commit the interaction as a single undo step with the given label.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "label"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "history.getState",
+    "title": "Get history state",
+    "description": "Report whether undo/redo are available and their labels.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "history.redo",
+    "title": "Redo",
+    "description": "Redo the last undone change.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "history.undo",
+    "title": "Undo",
+    "description": "Undo the last committed change.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "ik.createConstraint",
+    "title": "Create IK constraint",
+    "description": "Create an IK constraint over a 1 or 2 bone chain reaching toward a target bone, and return its id. The chain is parent-then-direct-child for a two-bone chain. Rejected as CONSTRAINT (with a reason: chainArity, chainDiscontinuous, boneMissing, targetMissing, cycle, or duplicateName).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "boneIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1,
+          "maxItems": 2
+        },
+        "targetId": { "$ref": "#/properties/boneIds/items" },
+        "mix": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },
+        "bendPositive": { "type": "boolean", "default": true }
+      },
+      "required": ["documentId", "name", "boneIds", "targetId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "ik.deleteConstraint",
+    "title": "Delete IK constraint",
+    "description": "Delete an IK constraint, cascading every animation IK timeline keyed to it (one undo step).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "ikConstraintId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "ikConstraintId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "ik.deleteKeyframe",
+    "title": "Delete IK keyframe",
+    "description": "Delete an IK keyframe (by id) from a constraint IK channel.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "ikConstraintId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "animationId", "ikConstraintId", "keyframeId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "ik.get",
+    "title": "Get IK constraint",
+    "description": "Get one IK constraint by id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "ikConstraintId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "ikConstraintId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "ik.list",
+    "title": "List IK constraints",
+    "description": "List the IK constraints in solve order.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "ik.moveKeyframe",
+    "title": "Move IK keyframe",
+    "description": "Move an IK keyframe (by id) to a new time on a constraint IK channel (IK times are strictly ascending). Landing on an occupied time is a typed KEYFRAME_COLLISION; a missing key is a typed KEYFRAME_NOT_FOUND. The moved keyframe keeps its mix/bendPositive/curve.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "ikConstraintId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "animationId", "ikConstraintId", "keyframeId", "time"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "ik.setBendPositive",
+    "title": "Set IK bend direction",
+    "description": "Set an IK constraint bend-direction flag (true bends positive, false negative).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "ikConstraintId": { "type": "string", "minLength": 1 },
+        "bendPositive": { "type": "boolean" }
+      },
+      "required": ["documentId", "ikConstraintId", "bendPositive"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "ik.setDepth",
+    "title": "Set IK depth",
+    "description": "Patch a Stage F2 IK depth field: `softness` (non-negative world-unit ease-in distance), and the `stretch` / `compress` / `uniform` booleans. Only the named fields change; the rest keep their current value. At least one field is required.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "ikConstraintId": { "type": "string", "minLength": 1 },
+        "softness": { "type": "number", "minimum": 0 },
+        "stretch": { "type": "boolean" },
+        "compress": { "type": "boolean" },
+        "uniform": { "type": "boolean" }
+      },
+      "required": ["documentId", "ikConstraintId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "ik.setKeyframe",
+    "title": "Set IK keyframe",
+    "description": "Insert or update an IK keyframe at a time on a constraint IK channel (mix + bendPositive). Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "ikConstraintId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 },
+        "mix": { "type": "number", "minimum": 0, "maximum": 1 },
+        "bendPositive": { "type": "boolean" },
+        "curve": {
+          "anyOf": [
+            { "type": "string", "const": "linear" },
+            { "type": "string", "const": "stepped" },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "const": "bezier" },
+                "cx1": { "type": "number" },
+                "cy1": { "type": "number" },
+                "cx2": { "type": "number" },
+                "cy2": { "type": "number" }
+              },
+              "required": ["type", "cx1", "cy1", "cx2", "cy2"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["documentId", "animationId", "ikConstraintId", "time", "mix", "bendPositive"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "ik.setMix",
+    "title": "Set IK mix",
+    "description": "Set an IK constraint mix blend (0..1) toward the solved pose (absolute target).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "ikConstraintId": { "type": "string", "minLength": 1 },
+        "mix": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "required": ["documentId", "ikConstraintId", "mix"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "import.spineProject",
+    "title": "Import Spine project",
+    "description": "Import a user-owned exported Spine project (a .json or a .skel binary) through the clean-room importer, open it as a new editable document, and return a summary plus any lossy-conversion warnings. Import only: this never writes or exports any Spine format (LAW 4 / PP-A5).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["path"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "kf.attachment.delete",
+    "title": "Delete attachment keyframe",
+    "description": "Delete the slot attachment-swap frame at exactly `time` from the stepped attachment timeline. A time with no frame is a typed KEYFRAME_NOT_FOUND.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "animationId", "slotId", "time"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "kf.attachment.move",
+    "title": "Move attachment keyframe",
+    "description": "Move a slot attachment-swap frame (by id) to a new time on the stepped attachment timeline (times are strictly ascending). Landing on an occupied time is a typed KEYFRAME_COLLISION; a missing frame is a typed KEYFRAME_NOT_FOUND. The moved frame keeps its `name`.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "animationId", "slotId", "keyframeId", "time"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "kf.attachment.set",
+    "title": "Set attachment keyframe",
+    "description": "Insert or replace a slot attachment-swap frame at a time on the stepped attachment timeline. `name` is the attachment to show (which must resolve on the slot), or null to hide the slot. Replacing an existing frame at the same time keeps its id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 },
+        "name": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] }
+      },
+      "required": ["documentId", "animationId", "slotId", "time", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "kf.curve",
+    "title": "Set keyframe curve",
+    "description": "Set a keyframe outgoing interpolation curve (linear / stepped / bezier).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "channel": {
+          "type": "string",
+          "enum": [
+            "rotate",
+            "translate",
+            "scale",
+            "shear",
+            "translateX",
+            "translateY",
+            "scaleX",
+            "scaleY",
+            "shearX",
+            "shearY",
+            "color",
+            "dark",
+            "rgb",
+            "alpha"
+          ]
+        },
+        "boneId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 },
+        "curve": {
+          "anyOf": [
+            { "type": "string", "const": "linear" },
+            { "type": "string", "const": "stepped" },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "const": "bezier" },
+                "cx1": { "type": "number" },
+                "cy1": { "type": "number" },
+                "cx2": { "type": "number" },
+                "cy2": { "type": "number" }
+              },
+              "required": ["type", "cx1", "cy1", "cx2", "cy2"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["documentId", "animationId", "channel", "keyframeId", "curve"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "kf.delete",
+    "title": "Delete keyframe",
+    "description": "Delete a keyframe (by id) from its channel.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "channel": {
+          "type": "string",
+          "enum": [
+            "rotate",
+            "translate",
+            "scale",
+            "shear",
+            "translateX",
+            "translateY",
+            "scaleX",
+            "scaleY",
+            "shearX",
+            "shearY",
+            "color",
+            "dark",
+            "rgb",
+            "alpha"
+          ]
+        },
+        "boneId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "animationId", "channel", "keyframeId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "kf.move",
+    "title": "Move keyframe",
+    "description": "Move a keyframe (by id) to a new time on its channel. Rejects landing on an occupied time as KEYFRAME_COLLISION.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "channel": {
+          "type": "string",
+          "enum": [
+            "rotate",
+            "translate",
+            "scale",
+            "shear",
+            "translateX",
+            "translateY",
+            "scaleX",
+            "scaleY",
+            "shearX",
+            "shearY",
+            "color",
+            "dark",
+            "rgb",
+            "alpha"
+          ]
+        },
+        "boneId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "animationId", "channel", "keyframeId", "time"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "kf.paste",
+    "title": "Paste keyframes",
+    "description": "Insert several keyframes at absolute times in one undo step. Each item names its channel (with boneId/slotId), time, value (matching the channel), and curve.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "channel": {
+                "type": "string",
+                "enum": [
+                  "rotate",
+                  "translate",
+                  "scale",
+                  "shear",
+                  "translateX",
+                  "translateY",
+                  "scaleX",
+                  "scaleY",
+                  "shearX",
+                  "shearY",
+                  "color",
+                  "dark",
+                  "rgb",
+                  "alpha"
+                ]
+              },
+              "boneId": { "type": "string", "minLength": 1 },
+              "slotId": { "type": "string", "minLength": 1 },
+              "time": { "type": "number", "minimum": 0 },
+              "value": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": { "angle": { "type": "number" } },
+                    "required": ["angle"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": { "x": { "type": "number" }, "y": { "type": "number" } },
+                    "required": ["x", "y"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "color": {
+                        "type": "object",
+                        "properties": {
+                          "r": { "type": "number", "minimum": 0, "maximum": 1 },
+                          "g": {
+                            "$ref": "#/properties/items/items/properties/value/anyOf/2/properties/color/properties/r"
+                          },
+                          "b": {
+                            "$ref": "#/properties/items/items/properties/value/anyOf/2/properties/color/properties/r"
+                          },
+                          "a": {
+                            "$ref": "#/properties/items/items/properties/value/anyOf/2/properties/color/properties/r"
+                          }
+                        },
+                        "required": ["r", "g", "b", "a"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": ["color"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": { "value": { "type": "number" } },
+                    "required": ["value"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "rgb": {
+                        "type": "object",
+                        "properties": {
+                          "r": {
+                            "$ref": "#/properties/items/items/properties/value/anyOf/2/properties/color/properties/r"
+                          },
+                          "g": {
+                            "$ref": "#/properties/items/items/properties/value/anyOf/2/properties/color/properties/r"
+                          },
+                          "b": {
+                            "$ref": "#/properties/items/items/properties/value/anyOf/2/properties/color/properties/r"
+                          }
+                        },
+                        "required": ["r", "g", "b"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": ["rgb"],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "alpha": {
+                        "$ref": "#/properties/items/items/properties/value/anyOf/2/properties/color/properties/r"
+                      }
+                    },
+                    "required": ["alpha"],
+                    "additionalProperties": false
+                  }
+                ]
+              },
+              "curve": {
+                "anyOf": [
+                  { "type": "string", "const": "linear" },
+                  { "type": "string", "const": "stepped" },
+                  {
+                    "type": "object",
+                    "properties": {
+                      "type": { "type": "string", "const": "bezier" },
+                      "cx1": { "type": "number" },
+                      "cy1": { "type": "number" },
+                      "cx2": { "type": "number" },
+                      "cy2": { "type": "number" }
+                    },
+                    "required": ["type", "cx1", "cy1", "cx2", "cy2"],
+                    "additionalProperties": false
+                  }
+                ],
+                "default": "linear"
+              }
+            },
+            "required": ["channel", "time", "value"],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        }
+      },
+      "required": ["documentId", "animationId", "items"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "kf.set",
+    "title": "Set keyframe",
+    "description": "Insert or update a keyframe at a time on a channel. `channel` is rotate/translate/scale/shear (with boneId) or color (with slotId); `value` must match the channel shape. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "channel": {
+          "type": "string",
+          "enum": [
+            "rotate",
+            "translate",
+            "scale",
+            "shear",
+            "translateX",
+            "translateY",
+            "scaleX",
+            "scaleY",
+            "shearX",
+            "shearY",
+            "color",
+            "dark",
+            "rgb",
+            "alpha"
+          ]
+        },
+        "boneId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 },
+        "value": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": { "angle": { "type": "number" } },
+              "required": ["angle"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": { "x": { "type": "number" }, "y": { "type": "number" } },
+              "required": ["x", "y"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "color": {
+                  "type": "object",
+                  "properties": {
+                    "r": { "type": "number", "minimum": 0, "maximum": 1 },
+                    "g": { "$ref": "#/properties/value/anyOf/2/properties/color/properties/r" },
+                    "b": { "$ref": "#/properties/value/anyOf/2/properties/color/properties/r" },
+                    "a": { "$ref": "#/properties/value/anyOf/2/properties/color/properties/r" }
+                  },
+                  "required": ["r", "g", "b", "a"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["color"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": { "value": { "type": "number" } },
+              "required": ["value"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "rgb": {
+                  "type": "object",
+                  "properties": {
+                    "r": { "$ref": "#/properties/value/anyOf/2/properties/color/properties/r" },
+                    "g": { "$ref": "#/properties/value/anyOf/2/properties/color/properties/r" },
+                    "b": { "$ref": "#/properties/value/anyOf/2/properties/color/properties/r" }
+                  },
+                  "required": ["r", "g", "b"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["rgb"],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "alpha": { "$ref": "#/properties/value/anyOf/2/properties/color/properties/r" }
+              },
+              "required": ["alpha"],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "curve": {
+          "anyOf": [
+            { "type": "string", "const": "linear" },
+            { "type": "string", "const": "stepped" },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "const": "bezier" },
+                "cx1": { "type": "number" },
+                "cy1": { "type": "number" },
+                "cx2": { "type": "number" },
+                "cy2": { "type": "number" }
+              },
+              "required": ["type", "cx1", "cy1", "cx2", "cy2"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["documentId", "animationId", "channel", "time", "value"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.addBoneBinding",
+    "title": "Add bone to mesh binding",
+    "description": "Add one bone influence to an already-weighted mesh, seeded by proximity and re-normalized (capped to 4). Rejected as MESH_BINDING when the mesh is unweighted, the bone is missing, or the bone is already bound.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "slotId", "name", "boneId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.addVertex",
+    "title": "Add mesh vertex",
+    "description": "Add an interior vertex to a mesh. The editor re-triangulates and passes the recomputed uvs/triangles/vertices. Rejected as MESH_TOPOLOGY_LOCKED on a weighted or deformed mesh.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "uvs": { "type": "array", "items": { "type": "number" } },
+        "triangles": { "$ref": "#/properties/uvs" },
+        "vertices": { "$ref": "#/properties/uvs" }
+      },
+      "required": ["documentId", "slotId", "name", "uvs", "triangles", "vertices"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.autoGridFill",
+    "title": "Auto grid-fill mesh",
+    "description": "Replace a mesh with an editor-computed regular interior grid (uvs/triangles/hullLength/vertices, optional edges) in one undoable step. Rejected as MESH_TOPOLOGY_LOCKED on a weighted or deformed mesh.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "uvs": { "type": "array", "items": { "type": "number" } },
+        "triangles": { "$ref": "#/properties/uvs" },
+        "hullLength": { "type": "integer", "minimum": 0 },
+        "vertices": { "$ref": "#/properties/uvs" },
+        "edges": { "$ref": "#/properties/uvs" }
+      },
+      "required": ["documentId", "slotId", "name", "uvs", "triangles", "hullLength", "vertices"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.autoPerimeterTrace",
+    "title": "Auto perimeter-trace mesh",
+    "description": "Replace a mesh with an editor-computed silhouette-traced hull plus interior fill (uvs/triangles/hullLength/vertices, optional edges) in one undoable step. Rejected as MESH_TOPOLOGY_LOCKED on a weighted or deformed mesh.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "uvs": { "type": "array", "items": { "type": "number" } },
+        "triangles": { "$ref": "#/properties/uvs" },
+        "hullLength": { "type": "integer", "minimum": 0 },
+        "vertices": { "$ref": "#/properties/uvs" },
+        "edges": { "$ref": "#/properties/uvs" }
+      },
+      "required": ["documentId", "slotId", "name", "uvs", "triangles", "hullLength", "vertices"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.autoWeight",
+    "title": "Auto-weight mesh from proximity",
+    "description": "Re-seed a weighted mesh by inverse distance to each bound bone segment (capped to the 4 nearest, normalized) as a starting point for manual paint. Rejected as MESH_BINDING when the mesh is unweighted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "slotId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.bindToBones",
+    "title": "Bind mesh to bones",
+    "description": "Convert an UNWEIGHTED mesh to the weighted encoding by binding it to a set of bones. weightMode rigidNearest gives each vertex weight 1 to its nearest bone; equalSplit splits equally across the (up to 4 nearest) bound bones. Skinning at setup pose reproduces the original geometry. Rejected as MESH_BINDING when the mesh is already weighted, the bone set is empty, or a bone is missing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "boneIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "weightMode": { "type": "string", "enum": ["rigidNearest", "equalSplit"] }
+      },
+      "required": ["documentId", "slotId", "name", "boneIds", "weightMode"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.deleteVertex",
+    "title": "Delete mesh vertex",
+    "description": "Delete a mesh vertex. The editor re-triangulates and passes the recomputed uvs/triangles/vertices. Rejected as MESH_TOPOLOGY_LOCKED on a weighted or deformed mesh.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "uvs": { "type": "array", "items": { "type": "number" } },
+        "triangles": { "$ref": "#/properties/uvs" },
+        "vertices": { "$ref": "#/properties/uvs" }
+      },
+      "required": ["documentId", "slotId", "name", "uvs", "triangles", "vertices"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.generateFromRegion",
+    "title": "Generate mesh from region",
+    "description": "Replace a region attachment with a mesh under the same name. The editor computes the quad-from-region geometry (uvs/triangles/hullLength/flat unweighted vertices) and passes it; the mesh keeps the region atlas path. Undo restores the exact region.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "uvs": { "type": "array", "items": { "type": "number" } },
+        "triangles": { "$ref": "#/properties/uvs" },
+        "hullLength": { "type": "integer", "minimum": 0 },
+        "width": { "type": "number" },
+        "height": { "type": "number" },
+        "color": {
+          "type": "object",
+          "properties": {
+            "r": { "type": "number", "minimum": 0, "maximum": 1 },
+            "g": { "$ref": "#/properties/color/properties/r" },
+            "b": { "$ref": "#/properties/color/properties/r" },
+            "a": { "$ref": "#/properties/color/properties/r" }
+          },
+          "required": ["r", "g", "b", "a"],
+          "additionalProperties": false,
+          "default": { "r": 1, "g": 1, "b": 1, "a": 1 }
+        },
+        "edges": { "$ref": "#/properties/uvs" },
+        "vertices": { "$ref": "#/properties/uvs" }
+      },
+      "required": [
+        "documentId",
+        "slotId",
+        "name",
+        "uvs",
+        "triangles",
+        "hullLength",
+        "width",
+        "height",
+        "vertices"
+      ],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.moveVertex",
+    "title": "Move mesh vertex",
+    "description": "Move one mesh vertex to (x, y). Never re-triangulates (indices stable); always allowed (not topology-locked). Wrap a drag in beginInteraction/endInteraction to coalesce it into one undo step.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "vertexIndex": { "type": "integer", "minimum": 0 },
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "required": ["documentId", "slotId", "name", "vertexIndex", "x", "y"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.normalizeWeights",
+    "title": "Normalize mesh weights",
+    "description": "Re-normalize every vertex of a weighted mesh to sum 1 and cap to 4 influences (idempotent). Rejected as MESH_BINDING when the mesh is unweighted.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "slotId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.paintWeight",
+    "title": "Paint mesh weights",
+    "description": "Apply a weight-paint stroke to one active bone across a set of dabs (per-vertex weight adjustments); each touched vertex is re-normalized (non-active proportions preserved) and capped to 4. mode add raises, subtract lowers, smooth applies the supplied signed delta. Wrap a stroke in beginInteraction/endInteraction to coalesce its dabs into one undo step. Rejected as MESH_BINDING when the mesh is unweighted, the bone is missing, or a dab indexes a vertex out of range.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "activeBoneId": { "type": "string", "minLength": 1 },
+        "dabs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "vertexIndex": { "type": "integer", "minimum": 0 },
+              "deltaWeight": { "type": "number" }
+            },
+            "required": ["vertexIndex", "deltaWeight"],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        },
+        "mode": { "type": "string", "enum": ["add", "subtract", "smooth"] }
+      },
+      "required": ["documentId", "slotId", "name", "activeBoneId", "dabs", "mode"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.removeBoneBinding",
+    "title": "Remove bone from mesh binding",
+    "description": "Drop one bone influence from a weighted mesh and re-normalize (a vertex left with no influence falls back to its nearest remaining bound bone). Rejected as MESH_BINDING when the mesh is unweighted, the bone is not bound, or it is the only bound bone (use mesh.unbind).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "slotId", "name", "boneId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.sample",
+    "title": "Sample solved mesh vertices",
+    "description": "Return final world-space vertices, triangles, and bounds after constraints, skinning, and deform. Supports weighted and linked meshes and named-skin default fallback. Physics replays at 60 Hz.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0, "maximum": 1800, "default": 0 },
+        "skin": { "type": "string", "minLength": 1, "default": "default" }
+      },
+      "required": ["documentId", "slotId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.setEdges",
+    "title": "Set mesh edges",
+    "description": "Set or replace a mesh edges (wireframe) array, as vertex-index pairs. Does not change topology; always allowed. An empty array clears the wireframe.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "edges": { "type": "array", "items": { "type": "number" } }
+      },
+      "required": ["documentId", "slotId", "name", "edges"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "mesh.unbind",
+    "title": "Unbind mesh",
+    "description": "Clear all weights, returning a mesh to the unweighted flat encoding (re-derived from the current setup pose so it renders identically). Required before changing a weighted mesh topology. Rejected as MESH_BINDING when the mesh is unweighted or still has deform keyframes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "slotId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.addCurve",
+    "title": "Add path curve",
+    "description": "Append one cubic curve (three control points) to the end of a path spline; the arc-length table is recomputed. Rejected as PATH (reason: notFound).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "slotId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.createConstraint",
+    "title": "Create path constraint",
+    "description": "Create a path constraint that distributes a set of bones along the path attachment carried by a target SLOT, and return its id. Rejected as CONSTRAINT (reason: targetMissing, targetNotPath, boneMissing, chainArity, or duplicateName).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "targetSlotId": { "type": "string", "minLength": 1 },
+        "boneIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "positionMode": {
+              "type": "string",
+              "enum": ["fixed", "percent"],
+              "default": "percent"
+            },
+            "spacingMode": {
+              "type": "string",
+              "enum": ["length", "fixed", "percent", "proportional"],
+              "default": "length"
+            },
+            "rotateMode": {
+              "type": "string",
+              "enum": ["tangent", "chain", "chainScale"],
+              "default": "tangent"
+            },
+            "position": { "type": "number", "default": 0 },
+            "spacing": { "type": "number", "default": 0 },
+            "offsetRotation": { "type": "number", "default": 0 },
+            "mixRotate": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },
+            "mixX": { "$ref": "#/properties/params/properties/mixRotate", "default": 1 },
+            "mixY": { "$ref": "#/properties/params/properties/mixRotate", "default": 1 }
+          },
+          "additionalProperties": false,
+          "default": {}
+        }
+      },
+      "required": ["documentId", "name", "targetSlotId", "boneIds"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.deleteConstraint",
+    "title": "Delete path constraint",
+    "description": "Delete a path constraint, cascading every animation path timeline keyed to it (one undo step).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "pathConstraintId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "pathConstraintId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.deleteControlPoint",
+    "title": "Delete path control point",
+    "description": "Delete one ANCHOR control point (pointIndex must be a multiple of 3), collapsing the curve it bounds; the arc-length table is recomputed. A path keeps at least one curve. Rejected as PATH (reason: notFound, pointRange for a handle/out-of-range index, or minCurves).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "pointIndex": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["documentId", "slotId", "name", "pointIndex"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.deleteKeyframe",
+    "title": "Delete path keyframe",
+    "description": "Delete a path keyframe (by id) from a constraint path channel.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "pathConstraintId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "animationId", "pathConstraintId", "keyframeId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.get",
+    "title": "Get path attachment",
+    "description": "Read a path attachment: its openness, parametrization flag, flat control-point stream, and cumulative arc-length table. Errors PATH_NOT_FOUND when the attachment is absent or not a path.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "slotId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.getConstraint",
+    "title": "Get path constraint",
+    "description": "Get one path constraint by id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "pathConstraintId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "pathConstraintId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.listConstraints",
+    "title": "List path constraints",
+    "description": "List the path constraints in solve order.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.moveControlPoint",
+    "title": "Move path control point",
+    "description": "Move one path control point (anchor or handle). The arc-length table is recomputed. Rejected as PATH (reason: notFound or pointRange).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "pointIndex": { "type": "integer", "minimum": 0 },
+        "x": { "type": "number" },
+        "y": { "type": "number" }
+      },
+      "required": ["documentId", "slotId", "name", "pointIndex", "x", "y"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.moveKeyframe",
+    "title": "Move path keyframe",
+    "description": "Move a path keyframe (by id) to a new time (path times are strictly ascending). Landing on an occupied time is a typed KEYFRAME_COLLISION; a missing key is a typed KEYFRAME_NOT_FOUND. The moved keyframe keeps its channels/curve.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "pathConstraintId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "animationId", "pathConstraintId", "keyframeId", "time"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.removeCurve",
+    "title": "Remove path curve",
+    "description": "Drop the last cubic curve from a path spline (a path keeps at least one curve). Rejected as PATH (reason: notFound or minCurves).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "slotId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.setClosed",
+    "title": "Set path closed",
+    "description": "Set a path spline open or closed. Closing drops the trailing anchor; opening appends one at the first anchor, so the control-point count stays valid. Rejected as PATH (reason: notFound).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "closed": { "type": "boolean" }
+      },
+      "required": ["documentId", "slotId", "name", "closed"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.setConstantSpeed",
+    "title": "Set path constant speed",
+    "description": "Set a path spline arc-length (constant-speed) vs naive-t parametrization. A pure flag flip. Rejected as PATH (reason: notFound).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "constantSpeed": { "type": "boolean" }
+      },
+      "required": ["documentId", "slotId", "name", "constantSpeed"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.setKeyframe",
+    "title": "Set path keyframe",
+    "description": "Insert or update a path-constraint keyframe at a time. Each channel (position/spacing/mixRotate/mixX/mixY) is optional; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "pathConstraintId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 },
+        "position": { "type": "number" },
+        "spacing": { "type": "number" },
+        "mixRotate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "mixX": { "$ref": "#/properties/mixRotate" },
+        "mixY": { "$ref": "#/properties/mixRotate" },
+        "curve": {
+          "anyOf": [
+            { "type": "string", "const": "linear" },
+            { "type": "string", "const": "stepped" },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "const": "bezier" },
+                "cx1": { "type": "number" },
+                "cy1": { "type": "number" },
+                "cx2": { "type": "number" },
+                "cy2": { "type": "number" }
+              },
+              "required": ["type", "cx1", "cy1", "cx2", "cy2"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["documentId", "animationId", "pathConstraintId", "time"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "path.setParams",
+    "title": "Set path constraint params",
+    "description": "Patch a path constraint parameter: the modes (positionMode/spacingMode/rotateMode), the scalars (position/spacing/offsetRotation), or the mix channels (mixRotate/mixX/mixY in [0,1]). Only the named fields change; at least one is required.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "pathConstraintId": { "type": "string", "minLength": 1 },
+        "positionMode": { "type": "string", "enum": ["fixed", "percent"] },
+        "spacingMode": { "type": "string", "enum": ["length", "fixed", "percent", "proportional"] },
+        "rotateMode": { "type": "string", "enum": ["tangent", "chain", "chainScale"] },
+        "position": { "type": "number" },
+        "spacing": { "type": "number" },
+        "offsetRotation": { "type": "number" },
+        "mixRotate": { "type": "number", "minimum": 0, "maximum": 1 },
+        "mixX": { "$ref": "#/properties/mixRotate" },
+        "mixY": { "$ref": "#/properties/mixRotate" }
+      },
+      "required": ["documentId", "pathConstraintId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "physics.createConstraint",
+    "title": "Create physics constraint",
+    "description": "Create a physics constraint that simulates a subset of ONE bone's local channels (x/y/rotation/scaleX/shearX) as a damped-driven spring, and return its id. `channels` must be non-empty and duplicate-free. Rejected as CONSTRAINT (reason: boneMissing, channelsEmpty, channelDuplicate, or duplicateName).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 },
+        "channels": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["x", "y", "rotation", "scaleX", "shearX"] },
+          "minItems": 1
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "step": { "type": "number", "exclusiveMinimum": 0, "default": 0.016666666666666666 },
+            "inertia": { "type": "number", "minimum": 0, "maximum": 1, "default": 0 },
+            "strength": { "type": "number", "minimum": 0, "default": 0 },
+            "damping": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },
+            "mass": { "type": "number", "exclusiveMinimum": 0, "default": 1 },
+            "wind": { "type": "number", "default": 0 },
+            "gravity": { "$ref": "#/properties/params/properties/wind", "default": 0 },
+            "mix": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 }
+          },
+          "additionalProperties": false,
+          "default": {}
+        }
+      },
+      "required": ["documentId", "name", "boneId", "channels"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "physics.deleteConstraint",
+    "title": "Delete physics constraint",
+    "description": "Delete a physics constraint, cascading every animation physics timeline keyed to it (one undo step).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "physicsConstraintId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "physicsConstraintId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "physics.deleteKeyframe",
+    "title": "Delete physics keyframe",
+    "description": "Delete a physics keyframe (by id) from a constraint physics channel.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "physicsConstraintId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "animationId", "physicsConstraintId", "keyframeId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "physics.getConstraint",
+    "title": "Get physics constraint",
+    "description": "Get one physics constraint by id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "physicsConstraintId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "physicsConstraintId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "physics.getSettings",
+    "title": "Get physics settings",
+    "description": "Get the OPTIONAL skeleton physics settings block (global gravity/wind/master mix), or null when the document defines none (the identity default: no global weather, unit master mix).",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "physics.listConstraints",
+    "title": "List physics constraints",
+    "description": "List the physics constraints in solve order.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "physics.moveKeyframe",
+    "title": "Move physics keyframe",
+    "description": "Move a physics keyframe (by id) to a new time (physics times are strictly ascending). Landing on an occupied time is a typed KEYFRAME_COLLISION; a missing key is a typed KEYFRAME_NOT_FOUND. The moved keyframe keeps its channels/curve.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "physicsConstraintId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "animationId", "physicsConstraintId", "keyframeId", "time"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "physics.renameConstraint",
+    "title": "Rename physics constraint",
+    "description": "Rename a physics constraint (identity is the id, so its timeline tracks are unaffected). Rejected as CONSTRAINT (reason: notFound or duplicateName).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "physicsConstraintId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "physicsConstraintId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "physics.setChannels",
+    "title": "Set physics channels",
+    "description": "Replace a physics constraint's simulated channel set (non-empty, duplicate-free subset of x/y/rotation/scaleX/shearX). Rejected as CONSTRAINT (reason: notFound, channelsEmpty, or channelDuplicate).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "physicsConstraintId": { "type": "string", "minLength": 1 },
+        "channels": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["x", "y", "rotation", "scaleX", "shearX"] },
+          "minItems": 1
+        }
+      },
+      "required": ["documentId", "physicsConstraintId", "channels"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "physics.setKeyframe",
+    "title": "Set physics keyframe",
+    "description": "Insert or update a physics-constraint keyframe at a time. Each dynamic channel (mix/inertia/strength/damping/wind/gravity) is optional; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). step/mass/channels are NOT keyable.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "physicsConstraintId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 },
+        "mix": { "type": "number", "minimum": 0, "maximum": 1 },
+        "inertia": { "type": "number", "minimum": 0, "maximum": 1 },
+        "strength": { "type": "number", "minimum": 0 },
+        "damping": { "type": "number", "minimum": 0, "maximum": 1 },
+        "wind": { "type": "number" },
+        "gravity": { "$ref": "#/properties/wind" },
+        "curve": {
+          "anyOf": [
+            { "type": "string", "const": "linear" },
+            { "type": "string", "const": "stepped" },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "const": "bezier" },
+                "cx1": { "type": "number" },
+                "cy1": { "type": "number" },
+                "cx2": { "type": "number" },
+                "cy2": { "type": "number" }
+              },
+              "required": ["type", "cx1", "cy1", "cx2", "cy2"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["documentId", "animationId", "physicsConstraintId", "time"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "physics.setParams",
+    "title": "Set physics constraint params",
+    "description": "Patch a physics constraint scalar parameter: step (>0), inertia/damping/mix ([0,1]), strength (>=0), mass (>0), or wind/gravity (finite). Only the named fields change; at least one is required.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "physicsConstraintId": { "type": "string", "minLength": 1 },
+        "step": { "type": "number", "exclusiveMinimum": 0 },
+        "inertia": { "type": "number", "minimum": 0, "maximum": 1 },
+        "strength": { "type": "number", "minimum": 0 },
+        "damping": { "type": "number", "minimum": 0, "maximum": 1 },
+        "mass": { "type": "number", "exclusiveMinimum": 0 },
+        "wind": { "type": "number" },
+        "gravity": { "$ref": "#/properties/wind" },
+        "mix": { "type": "number", "minimum": 0, "maximum": 1 }
+      },
+      "required": ["documentId", "physicsConstraintId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "physics.setSettings",
+    "title": "Set physics settings",
+    "description": "Set or CLEAR the global physics settings block. Pass { gravity, wind, mix } to set it, or `settings: null` to clear it (restoring the identity default).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "settings": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "gravity": { "type": "number" },
+                "wind": { "$ref": "#/properties/settings/anyOf/0/properties/gravity" },
+                "mix": { "type": "number", "minimum": 0, "maximum": 1 }
+              },
+              "required": ["gravity", "wind", "mix"],
+              "additionalProperties": false
+            },
+            { "type": "null" }
+          ]
+        }
+      },
+      "required": ["documentId", "settings"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "physics.setTargetBone",
+    "title": "Set physics target bone",
+    "description": "Retarget a physics constraint to a different bone (the single driven/setpoint bone). Rejected as CONSTRAINT (reason: notFound or boneMissing).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "physicsConstraintId": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "physicsConstraintId", "boneId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "render_frame",
+    "title": "Render frame",
+    "description": "Rasterize the current document to a PNG for headless authoring feedback (ADR-0006) and return it base64-encoded. Renders the setup pose, or an animation sampled at `time` (clamped to the animation duration). Atlas page PNGs referenced by the document are loaded from the project root; a referenced page file that is missing on disk is a loud error. When the document has no atlas pages at all, attachments render as tintable white placeholders and `placeholders` is true. Pass `effect` to overlay a solved effect/bundle from the live effects library ON TOP of the skeleton in the same frame (world-space anchors only in this pass; bone anchors are not wired yet).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animation": { "type": "string", "minLength": 1 },
+        "time": { "type": "number" },
+        "width": { "type": "integer", "minimum": 1, "maximum": 2048, "default": 512 },
+        "height": { "$ref": "#/properties/width", "default": 512 },
+        "fit": {
+          "anyOf": [
+            { "type": "string", "const": "content" },
+            {
+              "type": "object",
+              "properties": {
+                "x": { "type": "number" },
+                "y": { "type": "number" },
+                "w": { "type": "number", "exclusiveMinimum": 0 },
+                "h": { "type": "number", "exclusiveMinimum": 0 }
+              },
+              "required": ["x", "y", "w", "h"],
+              "additionalProperties": false
+            }
+          ],
+          "default": "content"
+        },
+        "background": {
+          "type": "object",
+          "properties": {
+            "r": { "type": "number", "minimum": 0, "maximum": 1 },
+            "g": { "$ref": "#/properties/background/properties/r" },
+            "b": { "$ref": "#/properties/background/properties/r" },
+            "a": { "$ref": "#/properties/background/properties/r" }
+          },
+          "required": ["r", "g", "b", "a"],
+          "additionalProperties": false
+        },
+        "effect": {
+          "type": "object",
+          "properties": {
+            "effect": { "type": "string", "minLength": 1 },
+            "bundle": { "type": "string", "minLength": 1 },
+            "seed": { "type": "integer" },
+            "time": { "type": "number", "minimum": 0 },
+            "anchors": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "x": { "type": "number" },
+                  "y": { "type": "number" },
+                  "rotation": { "type": "number" }
+                },
+                "required": ["x", "y"],
+                "additionalProperties": false
+              },
+              "propertyNames": { "minLength": 1 }
+            }
+          },
+          "required": ["seed"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "skin.create",
+    "title": "Create skin",
+    "description": "Create a NAMED (non-default) skin and return its id. The implicit \"default\" skin is reserved. Rejected as SKIN (with a reason: defaultProtected or duplicateName).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "skin.delete",
+    "title": "Delete skin",
+    "description": "Delete a NAMED skin, cascading every animation deform timeline keyed to it (one undo step).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "skinId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "skinId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "skin.get",
+    "title": "Get skin",
+    "description": "Get one NAMED skin (and its attachment addresses) by id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "skinId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "skinId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "skin.list",
+    "title": "List skins",
+    "description": "List the NAMED (non-default) skins in skin order, each with its attachment addresses.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "skin.removeAttachment",
+    "title": "Remove skin attachment",
+    "description": "Remove an attachment from a NAMED skin at a (slot, attachment-name) address. Rejected as SKIN (reason notFound) when the skin or the addressed attachment is absent.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "skinId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "skinId", "slotId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "skin.rename",
+    "title": "Rename skin",
+    "description": "Rename a NAMED skin (identity is the id, so deform tracks are unaffected). Rejected as SKIN (with a reason: defaultProtected, notFound, or duplicateName).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "skinId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "skinId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "skin.scope.add",
+    "title": "Add skin scope",
+    "description": "Add a bone or constraint NAME to a NAMED skin Stage F2 scoping list (the bones/constraints active only while this skin is active). Rejected as SKIN (reason: notFound, scopeDuplicate, scopeUnknownBone, or scopeUnknownConstraint).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "skinId": { "type": "string", "minLength": 1 },
+        "scope": { "type": "string", "enum": ["bones", "constraints"] },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "skinId", "scope", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "skin.scope.remove",
+    "title": "Remove skin scope",
+    "description": "Remove a bone or constraint NAME from a NAMED skin scoping list (clearing the dimension when the last entry goes). Rejected as SKIN (reason: notFound or scopeMissing).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "skinId": { "type": "string", "minLength": 1 },
+        "scope": { "type": "string", "enum": ["bones", "constraints"] },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "skinId", "scope", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "skin.setAttachment",
+    "title": "Set skin attachment",
+    "description": "Add or replace a region attachment on a NAMED skin at a (slot, attachment-name) address. The `path` references an atlas region. Rejected as SKIN (with a reason: notFound or slotMissing).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "skinId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "attachment": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string", "minLength": 1 },
+            "path": { "type": "string", "minLength": 1 },
+            "x": { "type": "number", "default": 0 },
+            "y": { "type": "number", "default": 0 },
+            "rotation": { "type": "number", "default": 0 },
+            "scaleX": { "type": "number", "default": 1 },
+            "scaleY": { "type": "number", "default": 1 },
+            "width": { "type": "number", "default": 0 },
+            "height": { "type": "number", "default": 0 },
+            "color": {
+              "type": "object",
+              "properties": {
+                "r": { "type": "number", "minimum": 0, "maximum": 1 },
+                "g": { "$ref": "#/properties/attachment/properties/color/properties/r" },
+                "b": { "$ref": "#/properties/attachment/properties/color/properties/r" },
+                "a": { "$ref": "#/properties/attachment/properties/color/properties/r" }
+              },
+              "required": ["r", "g", "b", "a"],
+              "additionalProperties": false,
+              "default": { "r": 1, "g": 1, "b": 1, "a": 1 }
+            }
+          },
+          "required": ["name", "path"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "skinId", "slotId", "attachment"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.activeAttachment",
+    "title": "Set active attachment",
+    "description": "Set the slot setup-pose active attachment name (null clears it).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "attachment": { "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }] }
+      },
+      "required": ["documentId", "slotId", "attachment"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.blend",
+    "title": "Set slot blend mode",
+    "description": "Set a slot blend mode (the format BlendMode enum).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "blendMode": { "type": "string", "enum": ["normal", "additive", "multiply", "screen"] }
+      },
+      "required": ["documentId", "slotId", "blendMode"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.color",
+    "title": "Set slot color",
+    "description": "Set a slot tint color (RGBA, each channel 0..1).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "color": {
+          "type": "object",
+          "properties": {
+            "r": { "type": "number", "minimum": 0, "maximum": 1 },
+            "g": { "$ref": "#/properties/color/properties/r" },
+            "b": { "$ref": "#/properties/color/properties/r" },
+            "a": { "$ref": "#/properties/color/properties/r" }
+          },
+          "required": ["r", "g", "b", "a"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "slotId", "color"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.create",
+    "title": "Create slot",
+    "description": "Create a slot riding a bone and return its id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "boneId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "color": {
+          "type": "object",
+          "properties": {
+            "r": { "type": "number", "minimum": 0, "maximum": 1 },
+            "g": { "$ref": "#/properties/color/properties/r" },
+            "b": { "$ref": "#/properties/color/properties/r" },
+            "a": { "$ref": "#/properties/color/properties/r" }
+          },
+          "required": ["r", "g", "b", "a"],
+          "additionalProperties": false,
+          "default": { "r": 1, "g": 1, "b": 1, "a": 1 }
+        },
+        "darkColor": {
+          "anyOf": [{ "$ref": "#/properties/color" }, { "type": "null" }],
+          "default": null
+        },
+        "attachment": {
+          "anyOf": [{ "type": "string", "minLength": 1 }, { "type": "null" }],
+          "default": null
+        },
+        "blendMode": {
+          "type": "string",
+          "enum": ["normal", "additive", "multiply", "screen"],
+          "default": "normal"
+        }
+      },
+      "required": ["documentId", "boneId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.darkColor",
+    "title": "Set slot dark color",
+    "description": "Set or clear a slot setup DARK color (Stage F2 two-color tint, RGBA 0..1). A non-null color enables the two-color tint and is required before keying the `dark` timeline; `color: null` disables it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "color": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "r": { "type": "number", "minimum": 0, "maximum": 1 },
+                "g": { "$ref": "#/properties/color/anyOf/0/properties/r" },
+                "b": { "$ref": "#/properties/color/anyOf/0/properties/r" },
+                "a": { "$ref": "#/properties/color/anyOf/0/properties/r" }
+              },
+              "required": ["r", "g", "b", "a"],
+              "additionalProperties": false
+            },
+            { "type": "null" }
+          ]
+        }
+      },
+      "required": ["documentId", "slotId", "color"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.delete",
+    "title": "Delete slot",
+    "description": "Delete a slot and its attachments (one undo step).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "slotId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.flow.addTransition",
+    "title": "Add feature flow transition",
+    "description": "Append a transition (from + on match + to) to the feature-flow graph. The shape is validated at the boundary; endpoint existence is an import-time validator concern.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "transition": {
+          "type": "object",
+          "properties": {
+            "from": { "type": "string", "minLength": 1 },
+            "on": {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "minLength": 1 },
+                "dataEquals": {
+                  "type": "object",
+                  "properties": {
+                    "field": { "type": "string", "minLength": 1 },
+                    "equals": { "type": ["number", "string", "boolean"] }
+                  },
+                  "required": ["field", "equals"],
+                  "additionalProperties": false
+                }
+              },
+              "required": ["type"],
+              "additionalProperties": false
+            },
+            "to": { "type": "string", "minLength": 1 }
+          },
+          "required": ["from", "on", "to"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "transition"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.flow.createState",
+    "title": "Create feature flow state",
+    "description": "Add a named feature-flow state (optional cinematic node). Rejects a duplicate or empty name (SLOT_EDIT).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "node": {
+          "type": "object",
+          "properties": {
+            "cinematic": {
+              "type": "object",
+              "properties": {
+                "vfxPreset": { "type": "string", "minLength": 1 },
+                "animation": { "type": "string", "minLength": 1 }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.flow.deleteState",
+    "title": "Delete feature flow state",
+    "description": "Delete a named state and every transition incident to it (one undo step). The mandatory \"base\" state cannot be deleted (SLOT_EDIT baseStateProtected).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.flow.get",
+    "title": "Get feature flow graph",
+    "description": "Return the feature-flow graph (states, transitions, entry).",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.flow.removeTransition",
+    "title": "Remove feature flow transition",
+    "description": "Remove one transition by its index in the graph transition list.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "index": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["documentId", "index"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.flow.renameState",
+    "title": "Rename feature flow state",
+    "description": "Rename a state and rewrite every transition that references it. \"base\" cannot be renamed and the new name must not collide (SLOT_EDIT).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "from": { "type": "string", "minLength": 1 },
+        "to": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "from", "to"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.get",
+    "title": "Get slot",
+    "description": "Get one slot (and its attachment names) by id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "slotId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.grid.get",
+    "title": "Get slot grid",
+    "description": "Return the current slot grid config.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.grid.preset",
+    "title": "Apply slot grid preset",
+    "description": "Apply a canonical grid preset in one call: reelStrip5x3, scatterPay6x5, or cluster7x7.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "preset": { "type": "string", "enum": ["reelStrip5x3", "scatterPay6x5", "cluster7x7"] }
+      },
+      "required": ["documentId", "preset"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.grid.set",
+    "title": "Set slot grid",
+    "description": "Set the slot grid config (topology + dimensions + gravity, optional anticipation). Rejects an invalid topology/shape combination (SLOT_EDIT).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "grid": {
+          "type": "object",
+          "properties": {
+            "topology": { "type": "string", "enum": ["reelStrip", "scatterPay", "cluster"] },
+            "cols": { "type": "integer", "minimum": 1, "maximum": 12 },
+            "rows": { "$ref": "#/properties/grid/properties/cols" },
+            "cellWidth": { "type": "integer", "exclusiveMinimum": 0 },
+            "cellHeight": { "type": "integer", "exclusiveMinimum": 0 },
+            "cellGap": { "type": "integer", "minimum": 0 },
+            "reelStopStaggerMs": { "type": "integer", "minimum": 0 },
+            "gravity": { "type": "string", "enum": ["column-down", "cluster-down"] },
+            "anticipation": {
+              "type": "object",
+              "properties": {
+                "triggerSymbols": {
+                  "type": "array",
+                  "items": { "type": "string", "minLength": 1 }
+                },
+                "thresholdCount": { "type": "integer" },
+                "maxAnticipatingCols": { "type": "integer" }
+              },
+              "required": ["triggerSymbols", "thresholdCount", "maxAnticipatingCols"],
+              "additionalProperties": false
+            }
+          },
+          "required": [
+            "topology",
+            "cols",
+            "rows",
+            "cellWidth",
+            "cellHeight",
+            "cellGap",
+            "reelStopStaggerMs",
+            "gravity",
+            "anticipation"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "grid"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.list",
+    "title": "List slots",
+    "description": "List the slots in setup-pose draw order.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.rename",
+    "title": "Rename slot",
+    "description": "Rename a slot (identity is the id, so references are unaffected).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "slotId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.reorder",
+    "title": "Reorder slot",
+    "description": "Move a slot to a new index in the setup-pose draw order.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "slotId": { "type": "string", "minLength": 1 },
+        "toIndex": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["documentId", "slotId", "toIndex"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.scene.get",
+    "title": "Get slot scene",
+    "description": "Return the whole slot-scene snapshot (grid, symbol library, win sequencer, feature flows, tumble, refs).",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.symbol.get",
+    "title": "Get mapped symbol",
+    "description": "Return the anim set mapped to one SymbolId, or null when the symbol is unmapped.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "symbolId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "symbolId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.symbol.list",
+    "title": "List mapped symbols",
+    "description": "List the mapped symbols (SymbolId + anim set) in id order.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.symbol.map",
+    "title": "Map symbol anim set",
+    "description": "Map a SymbolId to a skeleton + idle/land/win(/anticipation) animation set, adding the skeletonRef to the scene refs. Provide `skeletonAnimationNames` to enforce that the chosen names exist.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "symbolId": { "type": "string", "minLength": 1 },
+        "animSet": {
+          "type": "object",
+          "properties": {
+            "skeletonRef": { "type": "string", "minLength": 1 },
+            "idle": { "type": "string", "minLength": 1 },
+            "land": { "type": "string", "minLength": 1 },
+            "win": { "type": "string", "minLength": 1 },
+            "anticipation": { "type": "string", "minLength": 1 }
+          },
+          "required": ["skeletonRef", "idle", "land", "win"],
+          "additionalProperties": false
+        },
+        "skeletonAnimationNames": { "type": "array", "items": { "type": "string" } },
+        "skeletonHash": { "type": "string" }
+      },
+      "required": ["documentId", "symbolId", "animSet"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.symbol.unmap",
+    "title": "Unmap symbol",
+    "description": "Remove a SymbolId mapping, pruning its skeletonRef when no remaining symbol references it. Rejects an unmapped symbol (SLOT_EDIT notMapped).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "symbolId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "symbolId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.tumble.get",
+    "title": "Get tumble choreography",
+    "description": "Return the tumble/cascade choreography.",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.tumble.set",
+    "title": "Set tumble choreography",
+    "description": "Set the tumble/cascade timing (explode/drop/refill/settle/step ms as non-negative integers) plus the drop easing and rollup curve. Coalesces on the session.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "tumble": {
+          "type": "object",
+          "properties": {
+            "explodeMs": { "type": "integer", "minimum": 0 },
+            "dropMs": { "$ref": "#/properties/tumble/properties/explodeMs" },
+            "dropEasing": {
+              "type": "string",
+              "enum": ["linear", "easeInQuad", "easeOutQuad", "easeInOutCubic"]
+            },
+            "refillStaggerMs": { "$ref": "#/properties/tumble/properties/explodeMs" },
+            "settleMs": { "$ref": "#/properties/tumble/properties/explodeMs" },
+            "stepGapMs": { "$ref": "#/properties/tumble/properties/explodeMs" },
+            "rollupCurve": { "$ref": "#/properties/tumble/properties/dropEasing" }
+          },
+          "required": [
+            "explodeMs",
+            "dropMs",
+            "dropEasing",
+            "refillStaggerMs",
+            "settleMs",
+            "stepGapMs",
+            "rollupCurve"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "tumble"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.winseq.create",
+    "title": "Create win sequence",
+    "description": "Create a new, empty, named win sequence. Rejects a duplicate name (SLOT_EDIT).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "name"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.winseq.get",
+    "title": "Get win sequencer",
+    "description": "Return the win-sequencer config (sequences, thresholds, default sequence).",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.winseq.reorderSteps",
+    "title": "Reorder win sequence steps",
+    "description": "Reorder a sequence steps by an explicit new-order array of current step indices (a permutation).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "sequenceName": { "type": "string", "minLength": 1 },
+        "order": { "type": "array", "items": { "type": "integer", "minimum": 0 } }
+      },
+      "required": ["documentId", "sequenceName", "order"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.winseq.setStep",
+    "title": "Set win sequence step",
+    "description": "Set or append a step (atMs + target + action) at an index in a named sequence. An index equal to the step count appends; a smaller index replaces. The step shape is validated at the boundary.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "sequenceName": { "type": "string", "minLength": 1 },
+        "index": { "type": "integer", "minimum": 0 },
+        "step": {
+          "type": "object",
+          "properties": {
+            "atMs": { "type": "integer", "minimum": 0 },
+            "target": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": { "kind": { "type": "string", "const": "allWinningCells" } },
+                  "required": ["kind"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": { "type": "string", "const": "byLine" },
+                    "index": { "type": "integer", "minimum": 0 }
+                  },
+                  "required": ["kind", "index"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": { "type": "string", "const": "bySymbol" },
+                    "symbol": { "type": "string", "minLength": 1 }
+                  },
+                  "required": ["kind", "symbol"],
+                  "additionalProperties": false
+                }
+              ]
+            },
+            "action": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": { "kind": { "type": "string", "const": "animateWin" } },
+                  "required": ["kind"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": { "type": "string", "const": "vfx" },
+                    "preset": { "type": "string", "minLength": 1 },
+                    "anchorRule": { "type": "string", "enum": ["eachCell", "gridCenter"] }
+                  },
+                  "required": ["kind", "preset", "anchorRule"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": { "type": "string", "const": "rollupStart" },
+                    "curve": {
+                      "type": "string",
+                      "enum": ["linear", "easeInQuad", "easeOutQuad", "easeInOutCubic"]
+                    }
+                  },
+                  "required": ["kind", "curve"],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "kind": { "type": "string", "const": "escalationBanner" },
+                    "tier": { "type": "string", "enum": ["big", "mega", "epic"] }
+                  },
+                  "required": ["kind", "tier"],
+                  "additionalProperties": false
+                }
+              ]
+            }
+          },
+          "required": ["atMs", "target", "action"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "sequenceName", "index", "step"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.winseq.setThresholds",
+    "title": "Set escalation thresholds",
+    "description": "Set the big/mega/epic win escalation thresholds (finite, non-negative). Coalesces on the session.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "thresholds": {
+          "type": "object",
+          "properties": {
+            "big": { "type": "number", "minimum": 0 },
+            "mega": { "type": "number", "minimum": 0 },
+            "epic": { "type": "number", "minimum": 0 }
+          },
+          "required": ["big", "mega", "epic"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "thresholds"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "transform.createConstraint",
+    "title": "Create transform constraint",
+    "description": "Create a transform constraint that drives a set of bones from a target with per-channel mix and additive offset, and return its id. Solves after all IK. Rejected as CONSTRAINT (with a reason: boneMissing, targetMissing, cycle, or duplicateName).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "boneIds": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 },
+          "minItems": 1
+        },
+        "targetId": { "$ref": "#/properties/boneIds/items" },
+        "params": {
+          "type": "object",
+          "properties": {
+            "mixRotate": { "type": "number", "minimum": 0, "maximum": 1, "default": 1 },
+            "mixX": { "$ref": "#/properties/params/properties/mixRotate", "default": 0 },
+            "mixY": { "$ref": "#/properties/params/properties/mixRotate", "default": 0 },
+            "mixScaleX": { "$ref": "#/properties/params/properties/mixRotate", "default": 0 },
+            "mixScaleY": { "$ref": "#/properties/params/properties/mixRotate", "default": 0 },
+            "mixShearY": { "$ref": "#/properties/params/properties/mixRotate", "default": 0 },
+            "offsetRotation": { "type": "number", "default": 0 },
+            "offsetX": { "$ref": "#/properties/params/properties/offsetRotation", "default": 0 },
+            "offsetY": { "$ref": "#/properties/params/properties/offsetRotation", "default": 0 },
+            "offsetScaleX": {
+              "$ref": "#/properties/params/properties/offsetRotation",
+              "default": 0
+            },
+            "offsetScaleY": {
+              "$ref": "#/properties/params/properties/offsetRotation",
+              "default": 0
+            },
+            "offsetShearY": {
+              "$ref": "#/properties/params/properties/offsetRotation",
+              "default": 0
+            }
+          },
+          "additionalProperties": false,
+          "default": {}
+        }
+      },
+      "required": ["documentId", "name", "boneIds", "targetId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "transform.deleteConstraint",
+    "title": "Delete transform constraint",
+    "description": "Delete a transform constraint, cascading every animation transform timeline keyed to it (one undo step).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "transformConstraintId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "transformConstraintId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "transform.deleteKeyframe",
+    "title": "Delete transform keyframe",
+    "description": "Delete a transform keyframe (by id) from a constraint channel.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "transformConstraintId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "animationId", "transformConstraintId", "keyframeId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "transform.get",
+    "title": "Get transform constraint",
+    "description": "Get one transform constraint by id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "transformConstraintId": { "type": "string", "minLength": 1 }
+      },
+      "required": ["documentId", "transformConstraintId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "transform.list",
+    "title": "List transform constraints",
+    "description": "List the transform constraints in solve order (after all IK).",
+    "inputSchema": {
+      "type": "object",
+      "properties": { "documentId": { "type": "string", "minLength": 1 } },
+      "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "transform.moveKeyframe",
+    "title": "Move transform keyframe",
+    "description": "Move a transform keyframe (by id) to a new time on a constraint channel (times are strictly ascending). Landing on an occupied time is a typed KEYFRAME_COLLISION; a missing key is a typed KEYFRAME_NOT_FOUND. The moved keyframe keeps all six mix channels and its curve.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "transformConstraintId": { "type": "string", "minLength": 1 },
+        "keyframeId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 }
+      },
+      "required": ["documentId", "animationId", "transformConstraintId", "keyframeId", "time"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "transform.setKeyframe",
+    "title": "Set transform keyframe",
+    "description": "Insert or update a transform keyframe at a time on a constraint channel. `mix` carries the six per-channel factors; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "animationId": { "type": "string", "minLength": 1 },
+        "transformConstraintId": { "type": "string", "minLength": 1 },
+        "time": { "type": "number", "minimum": 0 },
+        "mix": {
+          "type": "object",
+          "properties": {
+            "mixRotate": { "type": "number", "minimum": 0, "maximum": 1 },
+            "mixX": { "$ref": "#/properties/mix/properties/mixRotate" },
+            "mixY": { "$ref": "#/properties/mix/properties/mixRotate" },
+            "mixScaleX": { "$ref": "#/properties/mix/properties/mixRotate" },
+            "mixScaleY": { "$ref": "#/properties/mix/properties/mixRotate" },
+            "mixShearY": { "$ref": "#/properties/mix/properties/mixRotate" }
+          },
+          "additionalProperties": false
+        },
+        "curve": {
+          "anyOf": [
+            { "type": "string", "const": "linear" },
+            { "type": "string", "const": "stepped" },
+            {
+              "type": "object",
+              "properties": {
+                "type": { "type": "string", "const": "bezier" },
+                "cx1": { "type": "number" },
+                "cy1": { "type": "number" },
+                "cx2": { "type": "number" },
+                "cy2": { "type": "number" }
+              },
+              "required": ["type", "cx1", "cy1", "cx2", "cy2"],
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "required": ["documentId", "animationId", "transformConstraintId", "time", "mix"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "transform.setParams",
+    "title": "Set transform constraint params",
+    "description": "Patch a transform constraint mix/offset channels (only the named channels change; the rest keep their current value). The patch holds the absolute target values. At least one channel required.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "transformConstraintId": { "type": "string", "minLength": 1 },
+        "patch": {
+          "type": "object",
+          "properties": {
+            "mixRotate": { "type": "number", "minimum": 0, "maximum": 1 },
+            "mixX": { "$ref": "#/properties/patch/properties/mixRotate" },
+            "mixY": { "$ref": "#/properties/patch/properties/mixRotate" },
+            "mixScaleX": { "$ref": "#/properties/patch/properties/mixRotate" },
+            "mixScaleY": { "$ref": "#/properties/patch/properties/mixRotate" },
+            "mixShearY": { "$ref": "#/properties/patch/properties/mixRotate" },
+            "offsetRotation": { "type": "number" },
+            "offsetX": { "$ref": "#/properties/patch/properties/offsetRotation" },
+            "offsetY": { "$ref": "#/properties/patch/properties/offsetRotation" },
+            "offsetScaleX": { "$ref": "#/properties/patch/properties/offsetRotation" },
+            "offsetScaleY": { "$ref": "#/properties/patch/properties/offsetRotation" },
+            "offsetShearY": { "$ref": "#/properties/patch/properties/offsetRotation" }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "transformConstraintId", "patch"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "transform.setVariants",
+    "title": "Set transform constraint variants",
+    "description": "Patch a transform constraint Stage F2 variant flag: `local` (local-space read/write instead of the world-space blend) and `relative` (offset relative to the bone current value instead of an absolute blend). Only the named flags change. At least one flag is required.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "transformConstraintId": { "type": "string", "minLength": 1 },
+        "local": { "type": "boolean" },
+        "relative": { "type": "boolean" }
+      },
+      "required": ["documentId", "transformConstraintId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  }
+]

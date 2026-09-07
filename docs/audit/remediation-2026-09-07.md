@@ -12,7 +12,8 @@ presentation boundaries. Work proceeds in verified subsystem changes.
 | F21 | Filesystem link confinement and bounded file I/O | Implemented; 89 MCP tests pass; PR #30 |
 | F02-F05, F09 | Project persistence, asset history, recovery, document identity | Implemented; 91 targeted core and 66 editor integration tests pass; desktop acceptance pending |
 | F08, F10-F13, F15 | Displayed pose, video startup, physics/export/native skin context | Implemented; pixel/player/worker checks pass; engine and WebCodecs acceptance pending |
-| F16-F20, F29 | Import capability, constraint/effect/slot UI, MCP, deform policy | Pending |
+| F20 | Complete MCP solved-pose/deform feedback and generated reference | Implemented; command and MCP integration checks pass |
+| F16-F19, F29 | Import capability, constraint/effect/slot UI, MCP, deform policy | Pending |
 | F01, F22-F28 | Repository, dependencies, CI, release, docs, performance, acceptance | Pending |
 
 ## Evidence and environment

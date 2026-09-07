@@ -41,6 +41,7 @@ import { addSkinScopeSpec } from './add-skin-scope.command';
 import { removeSkinAttachmentSpec } from './remove-skin-attachment.command';
 import { removeSkinScopeSpec } from './remove-skin-scope.command';
 import { renameSkinSpec } from './rename-skin.command';
+import { setDeformCurveSpec } from './set-deform-curve.command';
 import { setDeformKeyframeSpec } from './set-deform-keyframe.command';
 import { setGridConfigSpec } from './set-grid-config.command';
 import { mapSymbolAnimSetSpec } from './map-symbol-anim-set.command';
@@ -235,6 +236,7 @@ export const commandRegistry: readonly CommandSpec[] = [
   removeSkinAttachmentSpec,
   // WP-2.9 deform timelines
   setDeformKeyframeSpec,
+  setDeformCurveSpec,
   deleteDeformKeyframeSpec,
   moveDeformKeyframeSpec,
   clearAttachmentDeformSpec,

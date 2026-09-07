@@ -1,486 +1,1638 @@
-# Chapter 9: Tool Reference (MCP Control Surface)
-
-Armature 2D exposes its entire authoring surface as a set of MCP (Model Context Protocol) tools.
-The GUI panels and the MCP tools drive the exact same command layer (`@marionette/document-core`),
-so everything in this reference is also a precise description of what the editor itself can do.
-Anything you can click, you can script; anything you can script, you can undo.
-
-This chapter is the complete reference: 202 tools across 26 namespaces. For a guided walkthrough
-that uses a small subset of these, read Chapter 1 (Getting Started) first.
-
-## Conventions used by every tool
-
-- Every tool validates its input against a strict schema. Unknown fields are rejected, and
-  malformed input returns a typed `INVALID_INPUT` error rather than a partial edit.
-- Almost every tool takes a `documentId`, the handle returned by `document.new` or
-  `document.open`. An unknown id returns `DOCUMENT_NOT_FOUND`.
-- Every **mutating** tool executes a document-core command through the session's History.
-  Mutations return `{ revision }` (the document revision after the edit); creation tools return
-  the new id instead (`{ boneId }`, `{ slotId }`, `{ animationId }`, and so on).
-- Failures are typed. Domain errors carry a `reason` code, for example `CONSTRAINT` (with reasons
-  like `cycle`, `chainArity`, `targetMissing`), `SKIN` (`defaultProtected`, `duplicateName`),
-  `MESH_BINDING`, `MESH_TOPOLOGY_LOCKED`, `DEFORM` (`notMesh`, `offsetLength`),
-  `KEYFRAME_COLLISION`, `REPARENT_CYCLE`, `ANIMATION_DURATION`, `EFFECT_EDIT`, `SLOT_EDIT`.
-- Colors are always RGBA objects `{ r, g, b, a }` with each channel in `0..1`.
-- Angles are degrees. Times are seconds unless a field is explicitly named `...Ms`.
-- Consecutive MCP calls never auto-coalesce into one undo step. To group a gesture (for example a
-  scripted drag) into a single undo entry, wrap it in `history.beginInteraction` /
-  `history.endInteraction`.
-
-## Session and document lifecycle: `document.*`
-
-Sessions are in-memory documents managed by the server (up to 16 at once). The lifecycle is:
-create or open, edit through commands, validate, save, close.
-
-| Tool | Purpose | Input | Returns |
-|---|---|---|---|
-| `document.new` | Create a new empty skeleton document | `name` | `{ documentId }` |
-| `document.open` | Read a document from disk, validate it, open a session | `path` | `{ documentId, document }` |
-| `document.save` | Export to portable format JSON and write to disk | `documentId`, `path` | `{ path }` |
-| `document.close` | Discard the session | `documentId` | `{ closed: true }` |
-| `document.validate` | Validate the current state against the format contract | `documentId` | `{ ok, errors }` |
-| `document.export` | Project the session to a portable `SkeletonDocument` | `documentId` | `{ document }` |
-| `document.getSnapshot` | Internal snapshot (bones, ordering) for inspection | `documentId` | `{ snapshot }` |
-| `document.setMetadata` | Set the authoring metadata block (`fps`, `imagesPath`, `audioPath`); all absent clears it | `documentId`, optional `fps`/`imagesPath`/`audioPath` | `{ revision }` |
-| `document.getWorldTransforms` | Solve the setup pose and return each bone's world matrix | `documentId` | `{ transforms: [{ name, world: [a,b,c,d,tx,ty] }] }` |
-
-Always check `document.validate` returns `{ ok: true }` before treating a document as done; the
-`errors` array carries the typed `FormatError` list when it is not.
-
-## Import a Spine project: `import.*`
-
-Armature 2D can import a user-owned project exported from Spine and convert it to a validated
-Armature document on import (PP-A5). The importer is strictly clean-room (built only from Esoteric's
-published format documentation) and import only: it never writes or exports any Spine format.
-
-| Tool | Purpose | Input | Returns |
-|---|---|---|---|
-| `import.spineProject` | Import a Spine `.json` or `.skel` binary project, open it as an editable session | `path`, optional `name` | `{ documentId, name, format, summary, warnings }` |
-
-The path extension selects the reader: `.skel` is decoded as the binary format, anything else is
-parsed as JSON. `summary` reports the converted counts (bones, slots, skins, animations,
-constraints, events). `warnings` lists every lossy conversion (each with a `feature`, a `path`, and
-a `why`), for example a synthesized placeholder atlas or an unsupported physics constraint, so
-nothing is dropped silently. A malformed input fails loudly: `FILE_READ_ERROR`, `INVALID_JSON`, or
-`SPINE_IMPORT_FAILED` (whose `detail.errors` carries the importer's typed error list).
-
-## Undo and redo: `history.*`
-
-| Tool | Purpose | Input | Returns |
-|---|---|---|---|
-| `history.undo` | Undo the most recent change | `documentId` | `{ event }` |
-| `history.redo` | Redo the most recently undone change | `documentId` | `{ event }` |
-| `history.getState` | Query undo/redo availability and labels | `documentId` | `{ canUndo, canRedo, undoLabel, redoLabel }` |
-| `history.beginInteraction` | Start a coalescing interaction (a "gesture") | `documentId` | `{ ok: true }` |
-| `history.endInteraction` | Commit the interaction as ONE undo step | `documentId`, `label` | `{ event }` |
-
-## Bones: `bone.*`
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `bone.create` | Create a bone, optionally parented | `parentId` (or `null` for a root), `name`, `x`, `y`, `rotation`, `length`, `scaleX`, `scaleY`, `shearX`, `shearY`, `transformMode` |
-| `bone.move` | Set local translation | `boneId`, `x`, `y` |
-| `bone.rotate` | Set local rotation in degrees | `boneId`, `rotation` |
-| `bone.scale` | Set local scale | `boneId`, `scaleX`, `scaleY` |
-| `bone.shear` | Set local shear in degrees | `boneId`, `shearX`, `shearY` |
-| `bone.setLength` | Set the bone's length | `boneId`, `length` |
-| `bone.rename` | Rename a bone | `boneId`, `name` |
-| `bone.delete` | Delete a bone and all of its descendants | `boneId` |
-| `bone.reparent` | Reparent while holding the world transform; rejects cycles | `boneId`, `newParentId` |
-| `bone.transformMode` | Set how the bone inherits from its parent | `boneId`, `mode` |
-| `bone.list` | List all bones in document order | (documentId only) |
-| `bone.get` | Get a single bone | `boneId` |
-
-`transformMode` values: `normal`, `onlyTranslation`, `noRotationOrReflection`, `noScale`,
-`noScaleOrReflection`. See Chapter 3 for what each mode means.
-
-## Slots (skeletal draw slots): `slot.*`
-
-Note: the `slot.` prefix is shared with the slot-game composer namespaces further down. The nine
-tools here operate on skeletal draw slots.
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `slot.create` | Create a slot attached to a bone | `boneId`, `name`, optional `color`, `darkColor`, `attachment`, `blendMode` |
-| `slot.delete` | Delete a slot and its attachments | `slotId` |
-| `slot.rename` | Rename a slot | `slotId`, `name` |
-| `slot.blend` | Set the slot's blend mode | `slotId`, `blendMode` (`normal`, `additive`, `multiply`, `screen`) |
-| `slot.color` | Set the slot tint | `slotId`, `color` |
-| `slot.darkColor` | Set or clear the slot's setup two-color DARK tint (Stage F2) | `slotId`, `darkColor` (RGBA) or `null` |
-| `slot.reorder` | Move the slot within the draw order | `slotId`, `toIndex` |
-| `slot.activeAttachment` | Set the setup-pose active attachment (or `null` to hide) | `slotId`, `attachment` |
-| `slot.list` | List slots in draw order | (documentId only) |
-| `slot.get` | Get a slot plus its attachment names | `slotId` |
-
-A common trap: adding an attachment does NOT make it visible. Call `slot.activeAttachment`
-after `attach.region.add` or nothing renders.
-
-## Region attachments: `attach.*`
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `attach.region.add` | Add a region (image) attachment to a slot | `slotId`, `name`, `path` (atlas region), `x`, `y`, `rotation`, `scaleX`, `scaleY`, `width`, `height`, `color` |
-| `attach.region.transform` | Update placement/size; omitted fields keep their value | `slotId`, `name`, any of the transform fields |
-| `attach.linkedmesh.create` | Add a linked mesh reusing a parent mesh's geometry | `slotId`, `name`, `path`, `parent`, `skin?`, `timelines`, `width`, `height`, `color` |
-| `attach.linkedmesh.unlink` | Bake a linked mesh to a plain mesh | `slotId`, `name` |
-| `attach.sequence.set` | Set or clear a region/mesh frame-sequence | `slotId`, `name`, `sequence` (count/start/digits/setupIndex) or null |
-| `attach.path.add` | Add a path (cubic Bezier rail) attachment; omit `vertices` for the default two-curve open path | `slotId`, `name`, `closed`, `constantSpeed`, `vertices?` (flat [x0,y0,...] control points) |
-| `attach.remove` | Remove an attachment from a slot | `slotId`, `name` |
-
-## Paths (Bezier rails): `path.*`
-
-A path attachment is an unweighted piecewise cubic Bezier spline on a slot, used as a rail that a path
-constraint distributes bones along. The cumulative arc-length `lengths` table is recomputed by the tool on
-every control-point edit (authoring owns it, ADR-0011); callers never supply it. Control points are the flat
-`[x0, y0, x1, y1, ...]` stream laid out anchor, handle, handle, anchor; `pointIndex` addresses a logical
-control point. Edits are rejected as `PATH` with a `reason` (`notFound`, `pointRange`, `minCurves`).
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `path.get` | Read a path's openness, parametrization flag, control points, and arc-length table | `slotId`, `name` |
-| `path.moveControlPoint` | Move one control point (anchor or handle); recomputes lengths | `slotId`, `name`, `pointIndex`, `x`, `y` |
-| `path.deleteControlPoint` | Delete an anchor (pointIndex a multiple of 3), collapsing its curve | `slotId`, `name`, `pointIndex` |
-| `path.addCurve` | Append one cubic curve (three control points) to the end | `slotId`, `name` |
-| `path.removeCurve` | Drop the last curve (a path keeps at least one) | `slotId`, `name` |
-| `path.setClosed` | Toggle openness; adjusts the control-point stream to stay valid | `slotId`, `name`, `closed` |
-| `path.setConstantSpeed` | Flip arc-length vs naive-`t` parametrization | `slotId`, `name`, `constantSpeed` |
-
-## Meshes and weights: `mesh.*`
-
-Mesh geometry (vertices, UVs, triangles, hull) is computed by the caller and passed as flat
-number arrays; the commands validate and install it. Topology edits fail with
-`MESH_TOPOLOGY_LOCKED` when deform keys exist on the mesh (clear them first with
-`deform.clearAttachment`), and weight edits fail with `MESH_BINDING` plus a reason.
-
-Topology:
-
-| Tool | Purpose |
-|---|---|
-| `mesh.generateFromRegion` | Replace a region attachment with a mesh (initial quad or custom geometry) |
-| `mesh.addVertex` | Add an interior vertex (caller supplies re-triangulated arrays) |
-| `mesh.moveVertex` | Move one vertex; indices stay stable |
-| `mesh.deleteVertex` | Delete a vertex (caller supplies re-triangulated arrays) |
-| `mesh.setEdges` | Set the wireframe edge pairs |
-| `mesh.autoGridFill` | Replace the interior with a regular grid |
-| `mesh.autoPerimeterTrace` | Replace geometry with a silhouette-traced hull plus fill |
-
-Skinning:
-
-| Tool | Purpose |
-|---|---|
-| `mesh.bindToBones` | Convert an unweighted mesh to a weighted one (`boneIds`, `weightMode`: `rigidNearest` or `equalSplit`) |
-| `mesh.addBoneBinding` | Add one bone influence |
-| `mesh.removeBoneBinding` | Remove one bone influence |
-| `mesh.unbind` | Clear all weights, back to unweighted |
-| `mesh.autoWeight` | Re-seed all weights by proximity |
-| `mesh.paintWeight` | Apply a weight-paint stroke: `activeBoneId`, `dabs` of `{ vertexIndex, deltaWeight }`, `mode` (`add`, `subtract`, `smooth`) |
-| `mesh.normalizeWeights` | Re-normalize every vertex to sum 1 with at most 4 influences |
-
-## IK constraints: `ik.*`
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `ik.createConstraint` | Create an IK constraint over a 1 or 2 bone chain | `name`, `boneIds` (1 or 2, parent-child), `targetId`, `mix` (0..1), `bendPositive` |
-| `ik.setMix` | Set the mix | `ikConstraintId`, `mix` |
-| `ik.setBendPositive` | Flip the bend direction | `ikConstraintId`, `bendPositive` |
-| `ik.setDepth` | Patch the Stage F2 depth fields | `ikConstraintId`, any of `softness` / `stretch` / `compress` / `uniform` |
-| `ik.deleteConstraint` | Delete the constraint and cascade its timelines | `ikConstraintId` |
-| `ik.setKeyframe` | Key mix + bend in an animation | `animationId`, `ikConstraintId`, `time`, `mix`, `bendPositive`, optional `curve` |
-| `ik.deleteKeyframe` | Delete an IK keyframe | `animationId`, `ikConstraintId`, `keyframeId` |
-| `ik.moveKeyframe` | Move an IK keyframe to a new time (rejects a collision) | `animationId`, `ikConstraintId`, `keyframeId`, `time` |
-| `ik.list` | List IK constraints in solve order | |
-| `ik.get` | Get one constraint | `ikConstraintId` |
-
-## Transform constraints: `transform.*`
-
-A transform constraint drives one or more bones toward a target bone through twelve channels:
-six mix factors (`mixRotate`, `mixX`, `mixY`, `mixScaleX`, `mixScaleY`, `mixShearY`, each 0..1)
-and six offsets (`offsetRotation`, `offsetX`, `offsetY`, `offsetScaleX`, `offsetScaleY`,
-`offsetShearY`).
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `transform.createConstraint` | Create a constraint | `name`, `boneIds`, `targetId`, `params` (any of the 12 channels) |
-| `transform.setParams` | Patch one or more channels | `transformConstraintId`, `patch` |
-| `transform.setVariants` | Patch the Stage F2 local/relative flags | `transformConstraintId`, any of `local` / `relative` |
-| `transform.deleteConstraint` | Delete and cascade timelines | `transformConstraintId` |
-| `transform.setKeyframe` | Key the mix factors in an animation | `animationId`, `transformConstraintId`, `time`, `mix` (any of the 6 factors), optional `curve` |
-| `transform.deleteKeyframe` | Delete a keyframe | `animationId`, `transformConstraintId`, `keyframeId` |
-| `transform.moveKeyframe` | Move a keyframe to a new time (rejects a collision) | `animationId`, `transformConstraintId`, `keyframeId`, `time` |
-| `transform.list` | List in solve order | |
-| `transform.get` | Get one constraint | `transformConstraintId` |
-
-## Path constraints and timelines: `path.*`
-
-A path constraint distributes and orients a list of bones along the path attachment carried by a target
-SLOT (Stage F3, ADR-0011). It shares the single combined solve-order namespace with IK and transform. The
-`position`/`spacing`/`offsetRotation` scalars are unbounded; the three mix channels are in `[0,1]`. Create and
-param edits are rejected as `CONSTRAINT` with a `reason` (`targetMissing`, `targetNotPath`, `boneMissing`,
-`chainArity`, `duplicateName`). The timeline tools mirror `ik.*`: each keyframe carries a partial set of the
-five channels (an omitted channel keeps its base value at solve time).
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `path.createConstraint` | Create a path constraint over a target slot and a bone list | `name`, `targetSlotId`, `boneIds`, `params` (modes + scalars + mix) |
-| `path.setParams` | Patch modes/scalars/mix (only the named fields) | `pathConstraintId`, any of the parameter fields |
-| `path.deleteConstraint` | Delete a constraint, cascading its path timelines | `pathConstraintId` |
-| `path.listConstraints` | List path constraints in solve order | `documentId` |
-| `path.getConstraint` | Get one path constraint by id | `pathConstraintId` |
-| `path.setKeyframe` | Insert or update a path keyframe | `animationId`, `pathConstraintId`, `time`, optional `position`/`spacing`/`mixRotate`/`mixX`/`mixY`, `curve?` |
-| `path.moveKeyframe` | Retime a keyframe (`KEYFRAME_COLLISION` if occupied) | `animationId`, `pathConstraintId`, `keyframeId`, `time` |
-| `path.deleteKeyframe` | Delete a keyframe by id | `animationId`, `pathConstraintId`, `keyframeId` |
-
-## Physics constraints and timelines: `physics.*`
-
-A physics constraint (Stage F4, ADR-0014) simulates a non-empty, duplicate-free subset of ONE bone's local
-channels (`x`/`y`/`rotation`/`scaleX`/`shearX`) as a damped-driven spring toward the animated pose: it is how
-you author secondary motion (a tail jiggle, a dangling chain, cloth-like sway) without keyframing every beat.
-The bound bone is both the driven bone and its own setpoint, so a physics constraint never forms a solver
-cycle. `step`/`mass` are structural (a strictly positive fixed timestep and inertial mass); `inertia`/`damping`/
-`mix` are in `[0, 1]`, `strength` is `>= 0`, and `wind`/`gravity` are finite world forces. `step`/`mass`/
-`channels` are NOT keyable; a keyframe carries only the dynamic knobs (`mix`/`inertia`/`strength`/`damping`/
-`wind`/`gravity`). The OPTIONAL skeleton settings block adds global `gravity`/`wind` and a master `mix`.
-Physics shares the single combined solve-order namespace with IK, transform, and path. Constraint edits are
-rejected as `CONSTRAINT` with a `reason` (`boneMissing`, `channelsEmpty`, `channelDuplicate`, `duplicateName`,
-`notFound`); a keyframe collision is `KEYFRAME_COLLISION`.
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `physics.createConstraint` | Create a constraint over one bone and a channel set | `name`, `boneId`, `channels`, `params` (step/knobs/forces) |
-| `physics.setParams` | Patch the scalar params (only the named fields) | `physicsConstraintId`, any of `step`/`inertia`/`strength`/`damping`/`mass`/`wind`/`gravity`/`mix` |
-| `physics.setChannels` | Replace the simulated channel set (non-empty, unique) | `physicsConstraintId`, `channels` |
-| `physics.setTargetBone` | Retarget to a different bone | `physicsConstraintId`, `boneId` |
-| `physics.renameConstraint` | Rename (id-stable, timelines unaffected) | `physicsConstraintId`, `name` |
-| `physics.deleteConstraint` | Delete a constraint, cascading its physics timelines | `physicsConstraintId` |
-| `physics.listConstraints` | List physics constraints in solve order | `documentId` |
-| `physics.getConstraint` | Get one physics constraint by id | `physicsConstraintId` |
-| `physics.getSettings` | Read the global settings block (or null) | `documentId` |
-| `physics.setSettings` | Set or clear the global gravity/wind/mix block | `settings` (`{ gravity, wind, mix }` or null) |
-| `physics.setKeyframe` | Insert or update a physics keyframe | `animationId`, `physicsConstraintId`, `time`, optional `mix`/`inertia`/`strength`/`damping`/`wind`/`gravity`, `curve?` |
-| `physics.moveKeyframe` | Retime a keyframe (`KEYFRAME_COLLISION` if occupied) | `animationId`, `physicsConstraintId`, `keyframeId`, `time` |
-| `physics.deleteKeyframe` | Delete a keyframe by id | `animationId`, `physicsConstraintId`, `keyframeId` |
-
-## Constraint order: `constraints.*`
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `constraints.reorder` | Set the explicit cross-array solve order, or clear it | `order` (combined IK-then-transform-then-path-then-physics ids), or `order: null` to restore the default |
-
-## Skins: `skin.*`
-
-The default skin always exists and cannot be renamed or deleted (`SKIN` error, reason
-`defaultProtected`). Named skins overlay it.
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `skin.create` | Create a named skin | `name` |
-| `skin.rename` | Rename a named skin | `skinId`, `name` |
-| `skin.delete` | Delete a named skin and cascade its deform timelines | `skinId` |
-| `skin.scope.add` | Add a bone or constraint NAME to the skin's Stage F2 active-only scoping list | `skinId`, `scope` (`bones`/`constraints`), `name` |
-| `skin.scope.remove` | Remove a name from the skin's scoping list (clears the dimension when empty) | `skinId`, `scope`, `name` |
-| `skin.setAttachment` | Add or replace a region attachment in the skin at (slot, name) | `skinId`, `slotId`, `attachment` (full region description) |
-| `skin.removeAttachment` | Remove the attachment at (slot, name) | `skinId`, `slotId`, `name` |
-| `skin.list` | List named skins | |
-| `skin.get` | Get one named skin | `skinId` |
-
-## Deform timelines: `deform.*`
-
-Deform keyframes store per-vertex offsets for a mesh attachment inside an animation, addressed
-by skin (`"default"` or a named skin id), slot, and attachment name.
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `deform.setKeyframe` | Insert or update a deform key | `animationId`, `skin`, `slotId`, `name`, `time`, `offsets` (must match the mesh vertex count), optional `curve` |
-| `deform.deleteKeyframe` | Delete a deform key | ..., `keyframeId` |
-| `deform.moveKeyframe` | Move a key to a new time (`KEYFRAME_COLLISION` if occupied) | ..., `keyframeId`, `time` |
-| `deform.clearAttachment` | Remove ALL deform keys for (slot, attachment) across every animation and skin; unlocks topology editing | `slotId`, `name` |
-
-## Animations: `anim.*`
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `anim.create` | Create an empty animation | `name`, `duration` (seconds) |
-| `anim.delete` | Delete an animation and all of its timelines | `animationId` |
-| `anim.rename` | Rename | `animationId`, `name` |
-| `anim.duration` | Set the duration; rejects shrinking below the last keyframe (`ANIMATION_DURATION`) | `animationId`, `duration` |
-| `anim.duplicate` | Duplicate under a new name | `animationId`, `name` |
-| `anim.list` | List animations with track counts | |
-| `anim.get` | Get an animation with all timelines and keyframes | `animationId` |
-| `anim.sequence.set` | Insert or update a slot frame-sequence key (Stage F2) | `animationId`, `slotId`, `time`, `mode`, `index`, `delay` |
-| `anim.sequence.move` | Move a sequence key (by id) to a new time (rejects a collision) | `animationId`, `slotId`, `keyframeId`, `time` |
-| `anim.sequence.delete` | Delete a sequence key at a time | `animationId`, `slotId`, `time` |
-
-## Keyframes: `kf.*`
-
-The channel selects the target kind. The bone channels take a `boneId`: the joint channels `rotate`,
-`translate`, `scale`, `shear`, plus the Stage F2 per-component split channels `translateX`, `translateY`,
-`scaleX`, `scaleY`, `shearX`, `shearY`. The slot channels take a `slotId`: the joint `color`, the two-color
-`dark` tint, and the Stage F2 split color channels `rgb` and `alpha`. The value shape must match the
-channel: `{ angle }` for rotate, `{ x, y }` for translate/scale/shear, `{ value }` for the split bone
-components, `{ color }` for color/dark, `{ rgb }` for rgb, and `{ alpha }` for alpha. A joint channel and
-its split components never coexist on one bone/slot (`TIMELINE`, reason `componentConflict`): key
-`translate` OR `translateX`/`translateY` (likewise scale/shear), and `color` OR `rgb`/`alpha`.
-
-Curves are per-key outgoing interpolation: `"linear"`, `"stepped"`, or
-`{ type: "bezier", cx1, cy1, cx2, cy2 }`.
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `kf.set` | Insert or update a keyframe | `animationId`, `channel`, `boneId`/`slotId`, `time`, `value`, optional `curve` |
-| `kf.move` | Move a key to a new time (`KEYFRAME_COLLISION` if occupied) | ..., `keyframeId`, `time` |
-| `kf.delete` | Delete a key | ..., `keyframeId` |
-| `kf.curve` | Set a key's outgoing curve | ..., `keyframeId`, `curve` |
-| `kf.paste` | Insert many keys as ONE undo step | `animationId`, `items[]` of `{ channel, boneId?/slotId?, time, value, curve }` |
-| `kf.attachment.set` | Key an attachment swap (or `null` to hide) at a time | `animationId`, `slotId`, `time`, `name` |
-| `kf.attachment.delete` | Delete the attachment key at a time | `animationId`, `slotId`, `time` |
-| `kf.attachment.move` | Move an attachment key (by id) to a new time (rejects a collision) | `animationId`, `slotId`, `keyframeId`, `time` |
-
-## Events and draw order: `event.*` and `draworder.*`
-
-Events are named triggers (with optional int/float/string payload defaults and an audio hint) defined
-once on the document, then fired at keyed times on an animation's event timeline. A key references its
-definition by id, so a rename never breaks the keys that fire it; deleting a definition removes every key
-that fired it in one undo step. Event times are non-decreasing (coincident firings are legal) and carry no
-curve. A draw-order timeline reorders which slot draws in front of which over time; each key stores a
-compact list of signed slot offsets from the setup order (an empty list restores the setup order). Both
-are animation timelines, so their keys move and delete by `keyframeId` like value keys; draw-order times
-are strictly ascending (`KEYFRAME_COLLISION` on an occupied move) while event moves never collide.
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `event.define` | Define an event and return its id | `documentId`, `name`, optional `int`/`float`/`string`, optional `audio` (`{ path, volume, balance }`) |
-| `event.rename` | Rename an event (unique names, `EVENT_EDIT`) | `documentId`, `eventId`, `name` |
-| `event.delete` | Delete an event and cascade its keys | `documentId`, `eventId` |
-| `event.setDefaults` | Set the payload defaults (absent field clears it) | `documentId`, `eventId`, optional `int`/`float`/`string` |
-| `event.setAudio` | Set or clear the audio hint (range-checked, `EVENT_EDIT`) | `documentId`, `eventId`, optional `audio` |
-| `event.list` | List event definitions | `documentId` |
-| `event.get` | Get one event definition | `documentId`, `eventId` |
-| `event.key.set` | Insert or update a firing at a time (optional per-firing payload override) | `documentId`, `animationId`, `eventId`, `time`, optional `int`/`float`/`string` |
-| `event.key.move` | Move a firing (no collision) | `documentId`, `animationId`, `keyframeId`, `time` |
-| `event.key.delete` | Delete a firing | `documentId`, `animationId`, `keyframeId` |
-| `draworder.key.set` | Insert or update a reorder at a time (`offsets` of `{ slot, offset }`; `DRAW_ORDER` if inconsistent) | `documentId`, `animationId`, `time`, `offsets[]` |
-| `draworder.key.move` | Move a reorder (`KEYFRAME_COLLISION` if occupied) | `documentId`, `animationId`, `keyframeId`, `time` |
-| `draworder.key.delete` | Delete a reorder | `documentId`, `animationId`, `keyframeId` |
-
-`anim.get` includes the animation's `events` and `drawOrder` timelines; `document.setMetadata` (in the
-lifecycle section) sets the authoring `fps` and the source-asset directories that pair with events.
-
-## Atlas: `atlas.*`
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `atlas.pack` | Headless pipeline: read source PNGs, pack deterministic atlas pages, write them, install the atlas reference | `sourceDir`, `outputDir` (project-relative, confined to the project root), optional `maxPageSize` (up to 4096), `padding` |
-| `atlas.set` | Install a pre-built atlas reference (pages and regions) | `atlas` |
-| `atlas.get` | Return the current atlas reference | |
-
-## Headless rendering: `render_frame`
-
-Rasterizes the current document to a PNG so a scripted or AI-driven session can SEE its work.
-
-Input: optional `animation` name and `time` to pose, `width`/`height` (default 512, max 2048),
-`fit` (`"content"` or an explicit `{ x, y, w, h }` window), `background` color, and an optional
-`effect` overlay (`{ effect?or bundle?, seed, time, anchors }`) to composite VFX.
-Returns `{ pngBase64, width, height, bytes, placeholders }`; `placeholders` lists regions that
-had no texture and rendered as tinted stand-ins.
-
-## Effects (VFX): `effect.*` and `bundle.*`
-
-Effects are simulation-deterministic particle/VFX definitions: same seed, same frames. An effect
-is a stack of layers; each layer is an `emitter`, `spriteAnimator`, or `ribbonTrail`.
-
-Library and metadata:
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `effect.create` | Create an empty effect | `name`, optional `duration` (or `null` for looping), `deterministic`, `simulationDt`, `blendMode` |
-| `effect.delete` | Delete an effect (cascades bundle items that used it) | `effectId` |
-| `effect.rename` | Rename | `effectId`, `name` |
-| `effect.setMeta` | Patch duration / determinism / simulation step | `effectId`, fields |
-| `effect.setAtlas` | Replace the VFX atlas (rejects dangling region references) | `atlas` |
-| `effect.getAtlas` / `effect.getSnapshot` / `effect.list` / `effect.get` | Read back | |
-
-Layers:
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `effect.layer.add` | Append a layer | `effectId`, `kind` (`emitter`, `spriteAnimator`, `ribbonTrail`), `blendMode` (default additive), `region` |
-| `effect.layer.remove` | Remove a layer | `effectId`, `layerId` |
-| `effect.layer.reorder` | Reorder layers (z order) | `effectId`, `order[]` |
-| `effect.layer.setField` | Replace the layer body (emitter spawn/shape/texture/ranges/gravity/drag/trail and so on) | `effectId`, `layerId`, `field`, `body` |
-| `effect.layer.setBlendMode` | Per-layer blend | `effectId`, `layerId`, `blendMode` |
-
-Life and length curves (`effect.lifeStop.*`): every layer carries gradient-style curves such as
-`scaleOverLife`, `colorOverLife`, `alphaOverLife` (particles) and `widthOverLength`,
-`colorOverLength`, `alphaOverLength`, `trailWidthOverLength`, `trailAlphaOverLength` (ribbons
-and trails). Each curve is a list of stops; the two anchor stops at t=0 and t=1 are protected.
-
-| Tool | Purpose |
-|---|---|
-| `effect.lifeStop.add` | Insert an interior stop at `t` in (0,1) with a scalar or `{ r, g, b }` value |
-| `effect.lifeStop.remove` | Remove an interior stop |
-| `effect.lifeStop.move` | Move a stop to a new `t` |
-| `effect.lifeStop.setValue` | Change a stop's value |
-| `effect.lifeStop.setCurve` | Change a stop's easing |
-
-Bundles (`bundle.*`) compose effects into playlists: each item is
-`{ effect, startOffset, anchorRole, seedSalt }` so one trigger (say, "big win") can fire several
-effects at named anchor points with staggered starts.
-
-| Tool | Purpose |
-|---|---|
-| `bundle.create` / `bundle.delete` | Create or delete a named bundle |
-| `bundle.item.add` / `bundle.item.remove` / `bundle.item.reorder` / `bundle.item.set` | Manage items |
-| `bundle.list` / `bundle.get` | Read back |
-
-## Slot-game composer: `slot.grid.*`, `slot.symbol.*`, `slot.winseq.*`, `slot.flow.*`, `slot.tumble.*`
-
-These namespaces author the slot composition layer (Chapter 7). They never decide outcomes; they
-map a `SpinResult` from the certified math engine to presentation.
-
-Grid:
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `slot.grid.set` | Set the grid | `grid`: topology (`reelStrip`, `scatterPay`, `cluster`), `cols`/`rows` (1..12), cell size and gap, `reelStopStaggerMs`, gravity, anticipation |
-| `slot.grid.preset` | Apply a canonical preset | `preset`: `reelStrip5x3`, `scatterPay6x5`, `cluster7x7` |
-| `slot.grid.get` | Read back | |
-
-Symbols:
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `slot.symbol.map` | Map a symbol id to a skeleton and its animation set | `symbolId`, `animSet` `{ skeletonRef, idle, land, win, anticipation? }` |
-| `slot.symbol.unmap` | Remove a mapping | `symbolId` |
-| `slot.symbol.list` / `slot.symbol.get` | Read back | |
-
-Win sequencer:
-
-| Tool | Purpose | Key input |
-|---|---|---|
-| `slot.winseq.create` | Create a named sequence | `name` |
-| `slot.winseq.setStep` | Set or append a step | `sequenceName`, `index`, `step` `{ atMs, target, action }` |
-| `slot.winseq.reorderSteps` | Reorder steps | `sequenceName`, `order[]` |
-| `slot.winseq.setThresholds` | Big/mega/epic escalation thresholds | `thresholds` |
-| `slot.winseq.get` | Read back | |
-
-Step targets: `allWinningCells`, `byLine { index }`, `bySymbol { symbol }`.
-Step actions: `animateWin`, `vfx { preset, anchorRule }`, `rollupStart { curve }`,
-`escalationBanner { tier }`.
-
-Feature flow (state machine for base game, free spins, bonuses):
-
-| Tool | Purpose |
-|---|---|
-| `slot.flow.createState` / `slot.flow.deleteState` / `slot.flow.renameState` | Manage states (the base state is protected) |
-| `slot.flow.addTransition` / `slot.flow.removeTransition` | Manage `{ from, on, to }` transitions |
-| `slot.flow.get` | Read back |
-
-Tumble/cascade choreography:
-
-| Tool | Purpose |
-|---|---|
-| `slot.tumble.set` | Timing: `explodeMs`, `dropMs`, `dropEasing`, `refillStaggerMs`, `settleMs`, `stepGapMs`, `rollupCurve` |
-| `slot.tumble.get` | Read back |
-
-Finally, `slot.scene.get` returns the whole composition snapshot (grid, symbols, win sequencer,
-flows, tumble) in one call.
+# MCP tool reference
+
+Generated from the live registry. Run `pnpm --filter @marionette/mcp-server reference` to update.
+
+204 tools. All inputs are validated before execution. Document mutations use command history.
+The machine-readable companion is `mcp-tools.json`. The artist UI exposes its own documented subset.
+
+## anim.create
+
+Create a new, empty animation with a duration and return its id.
+
+Inputs: `documentId`, `name`, `duration`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 0.
+
+## anim.delete
+
+Delete an animation and all its timelines (one undo step).
+
+Inputs: `documentId`, `animationId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 1.
+
+## anim.duplicate
+
+Duplicate an animation under a new name and return the new id (one undo step).
+
+Inputs: `documentId`, `animationId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 2.
+
+## anim.duration
+
+Set an animation duration (seconds). Rejects shrinking below the last keyframe time as ANIMATION_DURATION.
+
+Inputs: `documentId`, `animationId`, `duration`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 3.
+
+## anim.get
+
+Get one animation with all its timelines and keyframes by id.
+
+Inputs: `documentId`, `animationId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 4.
+
+## anim.list
+
+List the animations (id, name, duration, track counts).
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 5.
+
+## anim.rename
+
+Rename an animation (identity is the id, so timelines are unaffected).
+
+Inputs: `documentId`, `animationId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 6.
+
+## anim.sequence.delete
+
+Delete a slot frame-sequence keyframe (by id). A missing key is a typed KEYFRAME_NOT_FOUND.
+
+Inputs: `documentId`, `animationId`, `slotId`, `keyframeId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 7.
+
+## anim.sequence.move
+
+Move a slot frame-sequence keyframe (by id) to a new time (strict-ascending). Landing on an occupied time is a typed KEYFRAME_COLLISION; a missing key is a typed KEYFRAME_NOT_FOUND.
+
+Inputs: `documentId`, `animationId`, `slotId`, `keyframeId`, `time`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 8.
+
+## anim.sequence.set
+
+Insert or update a slot frame-sequence keyframe at a time (Stage F2): `mode` playback, starting `index`, and `delay` seconds per frame. Updating an existing time keeps its id. The timeline stays strict-ascending in time.
+
+Inputs: `documentId`, `animationId`, `slotId`, `time`, `mode`, `index`, `delay`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 9.
+
+## atlas.get
+
+Return the document current atlas ref (packed pages + regions).
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 10.
+
+## atlas.pack
+
+Pack the source PNGs in a project directory into a deterministic atlas (import -> alpha-trim -> maxrects pack -> emit, ADR-0007) and install it through the command history (LAW 2). `sourceDir` and `outputDir` are project-relative and confined to the project root; page PNGs are written under `outputDir` and the returned AtlasRef records each page path project-relative so render_frame can read it back. Region names are the source file base names; region/mesh attachment `path` resolves against them.
+
+Inputs: `documentId`, `sourceDir`, `outputDir`, `maxPageSize`, `padding`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 11.
+
+## atlas.set
+
+Install the document atlas (packed pages + regions) through the command history (LAW 2). The editor atlas-pack pipeline produces the AtlasRef; this is the only legal path that sets it. Region/mesh attachment `path` references resolve against the region names installed here.
+
+Inputs: `documentId`, `atlas`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 12.
+
+## attach.linkedmesh.create
+
+Add a linked mesh (Stage F2) to a slot default skin: it reuses the geometry of a PARENT mesh on the SAME slot (in `skin`, default the default skin) while carrying its own atlas `path`, size, and color. `timelines` shares the parent deform timelines. The parent chain is resolved and cycle-checked (LINKED_MESH with reason parentMissing / parentInvalid / cycle / duplicateName).
+
+Inputs: `documentId`, `slotId`, `name`, `path`, `parent`, `skin`, `timelines`, `width`, `height`, `color`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 13.
+
+## attach.linkedmesh.unlink
+
+Bake a linked mesh to a plain mesh: it takes the resolved root geometry and keeps its own atlas path, size, and color. A target that is not a linked mesh is LINKED_MESH with reason notFound.
+
+Inputs: `documentId`, `slotId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 14.
+
+## attach.path.add
+
+Add a path attachment (a cubic Bezier rail) to a slot. Omitting `vertices` lays down the default two-curve open path. `vertices` is the flat [x0,y0,x1,y1,...] control-point stream; the arc-length table is computed from it. A path renders no pixels (no atlas region).
+
+Inputs: `documentId`, `slotId`, `name`, `closed`, `constantSpeed`, `vertices`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 15.
+
+## attach.region.add
+
+Add a region attachment to a slot. `path` references an atlas region; width/height/offset are caller-supplied (derived from the region by the editor).
+
+Inputs: `documentId`, `slotId`, `name`, `path`, `x`, `y`, `rotation`, `scaleX`, `scaleY`, `width`, `height`, `color`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 16.
+
+## attach.region.transform
+
+Set a region attachment placement/size. Omitted fields keep their current value.
+
+Inputs: `documentId`, `slotId`, `name`, `x`, `y`, `rotation`, `scaleX`, `scaleY`, `width`, `height`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 17.
+
+## attach.remove
+
+Remove an attachment from a slot (clears the slot active attachment if it was it).
+
+Inputs: `documentId`, `slotId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 18.
+
+## attach.sequence.set
+
+Set or clear the Stage F2 frame-sequence on a region or mesh attachment. Provide `sequence` (count >= 1, non-negative integer start/digits/setupIndex, setupIndex in [0, count)) to set it, or `sequence: null` to clear it. A bad shape/setupIndex or a non-region/mesh target is SEQUENCE (reason shape / setupRange / notFound).
+
+Inputs: `documentId`, `slotId`, `name`, `sequence`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 19.
+
+## bone.create
+
+Create a bone (optionally parented) and return its id.
+
+Inputs: `documentId`, `parentId`, `name`, `x`, `y`, `rotation`, `length`, `scaleX`, `scaleY`, `shearX`, `shearY`, `transformMode`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 20.
+
+## bone.delete
+
+Delete a bone and its descendant bones (one undo step).
+
+Inputs: `documentId`, `boneId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 21.
+
+## bone.get
+
+Get one bone by id.
+
+Inputs: `documentId`, `boneId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 22.
+
+## bone.list
+
+List the bones in document order.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 23.
+
+## bone.move
+
+Set a bone local translation (x, y).
+
+Inputs: `documentId`, `boneId`, `x`, `y`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 24.
+
+## bone.rename
+
+Rename a bone (identity is the id, so references are unaffected).
+
+Inputs: `documentId`, `boneId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 25.
+
+## bone.reparent
+
+Move a bone under a new parent (null for a root), holding its world transform fixed. Rejects a cycle (reparenting under itself or a descendant) as REPARENT_CYCLE.
+
+Inputs: `documentId`, `boneId`, `newParentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 26.
+
+## bone.rotate
+
+Set a bone local rotation in degrees.
+
+Inputs: `documentId`, `boneId`, `rotation`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 27.
+
+## bone.scale
+
+Set a bone local scale (scaleX, scaleY).
+
+Inputs: `documentId`, `boneId`, `scaleX`, `scaleY`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 28.
+
+## bone.setLength
+
+Set a bone length.
+
+Inputs: `documentId`, `boneId`, `length`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 29.
+
+## bone.shear
+
+Set a bone local shear in degrees (shearX, shearY).
+
+Inputs: `documentId`, `boneId`, `shearX`, `shearY`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 30.
+
+## bone.transformMode
+
+Set how a bone inherits its parent transform (the format TransformMode enum).
+
+Inputs: `documentId`, `boneId`, `mode`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 31.
+
+## bundle.create
+
+Create a new, empty, named effect bundle.
+
+Inputs: `documentId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 32.
+
+## bundle.delete
+
+Delete a named bundle and all its items (one undo step).
+
+Inputs: `documentId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 33.
+
+## bundle.get
+
+Get one bundle with all its items by name.
+
+Inputs: `documentId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 34.
+
+## bundle.item.add
+
+Append an item (a referenced effect + startOffset + anchorRole + seedSalt) to a bundle. The referenced effect must exist (EFFECT_EDIT bundleEffectMissing).
+
+Inputs: `documentId`, `name`, `item`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 35.
+
+## bundle.item.remove
+
+Remove an item from a bundle by its item id.
+
+Inputs: `documentId`, `name`, `itemId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 36.
+
+## bundle.item.reorder
+
+Reorder a bundle items by an explicit ordered item-id list (a permutation).
+
+Inputs: `documentId`, `name`, `order`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 37.
+
+## bundle.item.set
+
+Patch a bundle item fields (effect / startOffset / anchorRole / seedSalt). Only the provided fields change; a new effect reference must exist.
+
+Inputs: `documentId`, `name`, `itemId`, `effect`, `startOffset`, `anchorRole`, `seedSalt`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 38.
+
+## bundle.list
+
+List the effect bundles (name, item count) in bundle order.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 39.
+
+## constraints.reorder
+
+Set the explicit cross-array constraint solve order (ADR-0009/ADR-0011): `order` is the combined IK-then-transform-then-path constraint ids in the desired solve order, a dense unique cover of the current set (a wrong length, duplicate, or unknown id is CONSTRAINT with reason orderInvalid). Pass `order: null` to CLEAR the explicit order and restore the default (all IK, then transform, then path).
+
+Inputs: `documentId`, `order`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 40.
+
+## deform.clearAttachment
+
+Remove every deform keyframe for one (slot, attachment) across all animations and all skins (one undo step). The prerequisite for re-topologizing a deformed mesh.
+
+Inputs: `documentId`, `slotId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 41.
+
+## deform.deleteKeyframe
+
+Delete a deform keyframe (by id) from a (skin, slot, attachment) mesh channel. `skin` is "default" or a named SkinId.
+
+Inputs: `documentId`, `animationId`, `skin`, `slotId`, `name`, `keyframeId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 42.
+
+## deform.moveKeyframe
+
+Move a deform keyframe (by id) to a new time on its (skin, slot, attachment) channel. `skin` is "default" or a named SkinId. Rejects landing on an occupied time as KEYFRAME_COLLISION.
+
+Inputs: `documentId`, `animationId`, `skin`, `slotId`, `name`, `keyframeId`, `time`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 43.
+
+## deform.setCurve
+
+Set the outgoing interpolation curve (linear / stepped / bezier) of an EXISTING deform keyframe by id, keeping its time and offsets. The in-place complement to deform.setKeyframe (whose update path keeps the old curve); kf.curve covers only bone/slot channels. `skin` is "default" or a named SkinId.
+
+Inputs: `documentId`, `animationId`, `skin`, `slotId`, `name`, `keyframeId`, `curve`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 44.
+
+## deform.setKeyframe
+
+Insert or update a deform keyframe at a time on a (skin, slot, attachment) mesh channel. `skin` is "default" or a named SkinId. `offsets` is the flat per-LOGICAL-vertex [dx, dy, ...] array and its length must equal the mesh uvs length. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). Rejected as DEFORM (reason notMesh or offsetLength).
+
+Inputs: `documentId`, `animationId`, `skin`, `slotId`, `name`, `time`, `offsets`, `curve`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 45.
+
+## document.close
+
+Discard an open document session.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 46.
+
+## document.export
+
+Project the document to the portable format JSON (validated and hashed).
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 47.
+
+## document.getSnapshot
+
+Return the internal snapshot (bones, order) of an open document.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 48.
+
+## document.getWorldTransforms
+
+Read bone matrices from setup or a fully constrained animated pose. Physics is replayed from rest at 60 Hz; times clamp to the clip duration. Returns revision and resolved context.
+
+Inputs: `documentId`, `animationId`, `time`, `skin`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 49.
+
+## document.new
+
+Create a new, empty skeleton document and return its id.
+
+Inputs: `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 50.
+
+## document.open
+
+Read and validate a document from a path, returning a new document id.
+
+Inputs: `path`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 51.
+
+## document.save
+
+Export the document and write it to a path through the host file store.
+
+Inputs: `documentId`, `path`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 52.
+
+## document.setMetadata
+
+Set the optional skeleton metadata block (authoring fps and the project-relative imagesPath / audioPath source directories). Replaced wholesale; when every field is absent the block is cleared. Drives the Stage F1 command on the shared History (LAW 2).
+
+Inputs: `documentId`, `fps`, `imagesPath`, `audioPath`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 53.
+
+## document.validate
+
+Validate the current document against the format. Returns ok plus any errors.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 54.
+
+## draworder.key.delete
+
+Delete a draw-order key (by id) from an animation. A missing key is a typed KEYFRAME_NOT_FOUND.
+
+Inputs: `documentId`, `animationId`, `keyframeId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 55.
+
+## draworder.key.move
+
+Move a draw-order key (by id) to a new time (draw-order times are strictly ascending). Landing on an occupied time is a typed KEYFRAME_COLLISION; a missing key is a typed KEYFRAME_NOT_FOUND.
+
+Inputs: `documentId`, `animationId`, `keyframeId`, `time`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 56.
+
+## draworder.key.set
+
+Insert or update a draw-order key at a time: a compact list of per-slot signed offsets from the setup draw order (an empty list restores the setup order). Each slot must exist and target a distinct in-range index (DRAW_ORDER otherwise). Updating an existing key at the same time keeps its id.
+
+Inputs: `documentId`, `animationId`, `time`, `offsets`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 57.
+
+## effect.create
+
+Create a new, layer-less effect in the VFX library and return its id. Add layers with effect.layer.add.
+
+Inputs: `documentId`, `name`, `duration`, `deterministic`, `simulationDt`, `blendMode`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 58.
+
+## effect.delete
+
+Delete an effect and cascade-remove every bundle item that references it (one undo step).
+
+Inputs: `documentId`, `effectId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 59.
+
+## effect.get
+
+Get one effect with all its layers, bodies, and life curves by id.
+
+Inputs: `documentId`, `effectId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 60.
+
+## effect.getAtlas
+
+Return the current VFX atlas (pages and regions).
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 61.
+
+## effect.getSnapshot
+
+Return the deterministic snapshot of the whole effects library (effects, atlas, bundles).
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 62.
+
+## effect.layer.add
+
+Append a default layer (emitter / spriteAnimator / ribbonTrail) to an effect and return its id. `region` must resolve in the effects atlas or export will fail.
+
+Inputs: `documentId`, `effectId`, `kind`, `blendMode`, `region`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 63.
+
+## effect.layer.remove
+
+Remove a layer from an effect (one undo step restores it at its prior z position).
+
+Inputs: `documentId`, `effectId`, `layerId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 64.
+
+## effect.layer.reorder
+
+Reorder an effect layers by an explicit ordered layer-id list (a permutation of the current layer ids; z order, first is bottom).
+
+Inputs: `documentId`, `effectId`, `order`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 65.
+
+## effect.layer.setBlendMode
+
+Set a layer per-layer blend mode.
+
+Inputs: `documentId`, `effectId`, `layerId`, `blendMode`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 66.
+
+## effect.layer.setField
+
+Replace a layer body with a full rebuilt body (the caller patches one field and passes the whole body). `field` is the coalesce key. The body `type` must match the existing layer type.
+
+Inputs: `documentId`, `effectId`, `layerId`, `field`, `body`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 67.
+
+## effect.lifeStop.add
+
+Insert an interior stop (t in (0,1)) into a layer life curve, keeping t strictly ascending. `value` is a scalar or an {r,g,b} matching the curve field.
+
+Inputs: `documentId`, `effectId`, `layerId`, `field`, `t`, `value`, `curve`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 68.
+
+## effect.lifeStop.move
+
+Move a stop to a new t, keeping strict-ascending order and the t=0 / t=1 anchor positions.
+
+Inputs: `documentId`, `effectId`, `layerId`, `stopId`, `t`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 69.
+
+## effect.lifeStop.remove
+
+Remove an interior stop from a layer life curve. The t=0 / t=1 anchors and the two-stop floor are protected (EFFECT_EDIT lifeCurveMinStops).
+
+Inputs: `documentId`, `effectId`, `layerId`, `stopId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 70.
+
+## effect.lifeStop.setCurve
+
+Set a stop outgoing easing (linear / stepped / a cubic bezier).
+
+Inputs: `documentId`, `effectId`, `layerId`, `stopId`, `curve`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 71.
+
+## effect.lifeStop.setValue
+
+Set a stop value (a scalar or an {r,g,b} matching the curve field shape).
+
+Inputs: `documentId`, `effectId`, `layerId`, `stopId`, `value`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 72.
+
+## effect.list
+
+List the effects (id, name, meta, layer count) in library order.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 73.
+
+## effect.rename
+
+Rename an effect (identity is the id, so bundle-item references are unaffected).
+
+Inputs: `documentId`, `effectId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 74.
+
+## effect.setAtlas
+
+Replace the VFX atlas. Rejects (EFFECTS_ATLAS_DANGLING_REGION) any swap that drops a region a layer still references.
+
+Inputs: `documentId`, `atlas`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 75.
+
+## effect.setMeta
+
+Set an effect duration (null = endless), deterministic flag, and/or simulationDt (must be > 0). Only the provided fields change.
+
+Inputs: `documentId`, `effectId`, `duration`, `deterministic`, `simulationDt`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 76.
+
+## event.define
+
+Create a document-level event definition (its int/float/string payload defaults and an optional audio hint) and return its id. The name must be unique across event definitions.
+
+Inputs: `documentId`, `name`, `int`, `float`, `string`, `audio`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 77.
+
+## event.delete
+
+Delete an event definition and cascade-remove every animation event key that fires it (one undo step).
+
+Inputs: `documentId`, `eventId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 78.
+
+## event.get
+
+Get one document-level event definition by id.
+
+Inputs: `documentId`, `eventId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 79.
+
+## event.key.delete
+
+Delete an event-timeline key (by id) from an animation. A missing key is a typed KEYFRAME_NOT_FOUND.
+
+Inputs: `documentId`, `animationId`, `keyframeId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 80.
+
+## event.key.move
+
+Move an event-timeline key (by id) to a new time, keeping the timeline non-decreasing in time (coincident event firings are legal). A time with no such key is a typed KEYFRAME_NOT_FOUND.
+
+Inputs: `documentId`, `animationId`, `keyframeId`, `time`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 81.
+
+## event.key.set
+
+Insert or update an event-timeline key that fires an event definition at a time, optionally overriding its int/float/string payload defaults (an absent override defers to the definition). Updating an existing key that fires the same event at the same time keeps its id.
+
+Inputs: `documentId`, `animationId`, `eventId`, `time`, `int`, `float`, `string`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 82.
+
+## event.list
+
+List the document-level event definitions (id, name, payload defaults, audio hint).
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 83.
+
+## event.rename
+
+Rename an event definition (identity is the id, so an animation event key never re-binds). The new name must be unique across event definitions.
+
+Inputs: `documentId`, `eventId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 84.
+
+## event.setAudio
+
+Set (or, when audio is absent, clear) an event definition audio hint. `volume` must be in [0, 1] and `balance` in [-1, 1] (EVENT_EDIT audioRange otherwise).
+
+Inputs: `documentId`, `eventId`, `audio`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 85.
+
+## event.setDefaults
+
+Replace an event definition int/float/string payload defaults wholesale (an absent field clears that default). The audio hint is left untouched.
+
+Inputs: `documentId`, `eventId`, `int`, `float`, `string`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 86.
+
+## history.beginInteraction
+
+Start a coalescing interaction; subsequent edits collapse into one undo step.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 87.
+
+## history.endInteraction
+
+Commit the interaction as a single undo step with the given label.
+
+Inputs: `documentId`, `label`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 88.
+
+## history.getState
+
+Report whether undo/redo are available and their labels.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 89.
+
+## history.redo
+
+Redo the last undone change.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 90.
+
+## history.undo
+
+Undo the last committed change.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 91.
+
+## ik.createConstraint
+
+Create an IK constraint over a 1 or 2 bone chain reaching toward a target bone, and return its id. The chain is parent-then-direct-child for a two-bone chain. Rejected as CONSTRAINT (with a reason: chainArity, chainDiscontinuous, boneMissing, targetMissing, cycle, or duplicateName).
+
+Inputs: `documentId`, `name`, `boneIds`, `targetId`, `mix`, `bendPositive`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 92.
+
+## ik.deleteConstraint
+
+Delete an IK constraint, cascading every animation IK timeline keyed to it (one undo step).
+
+Inputs: `documentId`, `ikConstraintId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 93.
+
+## ik.deleteKeyframe
+
+Delete an IK keyframe (by id) from a constraint IK channel.
+
+Inputs: `documentId`, `animationId`, `ikConstraintId`, `keyframeId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 94.
+
+## ik.get
+
+Get one IK constraint by id.
+
+Inputs: `documentId`, `ikConstraintId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 95.
+
+## ik.list
+
+List the IK constraints in solve order.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 96.
+
+## ik.moveKeyframe
+
+Move an IK keyframe (by id) to a new time on a constraint IK channel (IK times are strictly ascending). Landing on an occupied time is a typed KEYFRAME_COLLISION; a missing key is a typed KEYFRAME_NOT_FOUND. The moved keyframe keeps its mix/bendPositive/curve.
+
+Inputs: `documentId`, `animationId`, `ikConstraintId`, `keyframeId`, `time`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 97.
+
+## ik.setBendPositive
+
+Set an IK constraint bend-direction flag (true bends positive, false negative).
+
+Inputs: `documentId`, `ikConstraintId`, `bendPositive`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 98.
+
+## ik.setDepth
+
+Patch a Stage F2 IK depth field: `softness` (non-negative world-unit ease-in distance), and the `stretch` / `compress` / `uniform` booleans. Only the named fields change; the rest keep their current value. At least one field is required.
+
+Inputs: `documentId`, `ikConstraintId`, `softness`, `stretch`, `compress`, `uniform`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 99.
+
+## ik.setKeyframe
+
+Insert or update an IK keyframe at a time on a constraint IK channel (mix + bendPositive). Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).
+
+Inputs: `documentId`, `animationId`, `ikConstraintId`, `time`, `mix`, `bendPositive`, `curve`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 100.
+
+## ik.setMix
+
+Set an IK constraint mix blend (0..1) toward the solved pose (absolute target).
+
+Inputs: `documentId`, `ikConstraintId`, `mix`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 101.
+
+## import.spineProject
+
+Import a user-owned exported Spine project (a .json or a .skel binary) through the clean-room importer, open it as a new editable document, and return a summary plus any lossy-conversion warnings. Import only: this never writes or exports any Spine format (LAW 4 / PP-A5).
+
+Inputs: `path`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 102.
+
+## kf.attachment.delete
+
+Delete the slot attachment-swap frame at exactly `time` from the stepped attachment timeline. A time with no frame is a typed KEYFRAME_NOT_FOUND.
+
+Inputs: `documentId`, `animationId`, `slotId`, `time`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 103.
+
+## kf.attachment.move
+
+Move a slot attachment-swap frame (by id) to a new time on the stepped attachment timeline (times are strictly ascending). Landing on an occupied time is a typed KEYFRAME_COLLISION; a missing frame is a typed KEYFRAME_NOT_FOUND. The moved frame keeps its `name`.
+
+Inputs: `documentId`, `animationId`, `slotId`, `keyframeId`, `time`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 104.
+
+## kf.attachment.set
+
+Insert or replace a slot attachment-swap frame at a time on the stepped attachment timeline. `name` is the attachment to show (which must resolve on the slot), or null to hide the slot. Replacing an existing frame at the same time keeps its id.
+
+Inputs: `documentId`, `animationId`, `slotId`, `time`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 105.
+
+## kf.curve
+
+Set a keyframe outgoing interpolation curve (linear / stepped / bezier).
+
+Inputs: `documentId`, `animationId`, `channel`, `boneId`, `slotId`, `keyframeId`, `curve`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 106.
+
+## kf.delete
+
+Delete a keyframe (by id) from its channel.
+
+Inputs: `documentId`, `animationId`, `channel`, `boneId`, `slotId`, `keyframeId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 107.
+
+## kf.move
+
+Move a keyframe (by id) to a new time on its channel. Rejects landing on an occupied time as KEYFRAME_COLLISION.
+
+Inputs: `documentId`, `animationId`, `channel`, `boneId`, `slotId`, `keyframeId`, `time`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 108.
+
+## kf.paste
+
+Insert several keyframes at absolute times in one undo step. Each item names its channel (with boneId/slotId), time, value (matching the channel), and curve.
+
+Inputs: `documentId`, `animationId`, `items`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 109.
+
+## kf.set
+
+Insert or update a keyframe at a time on a channel. `channel` is rotate/translate/scale/shear (with boneId) or color (with slotId); `value` must match the channel shape. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).
+
+Inputs: `documentId`, `animationId`, `channel`, `boneId`, `slotId`, `time`, `value`, `curve`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 110.
+
+## mesh.addBoneBinding
+
+Add one bone influence to an already-weighted mesh, seeded by proximity and re-normalized (capped to 4). Rejected as MESH_BINDING when the mesh is unweighted, the bone is missing, or the bone is already bound.
+
+Inputs: `documentId`, `slotId`, `name`, `boneId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 111.
+
+## mesh.addVertex
+
+Add an interior vertex to a mesh. The editor re-triangulates and passes the recomputed uvs/triangles/vertices. Rejected as MESH_TOPOLOGY_LOCKED on a weighted or deformed mesh.
+
+Inputs: `documentId`, `slotId`, `name`, `uvs`, `triangles`, `vertices`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 112.
+
+## mesh.autoGridFill
+
+Replace a mesh with an editor-computed regular interior grid (uvs/triangles/hullLength/vertices, optional edges) in one undoable step. Rejected as MESH_TOPOLOGY_LOCKED on a weighted or deformed mesh.
+
+Inputs: `documentId`, `slotId`, `name`, `uvs`, `triangles`, `hullLength`, `vertices`, `edges`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 113.
+
+## mesh.autoPerimeterTrace
+
+Replace a mesh with an editor-computed silhouette-traced hull plus interior fill (uvs/triangles/hullLength/vertices, optional edges) in one undoable step. Rejected as MESH_TOPOLOGY_LOCKED on a weighted or deformed mesh.
+
+Inputs: `documentId`, `slotId`, `name`, `uvs`, `triangles`, `hullLength`, `vertices`, `edges`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 114.
+
+## mesh.autoWeight
+
+Re-seed a weighted mesh by inverse distance to each bound bone segment (capped to the 4 nearest, normalized) as a starting point for manual paint. Rejected as MESH_BINDING when the mesh is unweighted.
+
+Inputs: `documentId`, `slotId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 115.
+
+## mesh.bindToBones
+
+Convert an UNWEIGHTED mesh to the weighted encoding by binding it to a set of bones. weightMode rigidNearest gives each vertex weight 1 to its nearest bone; equalSplit splits equally across the (up to 4 nearest) bound bones. Skinning at setup pose reproduces the original geometry. Rejected as MESH_BINDING when the mesh is already weighted, the bone set is empty, or a bone is missing.
+
+Inputs: `documentId`, `slotId`, `name`, `boneIds`, `weightMode`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 116.
+
+## mesh.deleteVertex
+
+Delete a mesh vertex. The editor re-triangulates and passes the recomputed uvs/triangles/vertices. Rejected as MESH_TOPOLOGY_LOCKED on a weighted or deformed mesh.
+
+Inputs: `documentId`, `slotId`, `name`, `uvs`, `triangles`, `vertices`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 117.
+
+## mesh.generateFromRegion
+
+Replace a region attachment with a mesh under the same name. The editor computes the quad-from-region geometry (uvs/triangles/hullLength/flat unweighted vertices) and passes it; the mesh keeps the region atlas path. Undo restores the exact region.
+
+Inputs: `documentId`, `slotId`, `name`, `uvs`, `triangles`, `hullLength`, `width`, `height`, `color`, `edges`, `vertices`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 118.
+
+## mesh.moveVertex
+
+Move one mesh vertex to (x, y). Never re-triangulates (indices stable); always allowed (not topology-locked). Wrap a drag in beginInteraction/endInteraction to coalesce it into one undo step.
+
+Inputs: `documentId`, `slotId`, `name`, `vertexIndex`, `x`, `y`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 119.
+
+## mesh.normalizeWeights
+
+Re-normalize every vertex of a weighted mesh to sum 1 and cap to 4 influences (idempotent). Rejected as MESH_BINDING when the mesh is unweighted.
+
+Inputs: `documentId`, `slotId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 120.
+
+## mesh.paintWeight
+
+Apply a weight-paint stroke to one active bone across a set of dabs (per-vertex weight adjustments); each touched vertex is re-normalized (non-active proportions preserved) and capped to 4. mode add raises, subtract lowers, smooth applies the supplied signed delta. Wrap a stroke in beginInteraction/endInteraction to coalesce its dabs into one undo step. Rejected as MESH_BINDING when the mesh is unweighted, the bone is missing, or a dab indexes a vertex out of range.
+
+Inputs: `documentId`, `slotId`, `name`, `activeBoneId`, `dabs`, `mode`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 121.
+
+## mesh.removeBoneBinding
+
+Drop one bone influence from a weighted mesh and re-normalize (a vertex left with no influence falls back to its nearest remaining bound bone). Rejected as MESH_BINDING when the mesh is unweighted, the bone is not bound, or it is the only bound bone (use mesh.unbind).
+
+Inputs: `documentId`, `slotId`, `name`, `boneId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 122.
+
+## mesh.sample
+
+Return final world-space vertices, triangles, and bounds after constraints, skinning, and deform. Supports weighted and linked meshes and named-skin default fallback. Physics replays at 60 Hz.
+
+Inputs: `documentId`, `slotId`, `name`, `animationId`, `time`, `skin`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 123.
+
+## mesh.setEdges
+
+Set or replace a mesh edges (wireframe) array, as vertex-index pairs. Does not change topology; always allowed. An empty array clears the wireframe.
+
+Inputs: `documentId`, `slotId`, `name`, `edges`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 124.
+
+## mesh.unbind
+
+Clear all weights, returning a mesh to the unweighted flat encoding (re-derived from the current setup pose so it renders identically). Required before changing a weighted mesh topology. Rejected as MESH_BINDING when the mesh is unweighted or still has deform keyframes.
+
+Inputs: `documentId`, `slotId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 125.
+
+## path.addCurve
+
+Append one cubic curve (three control points) to the end of a path spline; the arc-length table is recomputed. Rejected as PATH (reason: notFound).
+
+Inputs: `documentId`, `slotId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 126.
+
+## path.createConstraint
+
+Create a path constraint that distributes a set of bones along the path attachment carried by a target SLOT, and return its id. Rejected as CONSTRAINT (reason: targetMissing, targetNotPath, boneMissing, chainArity, or duplicateName).
+
+Inputs: `documentId`, `name`, `targetSlotId`, `boneIds`, `params`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 127.
+
+## path.deleteConstraint
+
+Delete a path constraint, cascading every animation path timeline keyed to it (one undo step).
+
+Inputs: `documentId`, `pathConstraintId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 128.
+
+## path.deleteControlPoint
+
+Delete one ANCHOR control point (pointIndex must be a multiple of 3), collapsing the curve it bounds; the arc-length table is recomputed. A path keeps at least one curve. Rejected as PATH (reason: notFound, pointRange for a handle/out-of-range index, or minCurves).
+
+Inputs: `documentId`, `slotId`, `name`, `pointIndex`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 129.
+
+## path.deleteKeyframe
+
+Delete a path keyframe (by id) from a constraint path channel.
+
+Inputs: `documentId`, `animationId`, `pathConstraintId`, `keyframeId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 130.
+
+## path.get
+
+Read a path attachment: its openness, parametrization flag, flat control-point stream, and cumulative arc-length table. Errors PATH_NOT_FOUND when the attachment is absent or not a path.
+
+Inputs: `documentId`, `slotId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 131.
+
+## path.getConstraint
+
+Get one path constraint by id.
+
+Inputs: `documentId`, `pathConstraintId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 132.
+
+## path.listConstraints
+
+List the path constraints in solve order.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 133.
+
+## path.moveControlPoint
+
+Move one path control point (anchor or handle). The arc-length table is recomputed. Rejected as PATH (reason: notFound or pointRange).
+
+Inputs: `documentId`, `slotId`, `name`, `pointIndex`, `x`, `y`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 134.
+
+## path.moveKeyframe
+
+Move a path keyframe (by id) to a new time (path times are strictly ascending). Landing on an occupied time is a typed KEYFRAME_COLLISION; a missing key is a typed KEYFRAME_NOT_FOUND. The moved keyframe keeps its channels/curve.
+
+Inputs: `documentId`, `animationId`, `pathConstraintId`, `keyframeId`, `time`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 135.
+
+## path.removeCurve
+
+Drop the last cubic curve from a path spline (a path keeps at least one curve). Rejected as PATH (reason: notFound or minCurves).
+
+Inputs: `documentId`, `slotId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 136.
+
+## path.setClosed
+
+Set a path spline open or closed. Closing drops the trailing anchor; opening appends one at the first anchor, so the control-point count stays valid. Rejected as PATH (reason: notFound).
+
+Inputs: `documentId`, `slotId`, `name`, `closed`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 137.
+
+## path.setConstantSpeed
+
+Set a path spline arc-length (constant-speed) vs naive-t parametrization. A pure flag flip. Rejected as PATH (reason: notFound).
+
+Inputs: `documentId`, `slotId`, `name`, `constantSpeed`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 138.
+
+## path.setKeyframe
+
+Insert or update a path-constraint keyframe at a time. Each channel (position/spacing/mixRotate/mixX/mixY) is optional; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).
+
+Inputs: `documentId`, `animationId`, `pathConstraintId`, `time`, `position`, `spacing`, `mixRotate`, `mixX`, `mixY`, `curve`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 139.
+
+## path.setParams
+
+Patch a path constraint parameter: the modes (positionMode/spacingMode/rotateMode), the scalars (position/spacing/offsetRotation), or the mix channels (mixRotate/mixX/mixY in [0,1]). Only the named fields change; at least one is required.
+
+Inputs: `documentId`, `pathConstraintId`, `positionMode`, `spacingMode`, `rotateMode`, `position`, `spacing`, `offsetRotation`, `mixRotate`, `mixX`, `mixY`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 140.
+
+## physics.createConstraint
+
+Create a physics constraint that simulates a subset of ONE bone's local channels (x/y/rotation/scaleX/shearX) as a damped-driven spring, and return its id. `channels` must be non-empty and duplicate-free. Rejected as CONSTRAINT (reason: boneMissing, channelsEmpty, channelDuplicate, or duplicateName).
+
+Inputs: `documentId`, `name`, `boneId`, `channels`, `params`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 141.
+
+## physics.deleteConstraint
+
+Delete a physics constraint, cascading every animation physics timeline keyed to it (one undo step).
+
+Inputs: `documentId`, `physicsConstraintId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 142.
+
+## physics.deleteKeyframe
+
+Delete a physics keyframe (by id) from a constraint physics channel.
+
+Inputs: `documentId`, `animationId`, `physicsConstraintId`, `keyframeId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 143.
+
+## physics.getConstraint
+
+Get one physics constraint by id.
+
+Inputs: `documentId`, `physicsConstraintId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 144.
+
+## physics.getSettings
+
+Get the OPTIONAL skeleton physics settings block (global gravity/wind/master mix), or null when the document defines none (the identity default: no global weather, unit master mix).
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 145.
+
+## physics.listConstraints
+
+List the physics constraints in solve order.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 146.
+
+## physics.moveKeyframe
+
+Move a physics keyframe (by id) to a new time (physics times are strictly ascending). Landing on an occupied time is a typed KEYFRAME_COLLISION; a missing key is a typed KEYFRAME_NOT_FOUND. The moved keyframe keeps its channels/curve.
+
+Inputs: `documentId`, `animationId`, `physicsConstraintId`, `keyframeId`, `time`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 147.
+
+## physics.renameConstraint
+
+Rename a physics constraint (identity is the id, so its timeline tracks are unaffected). Rejected as CONSTRAINT (reason: notFound or duplicateName).
+
+Inputs: `documentId`, `physicsConstraintId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 148.
+
+## physics.setChannels
+
+Replace a physics constraint's simulated channel set (non-empty, duplicate-free subset of x/y/rotation/scaleX/shearX). Rejected as CONSTRAINT (reason: notFound, channelsEmpty, or channelDuplicate).
+
+Inputs: `documentId`, `physicsConstraintId`, `channels`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 149.
+
+## physics.setKeyframe
+
+Insert or update a physics-constraint keyframe at a time. Each dynamic channel (mix/inertia/strength/damping/wind/gravity) is optional; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). step/mass/channels are NOT keyable.
+
+Inputs: `documentId`, `animationId`, `physicsConstraintId`, `time`, `mix`, `inertia`, `strength`, `damping`, `wind`, `gravity`, `curve`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 150.
+
+## physics.setParams
+
+Patch a physics constraint scalar parameter: step (>0), inertia/damping/mix ([0,1]), strength (>=0), mass (>0), or wind/gravity (finite). Only the named fields change; at least one is required.
+
+Inputs: `documentId`, `physicsConstraintId`, `step`, `inertia`, `strength`, `damping`, `mass`, `wind`, `gravity`, `mix`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 151.
+
+## physics.setSettings
+
+Set or CLEAR the global physics settings block. Pass { gravity, wind, mix } to set it, or `settings: null` to clear it (restoring the identity default).
+
+Inputs: `documentId`, `settings`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 152.
+
+## physics.setTargetBone
+
+Retarget a physics constraint to a different bone (the single driven/setpoint bone). Rejected as CONSTRAINT (reason: notFound or boneMissing).
+
+Inputs: `documentId`, `physicsConstraintId`, `boneId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 153.
+
+## render_frame
+
+Rasterize the current document to a PNG for headless authoring feedback (ADR-0006) and return it base64-encoded. Renders the setup pose, or an animation sampled at `time` (clamped to the animation duration). Atlas page PNGs referenced by the document are loaded from the project root; a referenced page file that is missing on disk is a loud error. When the document has no atlas pages at all, attachments render as tintable white placeholders and `placeholders` is true. Pass `effect` to overlay a solved effect/bundle from the live effects library ON TOP of the skeleton in the same frame (world-space anchors only in this pass; bone anchors are not wired yet).
+
+Inputs: `documentId`, `animation`, `time`, `width`, `height`, `fit`, `background`, `effect`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 154.
+
+## skin.create
+
+Create a NAMED (non-default) skin and return its id. The implicit "default" skin is reserved. Rejected as SKIN (with a reason: defaultProtected or duplicateName).
+
+Inputs: `documentId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 155.
+
+## skin.delete
+
+Delete a NAMED skin, cascading every animation deform timeline keyed to it (one undo step).
+
+Inputs: `documentId`, `skinId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 156.
+
+## skin.get
+
+Get one NAMED skin (and its attachment addresses) by id.
+
+Inputs: `documentId`, `skinId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 157.
+
+## skin.list
+
+List the NAMED (non-default) skins in skin order, each with its attachment addresses.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 158.
+
+## skin.removeAttachment
+
+Remove an attachment from a NAMED skin at a (slot, attachment-name) address. Rejected as SKIN (reason notFound) when the skin or the addressed attachment is absent.
+
+Inputs: `documentId`, `skinId`, `slotId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 159.
+
+## skin.rename
+
+Rename a NAMED skin (identity is the id, so deform tracks are unaffected). Rejected as SKIN (with a reason: defaultProtected, notFound, or duplicateName).
+
+Inputs: `documentId`, `skinId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 160.
+
+## skin.scope.add
+
+Add a bone or constraint NAME to a NAMED skin Stage F2 scoping list (the bones/constraints active only while this skin is active). Rejected as SKIN (reason: notFound, scopeDuplicate, scopeUnknownBone, or scopeUnknownConstraint).
+
+Inputs: `documentId`, `skinId`, `scope`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 161.
+
+## skin.scope.remove
+
+Remove a bone or constraint NAME from a NAMED skin scoping list (clearing the dimension when the last entry goes). Rejected as SKIN (reason: notFound or scopeMissing).
+
+Inputs: `documentId`, `skinId`, `scope`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 162.
+
+## skin.setAttachment
+
+Add or replace a region attachment on a NAMED skin at a (slot, attachment-name) address. The `path` references an atlas region. Rejected as SKIN (with a reason: notFound or slotMissing).
+
+Inputs: `documentId`, `skinId`, `slotId`, `attachment`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 163.
+
+## slot.activeAttachment
+
+Set the slot setup-pose active attachment name (null clears it).
+
+Inputs: `documentId`, `slotId`, `attachment`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 164.
+
+## slot.blend
+
+Set a slot blend mode (the format BlendMode enum).
+
+Inputs: `documentId`, `slotId`, `blendMode`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 165.
+
+## slot.color
+
+Set a slot tint color (RGBA, each channel 0..1).
+
+Inputs: `documentId`, `slotId`, `color`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 166.
+
+## slot.create
+
+Create a slot riding a bone and return its id.
+
+Inputs: `documentId`, `boneId`, `name`, `color`, `darkColor`, `attachment`, `blendMode`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 167.
+
+## slot.darkColor
+
+Set or clear a slot setup DARK color (Stage F2 two-color tint, RGBA 0..1). A non-null color enables the two-color tint and is required before keying the `dark` timeline; `color: null` disables it.
+
+Inputs: `documentId`, `slotId`, `color`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 168.
+
+## slot.delete
+
+Delete a slot and its attachments (one undo step).
+
+Inputs: `documentId`, `slotId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 169.
+
+## slot.flow.addTransition
+
+Append a transition (from + on match + to) to the feature-flow graph. The shape is validated at the boundary; endpoint existence is an import-time validator concern.
+
+Inputs: `documentId`, `transition`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 170.
+
+## slot.flow.createState
+
+Add a named feature-flow state (optional cinematic node). Rejects a duplicate or empty name (SLOT_EDIT).
+
+Inputs: `documentId`, `name`, `node`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 171.
+
+## slot.flow.deleteState
+
+Delete a named state and every transition incident to it (one undo step). The mandatory "base" state cannot be deleted (SLOT_EDIT baseStateProtected).
+
+Inputs: `documentId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 172.
+
+## slot.flow.get
+
+Return the feature-flow graph (states, transitions, entry).
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 173.
+
+## slot.flow.removeTransition
+
+Remove one transition by its index in the graph transition list.
+
+Inputs: `documentId`, `index`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 174.
+
+## slot.flow.renameState
+
+Rename a state and rewrite every transition that references it. "base" cannot be renamed and the new name must not collide (SLOT_EDIT).
+
+Inputs: `documentId`, `from`, `to`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 175.
+
+## slot.get
+
+Get one slot (and its attachment names) by id.
+
+Inputs: `documentId`, `slotId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 176.
+
+## slot.grid.get
+
+Return the current slot grid config.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 177.
+
+## slot.grid.preset
+
+Apply a canonical grid preset in one call: reelStrip5x3, scatterPay6x5, or cluster7x7.
+
+Inputs: `documentId`, `preset`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 178.
+
+## slot.grid.set
+
+Set the slot grid config (topology + dimensions + gravity, optional anticipation). Rejects an invalid topology/shape combination (SLOT_EDIT).
+
+Inputs: `documentId`, `grid`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 179.
+
+## slot.list
+
+List the slots in setup-pose draw order.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 180.
+
+## slot.rename
+
+Rename a slot (identity is the id, so references are unaffected).
+
+Inputs: `documentId`, `slotId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 181.
+
+## slot.reorder
+
+Move a slot to a new index in the setup-pose draw order.
+
+Inputs: `documentId`, `slotId`, `toIndex`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 182.
+
+## slot.scene.get
+
+Return the whole slot-scene snapshot (grid, symbol library, win sequencer, feature flows, tumble, refs).
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 183.
+
+## slot.symbol.get
+
+Return the anim set mapped to one SymbolId, or null when the symbol is unmapped.
+
+Inputs: `documentId`, `symbolId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 184.
+
+## slot.symbol.list
+
+List the mapped symbols (SymbolId + anim set) in id order.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 185.
+
+## slot.symbol.map
+
+Map a SymbolId to a skeleton + idle/land/win(/anticipation) animation set, adding the skeletonRef to the scene refs. Provide `skeletonAnimationNames` to enforce that the chosen names exist.
+
+Inputs: `documentId`, `symbolId`, `animSet`, `skeletonAnimationNames`, `skeletonHash`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 186.
+
+## slot.symbol.unmap
+
+Remove a SymbolId mapping, pruning its skeletonRef when no remaining symbol references it. Rejects an unmapped symbol (SLOT_EDIT notMapped).
+
+Inputs: `documentId`, `symbolId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 187.
+
+## slot.tumble.get
+
+Return the tumble/cascade choreography.
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 188.
+
+## slot.tumble.set
+
+Set the tumble/cascade timing (explode/drop/refill/settle/step ms as non-negative integers) plus the drop easing and rollup curve. Coalesces on the session.
+
+Inputs: `documentId`, `tumble`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 189.
+
+## slot.winseq.create
+
+Create a new, empty, named win sequence. Rejects a duplicate name (SLOT_EDIT).
+
+Inputs: `documentId`, `name`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 190.
+
+## slot.winseq.get
+
+Return the win-sequencer config (sequences, thresholds, default sequence).
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 191.
+
+## slot.winseq.reorderSteps
+
+Reorder a sequence steps by an explicit new-order array of current step indices (a permutation).
+
+Inputs: `documentId`, `sequenceName`, `order`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 192.
+
+## slot.winseq.setStep
+
+Set or append a step (atMs + target + action) at an index in a named sequence. An index equal to the step count appends; a smaller index replaces. The step shape is validated at the boundary.
+
+Inputs: `documentId`, `sequenceName`, `index`, `step`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 193.
+
+## slot.winseq.setThresholds
+
+Set the big/mega/epic win escalation thresholds (finite, non-negative). Coalesces on the session.
+
+Inputs: `documentId`, `thresholds`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 194.
+
+## transform.createConstraint
+
+Create a transform constraint that drives a set of bones from a target with per-channel mix and additive offset, and return its id. Solves after all IK. Rejected as CONSTRAINT (with a reason: boneMissing, targetMissing, cycle, or duplicateName).
+
+Inputs: `documentId`, `name`, `boneIds`, `targetId`, `params`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 195.
+
+## transform.deleteConstraint
+
+Delete a transform constraint, cascading every animation transform timeline keyed to it (one undo step).
+
+Inputs: `documentId`, `transformConstraintId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 196.
+
+## transform.deleteKeyframe
+
+Delete a transform keyframe (by id) from a constraint channel.
+
+Inputs: `documentId`, `animationId`, `transformConstraintId`, `keyframeId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 197.
+
+## transform.get
+
+Get one transform constraint by id.
+
+Inputs: `documentId`, `transformConstraintId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 198.
+
+## transform.list
+
+List the transform constraints in solve order (after all IK).
+
+Inputs: `documentId`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 199.
+
+## transform.moveKeyframe
+
+Move a transform keyframe (by id) to a new time on a constraint channel (times are strictly ascending). Landing on an occupied time is a typed KEYFRAME_COLLISION; a missing key is a typed KEYFRAME_NOT_FOUND. The moved keyframe keeps all six mix channels and its curve.
+
+Inputs: `documentId`, `animationId`, `transformConstraintId`, `keyframeId`, `time`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 200.
+
+## transform.setKeyframe
+
+Insert or update a transform keyframe at a time on a constraint channel. `mix` carries the six per-channel factors; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).
+
+Inputs: `documentId`, `animationId`, `transformConstraintId`, `time`, `mix`, `curve`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 201.
+
+## transform.setParams
+
+Patch a transform constraint mix/offset channels (only the named channels change; the rest keep their current value). The patch holds the absolute target values. At least one channel required.
+
+Inputs: `documentId`, `transformConstraintId`, `patch`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 202.
+
+## transform.setVariants
+
+Patch a transform constraint Stage F2 variant flag: `local` (local-space read/write instead of the world-space blend) and `relative` (offset relative to the bone current value instead of an absolute blend). Only the named flags change. At least one flag is required.
+
+Inputs: `documentId`, `transformConstraintId`, `local`, `relative`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 203.

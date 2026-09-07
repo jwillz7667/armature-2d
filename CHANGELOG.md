@@ -1,5 +1,11 @@
 # Changelog
 
+## Audit authoring feedback
+
+- Add constrained pose and weighted/linked-mesh sampling with revision, skin, time, and physics context.
+- Expose complete deform and IK-depth inspection and in-place deform-curve commands with undo.
+- Generate the 204-tool reference and exact input schemas from the MCP registry.
+
 ## Unreleased
 
 - Remove Node-only PNG codecs from the browser video worker. Bound encoder queues, handle startup

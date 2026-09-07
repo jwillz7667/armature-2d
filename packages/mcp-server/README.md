@@ -1,7 +1,7 @@
 # @marionette/mcp-server
 
-The headless control surface: a Model Context Protocol (MCP) server exposing the complete authoring
-capability of Armature 2D as 202 tools over stdio. An AI agent (or any MCP client) can build,
+The headless control surface: a Model Context Protocol (MCP) server exposing the authoring
+capabilities of Armature 2D as 204 tools over stdio. An AI agent (or any MCP client) can build,
 inspect, render, and save everything the GUI can, because every mutating tool drives the same
 `@marionette/document-core` commands through the same `History` (LAW 2, ADR-0001). The complete
 tool-by-tool reference is the user manual chapter `docs/manual/09-tool-reference.md`.
@@ -31,10 +31,11 @@ MCP host configuration:
 }
 ```
 
-## Tool catalog (202 tools)
+## Tool catalog (204 tools)
 
 Assembled in `src/tools.ts` (plus the spread-in effects and slot-composer tool sets); a catalog
-test asserts the names are unique and the count matches.
+test asserts the names are unique. `pnpm --filter @marionette/mcp-server reference:check`
+checks the generated manual and machine-readable schemas against the registry.
 
 | Namespace | Tools | Covers |
 |---|---|---|
@@ -43,13 +44,13 @@ test asserts the names are unique and the count matches.
 | bone | 12 | create, move, rotate, scale, shear, setLength, transformMode, rename, reparent, delete, list, get |
 | slot | 10 | create, delete, rename, blend, color, darkColor, reorder, activeAttachment, list, get |
 | attach | 6 | region add, remove, region transform, linked-mesh create/unlink, frame-sequence set |
-| mesh | 14 | generate from region, vertex/edge/topology edits, auto grid fill, perimeter trace, bind to bones, binding edits, unbind, auto-weight, paint stroke, normalize weights |
+| mesh | 15 | generate from region, vertex/edge/topology edits, auto grid fill, perimeter trace, bind to bones, binding edits, unbind, auto-weight, paint stroke, normalize weights |
 | ik | 10 | constraint create/mix/bendPositive/setDepth/delete, keyframes set/delete/move, list, get |
 | transform | 9 | constraint create/params/setVariants/delete, keyframes set/delete/move, list, get |
 | constraints | 1 | reorder (explicit cross-array solve order) |
 | physics | 13 | constraint create/delete/rename/setTargetBone/setChannels/setParams, settings get/set, keyframes set/delete/move, list, get |
 | skin | 9 | create, rename, delete, scope add/remove, setAttachment, removeAttachment, list, get |
-| deform | 4 | set/delete/move keyframe, clear attachment deform |
+| deform | 5 | set/delete/move keyframe, set curve, clear attachment deform |
 | anim | 10 | create, delete, rename, duration, duplicate, list, get, sequence set/move/delete |
 | event | 10 | define, rename, delete, setDefaults, setAudio, list, get, key set/move/delete |
 | draworder | 3 | key set/move/delete |
