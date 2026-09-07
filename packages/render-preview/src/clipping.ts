@@ -1,11 +1,13 @@
-import type { ClippingAttachment, SkeletonDocument, Skin } from '@marionette/format/types';
+import type { ClippingAttachment, SkeletonDocument } from '@marionette/format/types';
 import {
   computeClippedSlotRange,
   prepareClipping,
   resolveClipWorldPolygonForSlot,
+  resolveAttachment,
   type PreparedClip,
   type Pose,
 } from '@marionette/runtime-core';
+import { renderSkin } from './skin';
 
 // Clip-region evaluation for the CPU preview (ADR-0012 section 3, PP-C8). A `clipping` attachment names, in
 // draw order, a range of slots whose geometry it clips to its (bone-transformed) world polygon. This module
@@ -44,10 +46,6 @@ function getPrepared(clip: ClippingAttachment): PreparedClip {
   return prepared;
 }
 
-function findDefaultSkin(document: SkeletonDocument): Skin | undefined {
-  return document.skins.find((skin) => skin.name === DEFAULT_SKIN_NAME);
-}
-
 function slotIndexByName(document: SkeletonDocument, name: string): number {
   return document.slots.findIndex((slot) => slot.name === name);
 }
@@ -63,12 +61,15 @@ export interface ClipPlan {
   readonly bySlot: ReadonlyArray<ClipRegion | undefined>;
 }
 
-export function gatherClipRegionsFromPose(document: SkeletonDocument, pose: Pose): ClipPlan {
+export function gatherClipRegionsFromPose(
+  document: SkeletonDocument,
+  pose: Pose,
+  activeSkin = DEFAULT_SKIN_NAME,
+): ClipPlan {
   const bySlot: (ClipRegion | undefined)[] = new Array<ClipRegion | undefined>(
     document.slots.length,
   ).fill(undefined);
-  const defaultSkin = findDefaultSkin(document);
-  if (defaultSkin === undefined) return { regions: [], bySlot };
+  const skin = renderSkin(document, activeSkin);
 
   const regions: ClipRegion[] = [];
   const rangeScratch = new Int32Array(pose.slotCount);
@@ -81,8 +82,8 @@ export function gatherClipRegionsFromPose(document: SkeletonDocument, pose: Pose
 
     const activeName = pose.slotAttachment[slotIndex];
     if (activeName === null || activeName === undefined) continue;
-    const attachment = defaultSkin.attachments[slot.name]?.[activeName];
-    if (attachment === undefined || attachment.type !== 'clipping') continue;
+    const attachment = resolveAttachment(skin, slot.name, activeName);
+    if (attachment === null || attachment.type !== 'clipping') continue;
 
     const endSlotIndex = slotIndexByName(document, attachment.end);
     if (endSlotIndex < 0) continue;

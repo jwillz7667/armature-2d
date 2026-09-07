@@ -239,7 +239,7 @@ namespace Marionette.Runtime.Unity.View
 
             _time = next;
 
-            Sample.SampleSkeleton(_document, animationName, _time, _pose, null, frameDt);
+            Sample.SampleSkeleton(_document, animationName, _time, _pose, skinName, frameDt);
             DrawItemBuilder.BuildInto(
                 _document, _renderModel, _atlas, _pose, skinName, animationName, _time, _drawList);
             MeshBufferAssembler.Assemble(_drawList, _batches);

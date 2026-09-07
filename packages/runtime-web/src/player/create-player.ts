@@ -187,11 +187,11 @@ export class Player {
   // subscribers), steps the effect system, and advances the slot timeline, then renders every wired view.
   // A paused player ignores the tick. No clock is owned here: the host supplies dt (Law 1 determinism).
   update(deltaSeconds: number): void {
-    if (!this.playing || deltaSeconds < 0) return;
+    if (!this.playing || !Number.isFinite(deltaSeconds) || deltaSeconds < 0) return;
 
     updateAnimationState(this.state, deltaSeconds);
     this.drainEvents();
-    this.renderSkeleton();
+    this.renderSkeleton(deltaSeconds);
 
     if (this.effectSystem !== null && this.particleView !== null) {
       this.effectSystem.step(deltaSeconds);
@@ -224,6 +224,7 @@ export class Player {
   setAnimation(animationId: string, loop: boolean = this.loopDefault): void {
     setTrackAnimation(this.state, 0, animationId, loop);
     this.currentAnimation = animationId;
+    this.skeletonView.resetSimulation();
     this.renderSkeleton();
   }
 
@@ -239,14 +240,37 @@ export class Player {
   // single advance (a seek is not a frame-by-frame replay). The slot timeline seeks to the same time; the
   // effect system has no absolute seek and is not repositioned (documented in the README).
   seek(seconds: number): void {
+    if (!Number.isFinite(seconds)) throw new RangeError('Seek time must be finite');
+    const target = Math.max(0, seconds);
+    if (this.document.physicsConstraints.length > 0 && target > 3600)
+      throw new RangeError('Physics seek is limited to one hour');
     if (this.currentAnimation !== null) {
       setTrackAnimation(this.state, 0, this.currentAnimation, this.loopDefault);
-      updateAnimationState(this.state, Math.max(0, seconds));
-      this.drainEvents();
+      this.skeletonView.resetSimulation();
       this.renderSkeleton();
+      if (this.document.physicsConstraints.length === 0) {
+        updateAnimationState(this.state, target);
+        this.drainEvents();
+        this.renderSkeleton();
+      } else {
+        // Rebuild the physical state from the same fixed-rate timeline on every absolute seek.
+        const step = 1 / 60;
+        const count = Math.floor(target / step);
+        for (let i = 0; i < count; ++i) {
+          updateAnimationState(this.state, step);
+          this.drainEvents();
+          this.renderSkeleton(step);
+        }
+        const remainder = target - count * step;
+        if (remainder > 0) {
+          updateAnimationState(this.state, remainder);
+          this.drainEvents();
+          this.renderSkeleton(remainder);
+        }
+      }
     }
     if (this.slotView !== null) {
-      this.slotClockMs = Math.max(0, seconds) * 1000;
+      this.slotClockMs = target * 1000;
       this.slotView.update(this.slotClockMs);
     }
   }
@@ -302,10 +326,10 @@ export class Player {
 
   // ---- internals ----
 
-  private renderSkeleton(): void {
+  private renderSkeleton(frameDt = 0): void {
     // syncState applies the (possibly empty) track set: no tracks yields the setup pose, so this is the one
     // render path for both the initial frame and playback (a single cached scene keyed by the document).
-    this.skeletonView.syncState(this.document, this.state);
+    this.skeletonView.syncState(this.document, this.state, frameDt);
   }
 
   private drainEvents(): void {

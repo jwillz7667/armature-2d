@@ -53,7 +53,10 @@ export default defineConfig(({ command }) => {
       ],
       build: {
         rollupOptions: {
-          input: { main: resolve(dir, 'src/main/main.ts') },
+          input: {
+            main: resolve(dir, 'src/main/main.ts'),
+            'media-export-worker': resolve(dir, 'src/main/export/media-export.worker.ts'),
+          },
           output: { entryFileNames: '[name].js' },
         },
       },

@@ -75,6 +75,7 @@ function buildSequenceOptions(
 ): RenderSequenceOptions {
   return {
     document,
+    ...(options.activeSkin !== undefined ? { activeSkin: options.activeSkin } : {}),
     atlas,
     viewport: { width: options.width, height: options.height, fit: 'content' },
     background: options.background ?? TRANSPARENT,
@@ -134,6 +135,14 @@ export async function runMediaExport(params: RunMediaExportParams): Promise<Medi
   const base = renderSequence(buildSequenceOptions(document, atlas, options));
   const sequence = withProgress(base, control);
   const frameCount = sequence.frameCount;
+  if (
+    options.medium !== 'png-sequence' &&
+    sequence.width * sequence.height * frameCount > 128 * 1024 * 1024
+  ) {
+    throw new Error(
+      'Animated image export exceeds the 128 megapixel clip budget. Reduce the size or duration, or export a PNG sequence.',
+    );
+  }
 
   if (options.medium === 'gif') {
     return { kind: 'single', bytes: encodeGif(sequence, toGifOptions(options)), frameCount };

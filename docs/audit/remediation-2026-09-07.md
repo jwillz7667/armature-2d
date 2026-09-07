@@ -11,7 +11,7 @@ presentation boundaries. Work proceeds in verified subsystem changes.
 | F06, F07 | Mesh command safety and complete animation duration bounds | Implemented, 2,290 document-core tests pass; published in command-safety PR |
 | F21 | Filesystem link confinement and bounded file I/O | Implemented; 89 MCP tests pass; PR #30 |
 | F02-F05, F09 | Project persistence, asset history, recovery, document identity | Implemented; 91 targeted core and 66 editor integration tests pass; desktop acceptance pending |
-| F08, F10-F13, F15 | Displayed pose, video startup, physics/export/native skin context | Pending |
+| F08, F10-F13, F15 | Displayed pose, video startup, physics/export/native skin context | Implemented; pixel/player/worker checks pass; engine and WebCodecs acceptance pending |
 | F16-F20, F29 | Import capability, constraint/effect/slot UI, MCP, deform policy | Pending |
 | F01, F22-F28 | Repository, dependencies, CI, release, docs, performance, acceptance | Pending |
 
@@ -37,3 +37,15 @@ because an unsupported-feature label or a plan exists.
   implemented for F23. Further media-job and import limits remain in the export/security workstream.
 - Recovery currently snapshots valid editable project state. Invalid transient edits surface a Problems
   error and retain the prior recovery copy. Automatic installed-app recovery acceptance remains required.
+
+## Render and export repair verification
+
+- 107 render-preview tests pass, including byte goldens and the browser/Node RGBA comparison.
+- Two additional export-context tests pass: selected skin/default fallback and reproducible ranged physics.
+- 16 packaged-player tests pass, including physical state progression and deterministic absolute seeks.
+- 35 targeted editor export/selection tests pass.
+- The built video worker starts in a VM without Node globals. The built media worker exports PNG/GIF/APNG
+  and can be terminated. These tests now run in the CI build job.
+- Native wrappers forward the selected skin to the sampler; actual engine verification remains pending.
+- The complete project includes effects and slot authoring; the media dialog still exports a skeletal clip.
+  A composed scene/effects media workflow remains part of the authoring completeness work.

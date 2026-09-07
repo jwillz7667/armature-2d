@@ -1,3 +1,4 @@
+import { publishDisplayedWorlds } from './scene-solve';
 import { Application, type Ticker } from 'pixi.js';
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactElement } from 'react';
 import { SkeletonView } from '@marionette/runtime-web';
@@ -375,6 +376,11 @@ export function ViewportPanelContent(): ReactElement {
             // change detector so this re-validates only on a real change, not every frame.
             view.sync(cachedDoc);
           }
+          publishDisplayedWorlds(model, view.readBoneWorlds());
+          gizmoDirty = true;
+          meshOverlayDirty = true;
+          pathOverlayDirty = true;
+          weightOverlayDirty = true;
           lastTarget = target;
         }
 

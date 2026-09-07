@@ -3,7 +3,6 @@ import type {
   MeshAttachment,
   RegionAttachment,
   SkeletonDocument,
-  Skin,
 } from '@marionette/format/types';
 import {
   buildPose,
@@ -11,6 +10,7 @@ import {
   MAT2X3_STRIDE,
   resetToSetupPose,
   resolveRenderMesh,
+  resolveAttachment,
   sampleMeshVertices,
   sampleSkeleton,
   sampleSlotSequenceFrame,
@@ -23,6 +23,7 @@ import type { AtlasIndex, TextureSampler } from './atlas';
 import type { Color } from './color';
 import { UnknownAnimationError } from './errors';
 import { sequenceRegionName } from './sequence-region';
+import { renderSkin } from './skin';
 import {
   regionWorldCorners,
   REGION_QUAD_TRIANGLES,
@@ -30,8 +31,7 @@ import {
   type RegionTrim,
 } from './geometry';
 
-// The one skin render-preview draws, matching runtime-web (skeleton-view.ts DEFAULT_SKIN_NAME). Skin
-// switching is a later authoring surface; the solve and the records resolve attachments through this name.
+// Omitted skin context resolves to the default skin, matching runtime-web.
 const DEFAULT_SKIN_NAME = 'default';
 
 // One drawable primitive in world space: a set of world vertices, their texture uvs, the triangle index
@@ -75,10 +75,6 @@ function resetSlotsToSetup(pose: Pose): void {
   }
 }
 
-function findDefaultSkin(document: SkeletonDocument): Skin | undefined {
-  return document.skins.find((skin) => skin.name === DEFAULT_SKIN_NAME);
-}
-
 function readBoneWorld(pose: Pose, boneIndex: number): Mat2x3 {
   const base = boneIndex * MAT2X3_STRIDE;
   const w = pose.world;
@@ -105,12 +101,14 @@ export function solvePoseForFrame(
   pose: Pose,
   animation: string | undefined,
   time: number | undefined,
+  activeSkin = DEFAULT_SKIN_NAME,
+  frameDt = 0,
 ): MeshDeformSource {
   if (animation !== undefined) {
     const anim = document.animations[animation];
     if (anim === undefined) throw new UnknownAnimationError(animation);
     const sampleTime = Math.min(Math.max(time ?? 0, 0), anim.duration);
-    sampleSkeleton(document, animation, sampleTime, pose);
+    sampleSkeleton(document, animation, sampleTime, pose, activeSkin, frameDt);
     return { animationId: animation, sampleTime };
   }
   resetToSetupPose(pose);
@@ -128,10 +126,37 @@ export function gatherDrawItems(
   atlas: AtlasIndex,
   animation: string | undefined,
   time: number | undefined,
+  activeSkin = DEFAULT_SKIN_NAME,
 ): DrawItem[] {
   const pose = buildPose(document);
-  const deform = solvePoseForFrame(document, pose, animation, time);
-  return gatherDrawItemsFromPose(document, atlas, pose, deform);
+  const deform = solvePoseAtTime(document, pose, animation, time, activeSkin);
+  return gatherDrawItemsFromPose(document, atlas, pose, deform, activeSkin);
+}
+
+// A standalone frame has no previous physical state. Reconstruct it at the documented 60 Hz clock
+// instead of returning an unadvanced spring pose. Sequence rendering uses its own chosen fixed fps.
+export function solvePoseAtTime(
+  document: SkeletonDocument,
+  pose: Pose,
+  animation: string | undefined,
+  time: number | undefined,
+  activeSkin = DEFAULT_SKIN_NAME,
+): MeshDeformSource {
+  if (animation === undefined || document.physicsConstraints.length === 0)
+    return solvePoseForFrame(document, pose, animation, time, activeSkin);
+  const clip = document.animations[animation];
+  if (!clip) throw new UnknownAnimationError(animation);
+  const target = Math.min(Math.max(time ?? 0, 0), clip.duration);
+  if (!Number.isFinite(target) || target > 1800)
+    throw new RangeError('Frame time must be finite and at most 30 minutes');
+  let deform = solvePoseForFrame(document, pose, animation, 0, activeSkin, 0);
+  const count = Math.floor(target * 60);
+  for (let i = 1; i <= count; ++i)
+    deform = solvePoseForFrame(document, pose, animation, i / 60, activeSkin, 1 / 60);
+  const remainder = target - count / 60;
+  if (remainder > 0)
+    deform = solvePoseForFrame(document, pose, animation, target, activeSkin, remainder);
+  return deform;
 }
 
 // Gather the draw items in slot (draw) order from an ALREADY-solved pose (world pass current). Shared by
@@ -143,12 +168,12 @@ export function gatherDrawItemsFromPose(
   atlas: AtlasIndex,
   pose: Pose,
   deform: MeshDeformSource,
+  activeSkin = DEFAULT_SKIN_NAME,
 ): DrawItem[] {
   const animationId = deform.animationId;
   const sampleTime = deform.sampleTime;
 
-  const defaultSkin = findDefaultSkin(document);
-  if (defaultSkin === undefined) return [];
+  const skin = renderSkin(document, activeSkin);
 
   const items: DrawItem[] = [];
   const slotColor = pose.slotColor;
@@ -167,10 +192,11 @@ export function gatherDrawItemsFromPose(
     const activeName = pose.slotAttachment[slotIndex];
     if (activeName === null || activeName === undefined) continue;
 
-    const bySlot = defaultSkin.attachments[slot.name];
-    if (bySlot === undefined) continue;
-    const attachment = bySlot[activeName];
-    if (attachment === undefined) continue;
+    const attachment = resolveAttachment(skin, slot.name, activeName);
+    if (attachment === null) continue;
+    const sourceSkin = skin.bySkin.get(activeSkin)?.get(slot.name)?.has(activeName)
+      ? activeSkin
+      : DEFAULT_SKIN_NAME;
     // region, mesh, and linkedmesh are the drawable kinds here. A linked mesh carries its OWN color/path
     // (used below for tint/sampler) and reuses a parent mesh's geometry (resolved in the mesh branch).
     if (
@@ -211,7 +237,7 @@ export function gatherDrawItemsFromPose(
       const frameIndex =
         animationId === null
           ? sequence.setupIndex
-          : sampleSlotSequenceFrame(document, animationId, sampleTime, pose, slot.name);
+          : sampleSlotSequenceFrame(document, animationId, sampleTime, pose, slot.name, sequence);
       if (frameIndex >= 0) regionPath = sequenceRegionName(attachment.path, sequence, frameIndex);
     }
     const sampler = atlas.resolve(regionPath);
@@ -236,7 +262,7 @@ export function gatherDrawItemsFromPose(
       // mesh or linkedmesh: resolve the SOURCE geometry (a linked mesh reuses a parent mesh's uvs/triangles
       // and vertex stream); the world positions still come from runtime-core (sampleMeshVertices resolves
       // the same chain when animated, skinMeshInto over the source at setup), so the geometry never drifts.
-      const resolved = resolveRenderMesh(document, DEFAULT_SKIN_NAME, slot.name, attachment);
+      const resolved = resolveRenderMesh(document, sourceSkin, slot.name, attachment);
       if (resolved === null) continue;
       items.push(
         meshItem(
@@ -254,6 +280,7 @@ export function gatherDrawItemsFromPose(
           slot.blendMode,
           sampler,
           dark,
+          sourceSkin,
         ),
       );
     }
@@ -306,6 +333,7 @@ function meshItem(
   blend: BlendMode,
   sampler: TextureSampler,
   dark: Color | null,
+  skinName = DEFAULT_SKIN_NAME,
 ): DrawItem {
   const vertexCount = mesh.uvs.length / 2;
   const out = new Float32Array(vertexCount * 2);
@@ -319,7 +347,7 @@ function meshItem(
       animationId,
       sampleTime,
       pose,
-      DEFAULT_SKIN_NAME,
+      skinName,
       slotName,
       attachmentName,
       out,

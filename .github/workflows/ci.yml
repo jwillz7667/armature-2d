@@ -65,6 +65,10 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - name: Verify built worker startup and media exports
+        run: |
+          node tools/smoke-video-worker.mjs
+          node tools/smoke-media-worker.mjs
 
   format-semver:
     runs-on: ubuntu-latest

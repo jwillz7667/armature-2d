@@ -417,6 +417,7 @@ export const mediaExportOptionsSchema = z
   .object({
     medium: z.enum(['png-sequence', 'gif', 'apng']),
     animation: z.string().min(1).nullable(),
+    activeSkin: z.string().min(1).optional(),
     fps: z.number().int().min(1).max(120),
     width: z.number().int().min(1).max(4096),
     height: z.number().int().min(1).max(4096),

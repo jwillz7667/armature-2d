@@ -17,6 +17,7 @@ import {
   getTrackEntry,
   MAT2X3_STRIDE,
   resetToSetupPose,
+  resetPhysics,
   resolveRenderMesh,
   sampleMeshVertices,
   sampleSkeleton,
@@ -367,15 +368,33 @@ export class SkeletonView {
   // unscoped rig is unaffected (every constraint is always active). This matches the scoped attachment
   // resolution this view already does (PP-C6), so multi-track playback and single-animation playback scope
   // constraints identically.
-  syncState(document: SkeletonDocument, state: AnimationState): void {
+  syncState(document: SkeletonDocument, state: AnimationState, frameDt = 0): void {
     const scene = this.ensureScene(document);
-    applyAnimationState(state, scene.pose, scene.skinState.activeSkin);
+    applyAnimationState(state, scene.pose, scene.skinState.activeSkin, frameDt);
     const track0 = getTrackEntry(state, 0);
     if (track0 === null) {
       this.renderFromPose(scene, null, 0);
     } else {
       this.renderFromPose(scene, track0.animationId, track0.trackTime);
     }
+  }
+
+  resetSimulation(): void {
+    if (this.cached !== null) resetPhysics(this.cached.pose);
+  }
+
+  // Authoring chrome reads the world matrices that actually produced the displayed frame. The copy
+  // keeps a pointer gesture's start snapshot stable while subsequent frames update the live pose.
+  readBoneWorlds(): ReadonlyMap<string, Mat2x3> {
+    const worlds = new Map<string, Mat2x3>();
+    const scene = this.cached;
+    if (scene === null) return worlds;
+    for (const bone of scene.boneRecords) {
+      const b = bone.boneIndex * MAT2X3_STRIDE;
+      const w = scene.pose.world;
+      worlds.set(bone.name, [w[b]!, w[b + 1]!, w[b + 2]!, w[b + 3]!, w[b + 4]!, w[b + 5]!]);
+    }
+    return worlds;
   }
 
   // A read-only snapshot of the current scene for tests and tooling (no WebGL needed). Computed from
@@ -1002,6 +1021,7 @@ export class SkeletonView {
             t,
             scene.pose,
             scene.pose.slotNames[slotIndex]!,
+            sequence,
           );
     if (frameIndex < 0) return path;
     return sequenceRegionName(path, sequence, frameIndex);
