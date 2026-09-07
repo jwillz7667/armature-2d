@@ -94,6 +94,7 @@ def camera_for(names, actors, cast):
         if candidate<=1.75:
             z=max(z,candidate);maximum=1-1/z
     if minimum<=maximum+.000001:camera_left=clamp(camera_left,minimum,maximum)
+    else:return [0,0,1]
     return [round(camera_left,5),round(clamp((top+bottom)/2-.5/z,0,1-1/z),5),round(z,5)]
 
 
