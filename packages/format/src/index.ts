@@ -50,3 +50,18 @@ export type { BinaryDecodeErrorCode } from './binary';
 
 // The type-only contract surface (zero runtime); also available directly at @marionette/format/types.
 export type * from './types';
+export { atlasRefSchema } from './schema/atlas';
+export {
+  PROJECT_FORMAT_VERSION,
+  MAX_PROJECT_ASSET_BYTES,
+  MAX_PROJECT_BYTES,
+  projectDocumentSchema,
+  parseProjectDocument,
+  isProjectDocument,
+  computeProjectContentHash,
+  encodeProjectAsset,
+  decodeProjectAsset,
+  isSafeAssetPath,
+  ProjectValidationError,
+} from './project';
+export type { ProjectDocument, ProjectAsset, ProjectAssetScope } from './project';

@@ -1,5 +1,8 @@
+import { reportProblem } from './editor-state/problems-store';
 import {
   documentHost,
+  newDocumentSafely,
+  closeDocumentSafely,
   openDocumentFromDialog,
   saveCurrentDocument,
   type FileActionOutcome,
@@ -23,7 +26,16 @@ export function attachMenuActions(): () => void {
   const run = (action: MenuActionId): void => {
     switch (action) {
       case 'file:new':
-        documentHost.newDocument();
+        void newDocumentSafely();
+        return;
+      case 'file:saveAs':
+        void saveCurrentDocument(true).then(reportOutcome);
+        return;
+      case 'file:close':
+        void closeDocumentSafely();
+        return;
+      case 'file:recover':
+        void openDocumentFromDialog(true).then(reportOutcome);
         return;
       case 'file:open':
         void openDocumentFromDialog().then(reportOutcome);
@@ -34,14 +46,14 @@ export function attachMenuActions(): () => void {
       case 'file:importSprites':
         void runSpriteImport().then((outcome) => {
           if (outcome.kind === 'error') {
-            console.error(`[marionette] import failed: ${outcome.message}`);
+            reportProblem(`[marionette] import failed: ${outcome.message}`);
           }
         });
         return;
       case 'file:importAtlas':
         void runPremadeAtlasImport().then((outcome) => {
           if (outcome.kind === 'error') {
-            console.error(`[marionette] atlas import failed: ${outcome.message}`);
+            reportProblem(`[marionette] atlas import failed: ${outcome.message}`);
           }
         });
         return;
@@ -51,14 +63,14 @@ export function attachMenuActions(): () => void {
       case 'file:importLayered':
         void importLayeredFromDialog().then((outcome) => {
           if (outcome.kind === 'error') {
-            console.error(`[marionette] layered import failed: ${outcome.message}`);
+            reportProblem(`[marionette] layered import failed: ${outcome.message}`);
           }
         });
         return;
       case 'file:importSpine':
         void importSpineProjectFromDialog().then((outcome) => {
           if (outcome.kind === 'error') {
-            console.error(`[marionette] Spine import failed: ${outcome.message}`);
+            reportProblem(`[marionette] Spine import failed: ${outcome.message}`);
           }
         });
         return;
@@ -95,16 +107,13 @@ export function attachMenuActions(): () => void {
   try {
     unsubscribe = bridge().onMenuAction(run);
   } catch (error) {
-    console.error(
-      '[marionette] application menu actions unavailable:',
-      error instanceof Error ? error.message : error,
-    );
+    reportProblem(error instanceof Error ? error.message : 'Application menu is unavailable');
   }
   return () => unsubscribe?.();
 }
 
 function reportOutcome(outcome: FileActionOutcome): void {
   if (outcome.kind === 'error') {
-    console.error(`[marionette] menu action failed: ${outcome.message}`);
+    reportProblem(`[marionette] menu action failed: ${outcome.message}`);
   }
 }

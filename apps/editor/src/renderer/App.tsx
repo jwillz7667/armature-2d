@@ -22,6 +22,8 @@ import { SpineImportResults } from './spine-import-results';
 import { ExportDialog } from './export/export-dialog';
 import { LayeredImportResults } from './layered-import-results';
 import { GridSliceDialog } from './grid-slice-dialog';
+import { ProjectStatus } from './project-status';
+import { attachProjectRecovery } from './document';
 import 'dockview/dist/styles/dockview.css';
 
 const components = {
@@ -163,15 +165,20 @@ export function App(): ReactElement {
   useEffect(() => {
     const detachKeys = attachKeybindings();
     const detachMenu = attachMenuActions();
+    const detachRecovery = attachProjectRecovery();
     return () => {
       detachKeys();
       detachMenu();
+      detachRecovery();
     };
   }, []);
 
   return (
     <>
-      <DockviewReact components={components} onReady={onReady} className="dockview-theme-abyss" />
+      <ProjectStatus />
+      <div style={{ height: 'calc(100% - 30px)' }}>
+        <DockviewReact components={components} onReady={onReady} className="dockview-theme-abyss" />
+      </div>
       <SpineImportResults />
       <ExportDialog />
       <LayeredImportResults />

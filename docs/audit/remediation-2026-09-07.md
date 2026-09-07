@@ -9,8 +9,8 @@ presentation boundaries. Work proceeds in verified subsystem changes.
 | Findings | Work | State |
 |---|---|---|
 | F06, F07 | Mesh command safety and complete animation duration bounds | Implemented, 2,290 document-core tests pass; published in command-safety PR |
-| F21 | Filesystem link confinement and bounded file I/O | Implementation and tests in progress |
-| F02-F05, F09 | Project persistence, asset history, recovery, document identity | Next |
+| F21 | Filesystem link confinement and bounded file I/O | Implemented; 89 MCP tests pass; PR #30 |
+| F02-F05, F09 | Project persistence, asset history, recovery, document identity | Implemented; 91 targeted core and 66 editor integration tests pass; desktop acceptance pending |
 | F08, F10-F13, F15 | Displayed pose, video startup, physics/export/native skin context | Pending |
 | F16-F20, F29 | Import capability, constraint/effect/slot UI, MCP, deform policy | Pending |
 | F01, F22-F28 | Repository, dependencies, CI, release, docs, performance, acceptance | Pending |
@@ -25,3 +25,15 @@ presentation boundaries. Work proceeds in verified subsystem changes.
 
 Update this ledger with actual implementation and verification. Do not mark a gap complete merely
 because an unsupported-feature label or a plan exists.
+
+## Project repair verification
+
+- Project version 0.1.0 adds complete editable persistence without changing the runtime format versions.
+- Targeted core tests: 91 pass, including the remaining time-zero-only animation-duration boundary.
+- Targeted editor integration tests: 66 pass. Editor and document-core type checking and changed-file lint pass.
+- Electron production build succeeds. It still reports the known video-worker Node codec dependency (F10),
+  which is the next repair; a successful bundle alone does not prove video encoding works.
+- IPC sender validation, denied navigation/popups/webviews/permissions, and asset byte/pixel budgets are
+  implemented for F23. Further media-job and import limits remain in the export/security workstream.
+- Recovery currently snapshots valid editable project state. Invalid transient edits surface a Problems
+  error and retain the prior recovery copy. Automatic installed-app recovery acceptance remains required.

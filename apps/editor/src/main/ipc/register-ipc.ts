@@ -2,7 +2,8 @@
 // for allowlisted channels, every payload is validated with Zod at this boundary, and a typed
 // IpcResult is returned (never a bare throw across the wire). WP-0.8 extends this with file IO.
 
-import { app, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, type IpcMainInvokeEvent } from 'electron';
+import { approvedClosures, isTrustedSender } from './trusted-sender';
 import {
   IpcChannel,
   atlasImportGridRequestSchema,
@@ -18,6 +19,7 @@ import {
   exportWriteVideoRequestSchema,
   fileOpenRequestSchema,
   fileSaveRequestSchema,
+  fileSessionRequestSchema,
   getVersionRequestSchema,
   getVersionResponseSchema,
   layeredImportRequestSchema,
@@ -50,12 +52,88 @@ import {
   saveExportProfileFromDialog,
   writeVideoToFile,
 } from '../export';
-import { openDocumentFromFile, saveDocumentToFile } from '../file-io';
+import {
+  openDocumentFromFile,
+  saveDocumentToFile,
+  saveRecovery,
+  openRecovery,
+  discardRecovery,
+} from '../file-io';
 import { importLayeredFromFile } from '../layered-import';
 import { importSpineProjectFromFile } from '../spine-import';
 
 export function registerIpc(): void {
-  ipcMain.handle(
+  // Only the registered application's top frame may use privileged file/import/export operations.
+  const handle = (
+    channel: string,
+    listener: (event: IpcMainInvokeEvent, payload: unknown) => Promise<unknown>,
+  ): void => {
+    ipcMain.handle(channel, async (event, payload: unknown) => {
+      if (!isTrustedSender(event))
+        return {
+          ok: false,
+          error: { code: 'IPC_BAD_REQUEST', message: 'Untrusted application frame' },
+        };
+      try {
+        return await listener(event, payload);
+      } catch (error) {
+        return {
+          ok: false,
+          error: {
+            code: 'IPC_HANDLER_ERROR',
+            message: error instanceof Error ? error.message : 'Operation failed',
+          },
+        };
+      }
+    });
+  };
+  handle(IpcChannel.fileConfirmUnsaved, async (event, payload) => {
+    if (payload !== undefined)
+      return { ok: false, error: { code: 'IPC_BAD_REQUEST', message: 'Unexpected payload' } };
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (!window)
+      return { ok: false, error: { code: 'IPC_HANDLER_ERROR', message: 'Window is unavailable' } };
+    const choice = await dialog.showMessageBox(window, {
+      type: 'question',
+      title: 'Unsaved Changes',
+      message: 'Save changes to this project?',
+      detail: 'Discarding removes changes since the last save.',
+      buttons: ['Save', 'Discard', 'Cancel'],
+      defaultId: 0,
+      cancelId: 2,
+      noLink: true,
+    });
+    return {
+      ok: true,
+      data: choice.response === 0 ? 'save' : choice.response === 1 ? 'discard' : 'cancel',
+    };
+  });
+  handle(IpcChannel.fileCloseApproved, async (event, payload) => {
+    if (payload !== undefined)
+      return { ok: false, error: { code: 'IPC_BAD_REQUEST', message: 'Unexpected payload' } };
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) {
+      approvedClosures.add(window);
+      setImmediate(() => window.close());
+    }
+    return { ok: true, data: { status: 'closed' } };
+  });
+  handle(IpcChannel.fileRecoverySave, async (_event, payload) => {
+    const request = validateWith(fileSaveRequestSchema, payload, 'IPC_BAD_REQUEST');
+    if (!request.ok) return request;
+    if (!request.data.options)
+      return { ok: false, error: { code: 'IPC_BAD_REQUEST', message: 'Missing project session' } };
+    return saveRecovery(request.data.document, request.data.pages, request.data.options);
+  });
+  handle(IpcChannel.fileRecoveryOpen, async (_event, payload) => {
+    const request = validateWith(fileOpenRequestSchema, payload, 'IPC_BAD_REQUEST');
+    return request.ok ? openRecovery() : request;
+  });
+  handle(IpcChannel.fileRecoveryDiscard, async (_event, payload) => {
+    const request = validateWith(fileSessionRequestSchema, payload, 'IPC_BAD_REQUEST');
+    return request.ok ? discardRecovery(request.data.documentId) : request;
+  });
+  handle(
     IpcChannel.getVersion,
     async (_event, payload: unknown): Promise<IpcResult<GetVersionResponse>> => {
       const request = validateWith(getVersionRequestSchema, payload, 'IPC_BAD_REQUEST');
@@ -68,16 +146,16 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.fileSave,
     async (_event, payload: unknown): Promise<IpcResult<FileSaveResponse>> => {
       const request = validateWith(fileSaveRequestSchema, payload, 'IPC_BAD_REQUEST');
       if (!request.ok) return request;
-      return saveDocumentToFile(request.data.document, request.data.pages);
+      return saveDocumentToFile(request.data.document, request.data.pages, request.data.options);
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.fileOpen,
     async (_event, payload: unknown): Promise<IpcResult<FileOpenResponse>> => {
       const request = validateWith(fileOpenRequestSchema, payload, 'IPC_BAD_REQUEST');
@@ -86,7 +164,7 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.atlasImport,
     async (_event, payload: unknown): Promise<IpcResult<AtlasImportResponse>> => {
       const request = validateWith(atlasImportRequestSchema, payload, 'IPC_BAD_REQUEST');
@@ -95,7 +173,7 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.atlasImportImages,
     async (_event, payload: unknown): Promise<IpcResult<AtlasImportResponse>> => {
       const request = validateWith(atlasImportImagesRequestSchema, payload, 'IPC_BAD_REQUEST');
@@ -104,7 +182,7 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.spineImport,
     async (_event, payload: unknown): Promise<IpcResult<SpineImportResponse>> => {
       const request = validateWith(spineImportRequestSchema, payload, 'IPC_BAD_REQUEST');
@@ -113,7 +191,7 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.exportProject,
     async (_event, payload: unknown): Promise<IpcResult<ExportProjectResponse>> => {
       const request = validateWith(exportProjectRequestSchema, payload, 'IPC_BAD_REQUEST');
@@ -122,7 +200,7 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.exportMedia,
     async (event, payload: unknown): Promise<IpcResult<ExportMediaResponse>> => {
       const request = validateWith(exportMediaRequestSchema, payload, 'IPC_BAD_REQUEST');
@@ -132,7 +210,7 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.exportCancel,
     async (_event, payload: unknown): Promise<IpcResult<ExportCancelResponse>> => {
       const request = validateWith(exportCancelRequestSchema, payload, 'IPC_BAD_REQUEST');
@@ -141,7 +219,7 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.exportWriteVideo,
     async (_event, payload: unknown): Promise<IpcResult<ExportWriteVideoResponse>> => {
       const request = validateWith(exportWriteVideoRequestSchema, payload, 'IPC_BAD_REQUEST');
@@ -150,7 +228,7 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.exportProfileLoad,
     async (_event, payload: unknown): Promise<IpcResult<ExportProfileLoadResponse>> => {
       const request = validateWith(exportProfileLoadRequestSchema, payload, 'IPC_BAD_REQUEST');
@@ -159,7 +237,7 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.exportProfileSave,
     async (_event, payload: unknown): Promise<IpcResult<ExportProfileSaveResponse>> => {
       const request = validateWith(exportProfileSaveRequestSchema, payload, 'IPC_BAD_REQUEST');
@@ -168,7 +246,7 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.exportAtlas,
     async (_event, payload: unknown): Promise<IpcResult<ExportAtlasResponse>> => {
       const request = validateWith(exportAtlasRequestSchema, payload, 'IPC_BAD_REQUEST');
@@ -177,7 +255,7 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.atlasImportPremade,
     async (_event, payload: unknown): Promise<IpcResult<AtlasImportResponse>> => {
       const request = validateWith(atlasImportPremadeRequestSchema, payload, 'IPC_BAD_REQUEST');
@@ -186,7 +264,7 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.atlasImportGrid,
     async (_event, payload: unknown): Promise<IpcResult<AtlasImportResponse>> => {
       const request = validateWith(atlasImportGridRequestSchema, payload, 'IPC_BAD_REQUEST');
@@ -195,7 +273,7 @@ export function registerIpc(): void {
     },
   );
 
-  ipcMain.handle(
+  handle(
     IpcChannel.layeredImport,
     async (_event, payload: unknown): Promise<IpcResult<LayeredImportResponse>> => {
       const request = validateWith(layeredImportRequestSchema, payload, 'IPC_BAD_REQUEST');

@@ -32,7 +32,12 @@ export class SetAnimationDurationCommand implements Command {
       const animation = ctx.mutate.getAnimation(this.animId);
       if (!animation) throw new CommandTargetMissingError(this.kind, this.animId);
       const lastTime = lastAnimationKeyTime(animation);
-      if (!Number.isFinite(this.after) || this.after < lastTime) {
+      if (
+        !Number.isFinite(this.after) ||
+        this.after < 0 ||
+        this.after < lastTime ||
+        (lastTime >= 0 && this.after === 0)
+      ) {
         throw new AnimationDurationError(this.animId, this.after, lastTime);
       }
       this.before = animation.duration;

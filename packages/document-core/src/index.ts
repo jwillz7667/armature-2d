@@ -493,6 +493,8 @@ export {
   createDocument,
   loadDocument,
   loadDocumentWithEffects,
+  loadProjectDocument,
+  exportProjectDocument,
   effectsStateFromDocument,
   exportDocument,
   exportSlotSceneDocument,

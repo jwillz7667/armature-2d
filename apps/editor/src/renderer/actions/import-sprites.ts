@@ -1,9 +1,10 @@
+import { atlasRefSchema } from '@marionette/format';
 import type { AtlasRef } from '@marionette/format/types';
-import { buildRegionTextures, makeRegionTextureResolver } from '@marionette/runtime-web';
+import type { Document } from '@marionette/document-core';
 import { SetAtlasRefCommand, documentHost } from '../document';
-import { atlasTextureStore } from '../editor-state/atlas-texture-store';
+import { atlasTextureStore, prepareAtlas } from '../editor-state/atlas-texture-store';
+import { mergeAtlases } from './merge-atlas';
 import { bridge } from '../ipc-bridge';
-import { loadPageTextures } from '../panels/atlas-textures';
 import type {
   AtlasImportGridRequest,
   AtlasImportImagesRequest,
@@ -42,16 +43,57 @@ function messageOf(error: unknown, fallback: string): string {
 // (the document still has the atlas) and surfaces a typed error.
 async function applyImportedAtlas(
   response: Extract<AtlasImportResponse, { status: 'imported' }>,
+  original: Document,
 ): Promise<SpriteImportOutcome> {
   // Opaque IPC value; main is the trusted AtlasRef producer and the format validator re-checks it at
   // export (LAW 3), so this single narrowing assertion is justified.
-  const atlas = response.atlas as AtlasRef;
-  const pages = response.pages;
-  documentHost.current().history.execute(new SetAtlasRefCommand(atlas));
+  if (documentHost.current() !== original) return { kind: 'canceled' };
+  const revision = original.model.revision;
+  const atlas = atlasRefSchema.parse(response.atlas);
+  const renamed = new Map<string, string>();
   try {
-    const pageTextures = await loadPageTextures(pages);
-    const resolver = makeRegionTextureResolver(buildRegionTextures(atlas, pageTextures));
-    atlasTextureStore.setResolver(resolver, [...pageTextures.values()], pages);
+    const incoming = [];
+    for (const page of response.pages) {
+      const digest = await crypto.subtle.digest('SHA-256', page.data);
+      const hash = [...new Uint8Array(digest)]
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join('');
+      const file = `texture-${hash}.png`;
+      if (renamed.has(page.file)) throw new Error(`Duplicate imported page: ${page.file}`);
+      renamed.set(page.file, file);
+      incoming.push({ ...page, file });
+    }
+    const changed = {
+      pages: atlas.pages.map((page) => {
+        const file = renamed.get(page.file);
+        if (!file) throw new Error(`Missing imported texture: ${page.file}`);
+        return { ...page, file };
+      }),
+    };
+    const merged = mergeAtlases(original.model.preserved().atlas, changed);
+    const allBytes = new Map(
+      [...atlasTextureStore.getPageBytes(), ...incoming].map((page) => [page.file, page]),
+    );
+    const pages = merged.pages.flatMap((page) => {
+      const bytes = allBytes.get(page.file);
+      return bytes ? [bytes] : [];
+    });
+    const staged = await prepareAtlas(merged, pages);
+    if (original !== documentHost.current() || original.model.revision !== revision) {
+      staged.dispose();
+      return {
+        kind: 'error',
+        message: 'The project changed during import. Please import the images again.',
+      };
+    }
+    try {
+      atlasTextureStore.install(staged);
+      original.history.execute(new SetAtlasRefCommand(merged));
+      await atlasTextureStore.activate(merged);
+    } catch (error) {
+      atlasTextureStore.discardPrepared(staged);
+      throw error;
+    }
   } catch (error) {
     return { kind: 'error', message: messageOf(error, 'failed to load atlas page textures') };
   }
@@ -60,10 +102,11 @@ async function applyImportedAtlas(
 
 export async function runSpriteImport(): Promise<SpriteImportOutcome> {
   try {
+    const original = documentHost.current();
     const result = await bridge().importAtlas();
     if (!result.ok) return { kind: 'error', message: result.error.message };
     if (result.data.status === 'canceled') return { kind: 'canceled' };
-    return applyImportedAtlas(result.data);
+    return applyImportedAtlas(result.data, original);
   } catch (error) {
     // A missing bridge (failed preload) throws here; surface it instead of an opaque rejection.
     return { kind: 'error', message: messageOf(error, 'import failed') };
@@ -77,10 +120,11 @@ export async function runImageImport(
 ): Promise<SpriteImportOutcome> {
   if (images.length === 0) return { kind: 'canceled' };
   try {
+    const original = documentHost.current();
     const result = await bridge().importAtlasImages(images);
     if (!result.ok) return { kind: 'error', message: result.error.message };
     if (result.data.status === 'canceled') return { kind: 'canceled' };
-    return applyImportedAtlas(result.data);
+    return applyImportedAtlas(result.data, original);
   } catch (error) {
     return { kind: 'error', message: messageOf(error, 'import failed') };
   }
@@ -91,10 +135,11 @@ export async function runImageImport(
 // command + texture-publish path as a folder import (LAW 2). A user cancel is a silent no-op.
 export async function runPremadeAtlasImport(): Promise<SpriteImportOutcome> {
   try {
+    const original = documentHost.current();
     const result = await bridge().importPremadeAtlas();
     if (!result.ok) return { kind: 'error', message: result.error.message };
     if (result.data.status === 'canceled') return { kind: 'canceled' };
-    return applyImportedAtlas(result.data);
+    return applyImportedAtlas(result.data, original);
   } catch (error) {
     return { kind: 'error', message: messageOf(error, 'import failed') };
   }
@@ -107,10 +152,11 @@ export async function runGridAtlasImport(
   grid: GridSpec,
 ): Promise<SpriteImportOutcome> {
   try {
+    const original = documentHost.current();
     const result = await bridge().importGridAtlas(image, grid);
     if (!result.ok) return { kind: 'error', message: result.error.message };
     if (result.data.status === 'canceled') return { kind: 'canceled' };
-    return applyImportedAtlas(result.data);
+    return applyImportedAtlas(result.data, original);
   } catch (error) {
     return { kind: 'error', message: messageOf(error, 'import failed') };
   }
