@@ -87,7 +87,13 @@ def camera_for(names, actors, cast):
         a,b=p['x']-half,p['x']+half
         if b<focus_left-.018:minimum=max(minimum,b+.015)
         elif a>focus_right+.018:maximum=min(maximum,a-.015-1/z)
-    if minimum<=maximum:camera_left=clamp(camera_left,minimum,maximum)
+    if minimum>maximum and abs(maximum-(1-1/z))<.00001 and 0<minimum<focus_left-.02:
+        # A tiny zoom permits a complete exclusion when the background's right
+        # edge otherwise prevents shifting past a neighboring character.
+        candidate=1/(1-minimum)
+        if candidate<=1.75:
+            z=max(z,candidate);maximum=1-1/z
+    if minimum<=maximum+.000001:camera_left=clamp(camera_left,minimum,maximum)
     return [round(camera_left,5),round(clamp((top+bottom)/2-.5/z,0,1-1/z),5),round(z,5)]
 
 
