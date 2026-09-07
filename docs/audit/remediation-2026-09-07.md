@@ -19,7 +19,9 @@ presentation boundaries. Work proceeds in verified subsystem changes.
 | F16 | Explicit import profiles, sibling atlas transaction, loss reports, worker budgets | Implemented safeguards and JSON asset workflow; real-export binary profile/corpus and desktop fidelity acceptance pending |
 | F29 | Deform crossfades, additive layers, masks, linked-skin resolution | Implemented in TS state playback; native AnimationState API not present |
 | F14 | Native pixels | Pending |
-| F01, F22-F28 | Repository, dependencies, CI, release, docs, performance, acceptance | Pending |
+| F24 | Exact-commit format/release gates, required jobs, complete native triggers | Implemented; regression and packaged MCP checks pass |
+| F28 | Built MCP startup and worker acceptance | Executable smoke tests implemented; installed Electron and native GPU acceptance pending |
+| F01, F22-F23, F25-F27 | Repository, dependencies, resource budgets, release identity, docs, performance | Pending |
 
 ## Evidence and environment
 
@@ -103,3 +105,11 @@ because an unsupported-feature label or a plan exists.
 - Live web meshes and software exports call the same state deformation sampler. Linked meshes resolve their timeline-sharing source before blending.
 - 407 runtime-core, 163 runtime-web, and 110 render-preview tests pass, including identical-clip continuity, sparse-track pixels, outgoing alpha/masks, and scratch reuse.
 - Native wrappers still expose single-clip playback; native multi-track equivalence is not claimed.
+
+
+## CI integrity verification
+
+- 58 tooling tests pass, including 16 format-gate adversarial cases and 14 release-proof cases. Missing refs, shell metacharacters, comment-spoofed constants, stale ADRs, rollbacks, wrong commits and superseded successful runs are covered.
+- The packaged MCP CLI previously crashed on a dynamic CommonJS require inside ESM. Its explicit Node bridge now completes initialize and two 208-tool catalog requests outside the workspace. CI runs that executable smoke check.
+- GitHub import branch verification: native conformance, full workspace tests, lint, build/workers, types and particle acceptance pass. The old blanket format gate rejected PNG preflight and a public reexport; the new gate checks their actual non-wire scope while enforcing version movement for contract changes.
+- Required aggregators reject skipped jobs, include commit lint, and run native checks on every PR. Release packaging requires CI on the exact tagged main commit and reruns native conformance. Release identity/signing still require the subsequent release work.

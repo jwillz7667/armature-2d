@@ -12,6 +12,10 @@ await build({
   platform: 'node',
   format: 'esm',
   target: 'node22',
-  banner: { js: '#!/usr/bin/env node' },
+  // Bundled CommonJS dependencies (pngjs) still require Node built-ins. ESM needs an explicit
+  // createRequire bridge; a successful esbuild run alone does not prove the executable starts.
+  banner: {
+    js: '#!/usr/bin/env node\nimport { createRequire } from "node:module"; const require = createRequire(import.meta.url);',
+  },
   logLevel: 'info',
 });

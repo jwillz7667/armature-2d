@@ -23,7 +23,7 @@
     "check:dashes": "node tools/check-no-dashes.mjs",
     "check:format-semver": "node tools/check-format-semver.mjs",
     "check:format-version-stable": "node packages/format/scripts/assert-format-version-stable.mjs",
-    "ci:local": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm check:packages && pnpm check:dashes"
+    "ci:local": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build && pnpm check:packages && pnpm check:dashes"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.1",
