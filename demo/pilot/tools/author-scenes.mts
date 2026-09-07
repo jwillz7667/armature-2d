@@ -186,8 +186,27 @@ for (const item of timeline.scenes) {
       await key(r.bones.torso!, 'rotate', t, { angle: p.torsoAngle ?? 0 });
       if (fi % 4 === 0 || p.reach || p.rootAngle || p.carry || fi === scene.frames.length - 1)
         await key(r.bones.torso!, 'translate', t, { x: 0, y: (p.torsoY ?? 0) * c.height });
-      for (const eye of ['eye-near', 'eye-far'])
-        if (r.bones[eye]) await key(r.bones[eye]!, 'scale', t, { x: 1, y: p.blink ?? 1 });
+      for (const eye of ['eye-near', 'eye-far']) {
+        if (!r.bones[eye]) continue;
+        await key(r.bones[eye]!, 'scale', t, { x: 1, y: p.blink ?? 1 });
+        const side = eye.slice(4),
+          closed = (p.blink ?? 1) < 0.2;
+        for (const part of [eye, 'pupil-' + side, 'lid-' + side]) {
+          if (r.slots[part])
+            await swap(
+              r.slots[part]!,
+              t,
+              part.startsWith('lid-') ? (closed ? part : null) : closed ? null : part,
+            );
+        }
+      }
+      for (const part of c.parts) {
+        if (!part.gazeRange) continue;
+        await key(r.bones[part.id]!, 'translate', t, {
+          x: (p.gazeX ?? 0) * part.gazeRange[0],
+          y: (p.gazeY ?? 0) * part.gazeRange[1],
+        });
+      }
       if (r.mouth)
         await swap(r.mouth, t, r.mouthNames[Math.min(p.mouth ?? 0, r.mouthNames.length - 1)]!);
       for (const [legName, leg] of Object.entries(r.legs)) {

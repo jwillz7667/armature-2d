@@ -1,5 +1,8 @@
 // Production pose inputs, separate from the native document format.
 export interface ActorControl {
+  gazeX?: number;
+  gazeY?: number;
+  lookAt?: string;
   x: number;
   y: number;
   h: number;

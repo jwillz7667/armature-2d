@@ -18,6 +18,9 @@ export interface Part {
   parent: string;
   visible: boolean;
   mouthState?: number;
+  leg?: string;
+  segment?: 'upper' | 'lower' | 'paw';
+  gazeRange?: Vec;
 }
 export interface Leg {
   id: string;
@@ -118,6 +121,7 @@ export class Author {
     y: number,
     width: number,
     height: number,
+    rotation = 0,
   ) {
     await this.call('attach.region.add', {
       documentId: this.id,
@@ -128,6 +132,7 @@ export class Author {
       y,
       width,
       height,
+      rotation,
     });
     await this.call('slot.activeAttachment', { documentId: this.id, slotId, attachment: name });
   }
@@ -240,6 +245,40 @@ export class Author {
       rig.legs[leg.id] = { upper, lower, target, definition: leg };
     }
     for (const p of c.parts) {
+      if (p.leg && p.segment) {
+        const leg = rig.legs[p.leg]!;
+        const point =
+          p.segment === 'upper'
+            ? leg.definition.hip
+            : p.segment === 'lower'
+              ? leg.definition.knee
+              : leg.definition.foot;
+        const theta =
+          p.segment === 'upper'
+            ? angle(leg.definition.hip, leg.definition.knee)
+            : p.segment === 'lower'
+              ? angle(leg.definition.knee, leg.definition.foot)
+              : 0;
+        const bone =
+          p.segment === 'upper' ? leg.upper : p.segment === 'lower' ? leg.lower : leg.target;
+        const [left, top, right, bottom] = p.box;
+        const dx = (left + right) / 2 - point[0],
+          dy = (top + bottom) / 2 - point[1];
+        const radians = (theta * Math.PI) / 180;
+        const slot = await this.slot(`${prefix}/${p.id}`, bone);
+        rig.slots[p.id] = slot;
+        await this.region(
+          slot,
+          p.id,
+          p.region,
+          dx * Math.cos(radians) + dy * Math.sin(radians),
+          -dx * Math.sin(radians) + dy * Math.cos(radians),
+          right - left,
+          bottom - top,
+          -theta,
+        );
+        continue;
+      }
       if (p.id.startsWith('mouth-')) {
         if (!rig.mouth) rig.mouth = await this.slot(`${prefix}/mouth`, rig.bones.head!);
         const [l, t, r, b] = p.box;
@@ -270,6 +309,8 @@ export class Author {
         r - l,
         b - t,
       );
+      if (p.id.startsWith('lid-'))
+        await this.call('slot.activeAttachment', { documentId: this.id, slotId, attachment: null });
       if (!leg) continue;
       const grid = meshGrid(l - origin[0], t - origin[1], r - l, b - t, 10, 18);
       await this.call('mesh.generateFromRegion', {
@@ -421,7 +462,20 @@ export async function authorRigLibrary(root: string) {
             [1.03, 1],
             [duration, 1],
           ] as const)
-            if (time <= duration) await a.key(id, r.bones[eye]!, 'scale', time, { x: 1, y });
+            if (time <= duration) {
+              await a.key(id, r.bones[eye]!, 'scale', time, { x: 1, y });
+              const side = eye.slice(4),
+                closed = y < 0.2;
+              for (const part of [eye, 'pupil-' + side, 'lid-' + side]) {
+                if (r.slots[part])
+                  await a.attachment(
+                    id,
+                    r.slots[part]!,
+                    time,
+                    part.startsWith('lid-') ? (closed ? part : null) : closed ? null : part,
+                  );
+              }
+            }
         }
       if (clip === 'talk' && r.mouthNames.length > 1)
         for (let i = 0; i < 18; i++)
