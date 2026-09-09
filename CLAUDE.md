@@ -18,7 +18,7 @@ authoring UI and playback renderer trail the backend by roughly one phase (the v
 viewport, then the WP-2.1/2.3/2.4/2.6/2.7/2.8/2.9 authoring surfaces over the already-complete command
 layer), then the Phase 3 remainder (GL particle rendering + designer panel), then the Phase 4 remainder
 (GL slot render + scene preview), then Phase 5 continues as planned. NOTE: the WebGL pixel parity, the
-live real-engine acceptance step, and the byte-exact fixture-determinism gate on the pinned Node 22.13.1
+live real-engine acceptance step, and the byte-exact fixture-determinism gate on the pinned Node 24.20.0
 are not exercisable in a headless container; they are covered by pure-logic + parity + tolerance tests and
 the committed golden fixtures instead.** Build phase by phase, do not scaffold everything at once.
 The authoritative spec is `MARIONETTE_HANDOFF.md`. The plan of record lives in `docs/plan/`; the master index

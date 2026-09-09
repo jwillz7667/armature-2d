@@ -5,6 +5,7 @@ import { defineConfig } from 'vitest/config';
 // sufficient.
 export default defineConfig({
   test: {
+    maxWorkers: 2,
     environment: 'node',
     include: ['test/**/*.test.ts'],
   },

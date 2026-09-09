@@ -72,8 +72,8 @@ Dependency direction is machine-enforced (ESLint boundaries plus guard tests); `
 
 ## Prerequisites
 
-- Node 22 LTS, pinned in `.node-version` (22.13.1, the exact patch used to generate fixtures).
-- pnpm 11.8.0 via the root `packageManager` field (enable with `corepack enable`).
+- Node 24 LTS, pinned in `.node-version` (24.20.0, the exact patch used to generate fixtures).
+- pnpm 11.19.0 via the root `packageManager` field (enable with `corepack enable`).
 
 ## Quickstart
 

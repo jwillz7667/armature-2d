@@ -138,14 +138,36 @@ jobs:
         run: pnpm exec commitlint --from "$COMMIT_BASE" --to "$COMMIT_HEAD"
 
   # Every required job must finish successfully, including commit lint. Missing/skipped jobs fail.
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit:dependencies
+
   ci-pass:
     runs-on: ubuntu-latest
     if: always()
     needs:
-      [typecheck, lint, test, build, format-semver, package-guard, phase3-acceptance, commitlint]
+      [
+        typecheck,
+        lint,
+        test,
+        build,
+        format-semver,
+        package-guard,
+        phase3-acceptance,
+        commitlint,
+        dependency-audit,
+      ]
     steps:
       - name: Verify every required job succeeded
         env:
           JOB_RESULTS: ${{ toJSON(needs) }}
         run: |
-          node -e 'const jobs=JSON.parse(process.env.JOB_RESULTS); const names=["typecheck","lint","test","build","format-semver","package-guard","phase3-acceptance","commitlint"]; for(const name of names) { if(jobs[name]?.result !== "success") throw new Error(name + " did not succeed"); }'
+          node -e 'const jobs=JSON.parse(process.env.JOB_RESULTS); const names=["typecheck","lint","test","build","format-semver","package-guard","phase3-acceptance","commitlint","dependency-audit"]; for(const name of names) { if(jobs[name]?.result !== "success") throw new Error(name + " did not succeed"); }'

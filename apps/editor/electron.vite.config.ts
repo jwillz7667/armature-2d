@@ -1,7 +1,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
-import { defineConfig, externalizeDepsPlugin } from 'electron-vite';
+import { defineConfig } from 'electron-vite';
 import type { Plugin } from 'vite';
 import { cspForMode, type BuildMode } from './src/main/csp';
 
@@ -35,23 +35,16 @@ export default defineConfig(({ command }) => {
       // into main. Add a workspace package here when the main process starts importing it. atlas-pack's own
       // npm deps (maxrects-packer, pngjs) and the transitive @noble/hashes are not listed editor dependencies,
       // so they bundle automatically; zod is a direct editor dependency and stays external (Node resolves it).
-      plugins: [
-        externalizeDepsPlugin({
+      build: {
+        externalizeDeps: {
           exclude: [
             '@marionette/format',
             '@marionette/atlas-pack',
-            // Bundled for the same reason (consumed as TS source): the media-export pipeline behind the
-            // export:media IPC handler uses render-preview's renderSequence + GIF/APNG encoders in main.
             '@marionette/render-preview',
-            // render-preview imports runtime-core; leaving it external makes main require the raw
-            // ./src/index.ts export at runtime (ERR_UNKNOWN_FILE_EXTENSION crash on launch).
             '@marionette/runtime-core',
-            // The spine:import IPC handler converts in main; same TS-source-export bundling requirement.
             '@marionette/import-spine',
           ],
-        }),
-      ],
-      build: {
+        },
         rollupOptions: {
           input: {
             main: resolve(dir, 'src/main/main.ts'),
@@ -63,9 +56,10 @@ export default defineConfig(({ command }) => {
       },
     },
     preload: {
-      // No externalizeDepsPlugin: Zod must be bundled into the sandboxed preload (it cannot require
+      // Zod must be bundled into the sandboxed preload (it cannot require
       // external modules at runtime). Electron itself stays external (electron-vite handles that).
       build: {
+        externalizeDeps: false,
         rollupOptions: {
           input: { preload: resolve(dir, 'src/preload/preload.ts') },
           output: { format: 'cjs', entryFileNames: '[name].cjs' },

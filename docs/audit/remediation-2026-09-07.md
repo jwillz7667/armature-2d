@@ -21,7 +21,8 @@ presentation boundaries. Work proceeds in verified subsystem changes.
 | F14 | Native pixels | Pending |
 | F24 | Exact-commit format/release gates, required jobs, complete native triggers | Implemented; regression and packaged MCP checks pass |
 | F28 | Built MCP startup and worker acceptance | Executable smoke tests implemented; installed Electron and native GPU acceptance pending |
-| F01, F22-F23, F25-F27 | Repository, dependencies, resource budgets, release identity, docs, performance | Pending |
+| F22 | Supported dependencies and advisory gates | Updated; verification recorded in dependency maintenance notes |
+| F01, F23, F25-F27 | Repository, resource budgets, release identity, docs, performance | Pending |
 
 ## Evidence and environment
 
@@ -113,3 +114,13 @@ because an unsupported-feature label or a plan exists.
 - The packaged MCP CLI previously crashed on a dynamic CommonJS require inside ESM. Its explicit Node bridge now completes initialize and two 208-tool catalog requests outside the workspace. CI runs that executable smoke check.
 - GitHub import branch verification: native conformance, full workspace tests, lint, build/workers, types and particle acceptance pass. The old blanket format gate rejected PNG preflight and a public reexport; the new gate checks their actual non-wire scope while enforcing version movement for contract changes.
 - Required aggregators reject skipped jobs, include commit lint, and run native checks on every PR. Release packaging requires CI on the exact tagged main commit and reruns native conformance. Release identity/signing still require the subsequent release work.
+
+## F22 dependency verification (September 9)
+
+Supported dependency updates and scoped transitive security floors produce zero
+known advisories (`pnpm audit`, 709 dependencies). The workspace suite passes
+4,865 tests in 12 packages. All 19 type-check/build prerequisites pass; production
+build, lint, boundary guards, and built video/media/Spine/MCP startup checks pass.
+The MCP executable exposes 208 tools. See `../dev/dependency-maintenance.md` for
+the exact toolchain, fixture drift analysis, and maintenance policy. These results
+do not establish Electron desktop, native GPU, or installer acceptance.
