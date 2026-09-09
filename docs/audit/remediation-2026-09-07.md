@@ -124,3 +124,21 @@ build, lint, boundary guards, and built video/media/Spine/MCP startup checks pas
 The MCP executable exposes 208 tools. See `../dev/dependency-maintenance.md` for
 the exact toolchain, fixture drift analysis, and maintenance policy. These results
 do not establish Electron desktop, native GPU, or installer acceptance.
+
+## Resource-budget checkpoint (September 9, paused at user request)
+
+Work in progress on `fix/audit-runtime-budgets-20260909`:
+
+- Reject non-finite playback arguments, bound track indices and per-update loop/event work,
+  and validate updates before mutating clocks. Queue transitions after multiple loops now
+  wait for the next boundary and fire events from the old/new active segments.
+- Move layered PSD/ORA import and sprite-atlas packing into timed workers. Add ORA
+  expanded-size, entry, XML nesting, and decoded-pixel limits; PSD bitmap memory limits
+  and explicit rejection of the decoder's unbounded CMYK path.
+- Bound atlas file reads and aggregate source bytes/pixels; limit renderer image requests,
+  serialize atlas imports, and remove temporary packed output after delivering page bytes.
+
+The intermediate full suite passed 4,870 tests after the playback/layered changes.
+The subsequent atlas-worker and shared atlas-file-store changes are a checkpoint:
+full regression, built-worker startup/termination, and desktop acceptance have not yet
+been rerun for those final edits. F23 remains in progress. No release or merge performed.

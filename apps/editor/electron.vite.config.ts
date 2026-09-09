@@ -49,6 +49,8 @@ export default defineConfig(({ command }) => {
           input: {
             main: resolve(dir, 'src/main/main.ts'),
             'media-export-worker': resolve(dir, 'src/main/export/media-export.worker.ts'),
+            'atlas-import-worker': resolve(dir, 'src/main/atlas-import.worker.ts'),
+            'layered-import-worker': resolve(dir, 'src/main/layered-import.worker.ts'),
             'spine-import-worker': resolve(dir, 'src/main/spine-import.worker.ts'),
           },
           output: { entryFileNames: '[name].js' },

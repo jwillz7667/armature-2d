@@ -1,8 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { app, BrowserWindow, dialog } from 'electron';
-import { createNodeFileStore, isAtlasError, runAtlasPipeline } from './atlas';
+import { Worker } from 'node:worker_threads';
+import { atlasImportResponseSchema } from '../shared';
 import { confinePagePath } from './project-textures';
 import type { AtlasImportImagesRequest, AtlasImportResponse, IpcResult } from '../shared';
 
@@ -15,9 +16,7 @@ import type { AtlasImportImagesRequest, AtlasImportResponse, IpcResult } from '.
 // Packed page PNGs are written under the app's userData directory, never into the user's source folder.
 // userData is app-owned and writable on every platform, so importing does not pollute the user's assets
 // and needs no second "where to save" dialog (which would also widen the path-injection surface). The
-// subdirectory is keyed by the source folder's basename; re-importing the same folder overwrites
-// deterministically (same input produces the same pages), which is correct since SetAtlasRef replaces the
-// whole atlas anyway.
+// Each import uses a unique temporary directory, removed after page bytes reach the renderer.
 const ATLAS_OUTPUT_SUBDIR = 'atlas';
 // Renderer-supplied images (drag-drop / file picker) are staged here before packing, then removed. Keyed by
 // a random id so concurrent imports never collide; app-owned, so it never pollutes the user's assets.
@@ -40,30 +39,43 @@ async function packAndReadPages(
     return handlerError(`could not create atlas output directory ${outputDir}`);
   }
   try {
-    const atlas = await runAtlasPipeline({
-      sourceDir,
-      outputDir,
-      fileStore: createNodeFileStore(),
+    const data = await new Promise<AtlasImportResponse>((resolve, reject) => {
+      const worker = new Worker(new URL('./atlas-import-worker.js', import.meta.url), {
+        workerData: { sourceDir, outputDir },
+        resourceLimits: { maxOldGenerationSizeMb: 768 },
+      });
+      let settled = false;
+      const finish = (value?: AtlasImportResponse, error?: Error): void => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        void worker.terminate().then(() => {
+          if (value) resolve(value);
+          else reject(error ?? new Error('Atlas worker exited without a result'));
+        }, reject);
+      };
+      const timer = setTimeout(
+        () => finish(undefined, new Error('Atlas import exceeded 60 seconds; reduce source size')),
+        60000,
+      );
+      worker.on('message', (value: unknown) => {
+        const parsed = atlasImportResponseSchema.safeParse(value);
+        if (parsed.success) finish(parsed.data);
+        else finish(undefined, new Error('Atlas import failed or exceeded resource limits'));
+      });
+      worker.on('error', (error) => finish(undefined, error));
+      worker.on('exit', () => finish());
     });
-    const pages = await Promise.all(
-      atlas.pages.map(async (page) => ({
-        file: page.file,
-        data: new Uint8Array(await readFile(join(outputDir, page.file))),
-      })),
-    );
-    return { ok: true, data: { status: 'imported', atlas, pages } };
+    return { ok: true, data };
   } catch (error) {
-    // The pack pipeline throws a typed AtlasError carrying a stable code; surface the code so the renderer
-    // notice is actionable. Any other failure is reported with its message.
-    if (isAtlasError(error)) {
-      return handlerError(`atlas import failed (${error.code}): ${error.message}`);
-    }
     const message = error instanceof Error ? error.message : 'unknown error';
     return handlerError(`atlas import failed: ${message}`);
+  } finally {
+    await rm(outputDir, { recursive: true, force: true }).catch(() => undefined);
   }
 }
 
-export async function importAtlasFromDirectory(): Promise<IpcResult<AtlasImportResponse>> {
+async function importAtlasFromDirectoryInternal(): Promise<IpcResult<AtlasImportResponse>> {
   const openOptions = {
     title: 'Import Sprites',
     properties: ['openDirectory' as const],
@@ -79,7 +91,11 @@ export async function importAtlasFromDirectory(): Promise<IpcResult<AtlasImportR
     return { ok: true, data: { status: 'canceled' } };
   }
 
-  const outputDir = join(app.getPath('userData'), ATLAS_OUTPUT_SUBDIR, basename(sourceDir));
+  const outputDir = join(
+    app.getPath('userData'),
+    ATLAS_OUTPUT_SUBDIR,
+    `${basename(sourceDir)}-${randomUUID()}`,
+  );
   return packAndReadPages(sourceDir, outputDir);
 }
 
@@ -90,7 +106,7 @@ export async function importAtlasFromDirectory(): Promise<IpcResult<AtlasImportR
 // required), so a hostile name cannot write outside staging. The staging directory is always removed
 // afterward. Names the pipeline does not recognize as PNG are ignored by the packer (it filters to PNG),
 // matching the folder-import behavior.
-export async function importAtlasImages(
+async function importAtlasImagesInternal(
   images: AtlasImportImagesRequest['images'],
 ): Promise<IpcResult<AtlasImportResponse>> {
   const importId = randomUUID();
@@ -113,7 +129,28 @@ export async function importAtlasImages(
     const message = error instanceof Error ? error.message : 'unknown error';
     return handlerError(`atlas import failed: ${message}`);
   } finally {
-    // Best-effort cleanup of the staging bytes; the packed output lives in the app-owned atlas dir.
+    // Best-effort cleanup of the staging bytes; packed output is cleaned up by packAndReadPages.
     await rm(stagingDir, { recursive: true, force: true }).catch(() => undefined);
   }
+}
+
+let importBusy = false;
+async function withImportSlot(
+  operation: () => Promise<IpcResult<AtlasImportResponse>>,
+): Promise<IpcResult<AtlasImportResponse>> {
+  if (importBusy) return handlerError('An atlas import is already running');
+  importBusy = true;
+  try {
+    return await operation();
+  } finally {
+    importBusy = false;
+  }
+}
+export function importAtlasFromDirectory(): Promise<IpcResult<AtlasImportResponse>> {
+  return withImportSlot(importAtlasFromDirectoryInternal);
+}
+export function importAtlasImages(
+  images: AtlasImportImagesRequest['images'],
+): Promise<IpcResult<AtlasImportResponse>> {
+  return withImportSlot(() => importAtlasImagesInternal(images));
 }
