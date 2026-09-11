@@ -50,6 +50,7 @@ jobs:
           node tools/smoke-video-worker.mjs
           node tools/smoke-media-worker.mjs
           node tools/smoke-spine-worker.mjs
+          node tools/smoke-import-workers.mjs
           node tools/smoke-mcp-cli.mjs
       - name: Ensure a draft release exists for this tag
         env:

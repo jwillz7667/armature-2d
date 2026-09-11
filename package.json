@@ -15,7 +15,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "turbo run test --concurrency=3",
+    "test": "turbo run test --concurrency=2",
     "build": "turbo run build",
     "conformance:particles": "pnpm --filter @marionette/conformance exec vitest run test/phase3-effects.test.ts",
     "phase3:acceptance": "pnpm --filter @marionette/conformance run phase3:acceptance",

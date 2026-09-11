@@ -32,6 +32,7 @@ namespace Marionette.Runtime.Unity.View
 
             public Vector3[] Positions = System.Array.Empty<Vector3>();
             public Vector2[] Uvs = System.Array.Empty<Vector2>();
+            public Vector4[] DarkColors = System.Array.Empty<Vector4>();
             public Color32[] Colors = System.Array.Empty<Color32>();
             public int[] Indices = System.Array.Empty<int>();
 
@@ -70,7 +71,8 @@ namespace Marionette.Runtime.Unity.View
             IReadOnlyDictionary<string, Texture2D> pageTextures,
             int sortingLayerId,
             int baseSortingOrder,
-            Material fallbackMaterial)
+            Material fallbackMaterial,
+            bool premultipliedAlpha = false)
         {
             for (int b = 0; b < batches.Count; b += 1)
             {
@@ -82,6 +84,7 @@ namespace Marionette.Runtime.Unity.View
                 target.Renderer.sharedMaterial = material;
 
                 target.Properties.Clear();
+                target.Properties.SetFloat("_PremultipliedAlpha", premultipliedAlpha ? 1f : 0f);
                 if (batch.PageFile != null
                     && pageTextures.TryGetValue(batch.PageFile, out Texture2D pageTexture)
                     && pageTexture != null)
@@ -100,6 +103,15 @@ namespace Marionette.Runtime.Unity.View
             {
                 _pool[b].GameObject.SetActive(false);
             }
+        }
+
+        public void Dispose()
+        {
+            foreach (BatchRenderer item in _pool) {
+                UnityEngine.Object.Destroy(item.Mesh);
+                UnityEngine.Object.Destroy(item.GameObject);
+            }
+            _pool.Clear();
         }
 
         private BatchRenderer Rent(int index)
@@ -135,6 +147,7 @@ namespace Marionette.Runtime.Unity.View
                 target.Positions = new Vector3[vertexCount];
                 target.Uvs = new Vector2[vertexCount];
                 target.Colors = new Color32[vertexCount];
+                target.DarkColors = new Vector4[vertexCount];
             }
 
             if (target.Indices.Length < indexCount)
@@ -151,6 +164,7 @@ namespace Marionette.Runtime.Unity.View
                 // Atlas UVs are top-left origin; Unity texture space is bottom-left, so flip v.
                 target.Uvs[v] = new Vector2((float)uvs[v * 2], 1f - (float)uvs[(v * 2) + 1]);
                 int c = v * 4;
+                target.DarkColors[v] = new Vector4((float)batch.DarkColors[c], (float)batch.DarkColors[c + 1], (float)batch.DarkColors[c + 2], 0f);
                 target.Colors[v] = new Color32(
                     ToByte(colors[c]),
                     ToByte(colors[c + 1]),
@@ -168,10 +182,13 @@ namespace Marionette.Runtime.Unity.View
 
             Mesh mesh = target.Mesh;
             mesh.Clear();
+            mesh.indexFormat = vertexCount > 65535 ? UnityEngine.Rendering.IndexFormat.UInt32 : UnityEngine.Rendering.IndexFormat.UInt16;
             mesh.SetVertices(target.Positions, 0, vertexCount);
             mesh.SetUVs(0, target.Uvs, 0, vertexCount);
             mesh.SetColors(target.Colors, 0, vertexCount);
+            mesh.SetUVs(1, target.DarkColors, 0, vertexCount);
             mesh.SetTriangles(target.Indices, 0, indexCount, 0, false);
+            mesh.RecalculateBounds();
         }
 
         private static byte ToByte(double value)
