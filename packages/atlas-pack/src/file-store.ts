@@ -1,4 +1,5 @@
 import { open, readdir, writeFile } from 'node:fs/promises';
+import { AtlasError } from './errors';
 import { constants } from 'node:fs';
 
 // Injected filesystem so the trim/pack logic is unit-testable without touching real disk, mirroring how
@@ -22,16 +23,21 @@ export function createNodeFileStore(): AtlasFileStore {
       try {
         const stat = await file.stat();
         if (!stat.isFile() || stat.size > 256 * 1024 * 1024)
-          throw new Error('Atlas source must be a regular file no larger than 256 MiB');
+          throw new AtlasError(
+            'ATLAS_RESOURCE_LIMIT',
+            'Atlas source must be a regular file no larger than 256 MiB',
+          );
         const bytes = new Uint8Array(stat.size);
         let offset = 0;
         while (offset < bytes.length) {
           const read = await file.read(bytes, offset, bytes.length - offset, offset);
-          if (!read.bytesRead) throw new Error('Atlas source changed while reading');
+          if (!read.bytesRead)
+            throw new AtlasError('ATLAS_SOURCE_CHANGED', 'Atlas source changed while reading');
           offset += read.bytesRead;
         }
         const extra = await file.read(new Uint8Array(1), 0, 1, offset);
-        if (extra.bytesRead) throw new Error('Atlas source grew while reading');
+        if (extra.bytesRead)
+          throw new AtlasError('ATLAS_SOURCE_CHANGED', 'Atlas source grew while reading');
         return bytes;
       } finally {
         await file.close();

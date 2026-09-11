@@ -1,3 +1,4 @@
+import { AtlasError } from './errors';
 import { inspectPng } from '@marionette/format';
 import { basename, extname, join } from 'node:path';
 import { mapWithConcurrency } from './concurrency';
@@ -35,16 +36,25 @@ export async function importSprites(
     .slice()
     .sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
 
-  if (pngFiles.length > 4096) throw new Error('Atlas import exceeds 4096 source images');
+  if (pngFiles.length > 4096)
+    throw new AtlasError('ATLAS_RESOURCE_LIMIT', 'Atlas import exceeds 4096 source images');
   let sourceBytes = 0;
   let pixels = 0;
   return mapWithConcurrency(pngFiles, MAX_IMPORT_CONCURRENCY, async (fileName) => {
     const bytes = await fileStore.readBytes(join(dir, fileName));
     sourceBytes += bytes.byteLength;
-    const header = inspectPng(bytes);
+    let header: { width: number; height: number };
+    try {
+      header = inspectPng(bytes);
+    } catch (cause) {
+      throw new AtlasError('ATLAS_DECODE_FAILED', 'PNG preflight failed', { cause });
+    }
     pixels += header.width * header.height;
     if (sourceBytes > 512 * 1024 * 1024 || pixels > 64 * 1024 * 1024) {
-      throw new Error('Atlas import exceeds 512 MiB source data or 64 million decoded pixels');
+      throw new AtlasError(
+        'ATLAS_RESOURCE_LIMIT',
+        'Atlas import exceeds 512 MiB source data or 64 million decoded pixels',
+      );
     }
     const image = decodePng(bytes);
     return {

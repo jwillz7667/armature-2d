@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { app, BrowserWindow, dialog } from 'electron';
+import { z } from 'zod';
 import { Worker } from 'node:worker_threads';
 import { atlasImportResponseSchema } from '../shared';
 import { confinePagePath } from './project-textures';
@@ -15,7 +16,7 @@ import type { AtlasImportImagesRequest, AtlasImportResponse, IpcResult } from '.
 
 // Packed page PNGs are written under the app's userData directory, never into the user's source folder.
 // userData is app-owned and writable on every platform, so importing does not pollute the user's assets
-// and needs no second "where to save" dialog (which would also widen the path-injection surface). The
+// and needs no second "where to save" dialog (which would also widen the path-injection surface).
 // Each import uses a unique temporary directory, removed after page bytes reach the renderer.
 const ATLAS_OUTPUT_SUBDIR = 'atlas';
 // Renderer-supplied images (drag-drop / file picker) are staged here before packing, then removed. Keyed by
@@ -61,7 +62,23 @@ async function packAndReadPages(
       worker.on('message', (value: unknown) => {
         const parsed = atlasImportResponseSchema.safeParse(value);
         if (parsed.success) finish(parsed.data);
-        else finish(undefined, new Error('Atlas import failed or exceeded resource limits'));
+        else {
+          const failure = z
+            .object({
+              status: z.literal('failed'),
+              code: z.string().max(80),
+              message: z.string().max(4096),
+            })
+            .safeParse(value);
+          finish(
+            undefined,
+            new Error(
+              failure.success
+                ? `${failure.data.code}: ${failure.data.message}`
+                : 'Invalid atlas import worker response',
+            ),
+          );
+        }
       });
       worker.on('error', (error) => finish(undefined, error));
       worker.on('exit', () => finish());

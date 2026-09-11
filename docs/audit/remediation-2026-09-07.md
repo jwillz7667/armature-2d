@@ -22,7 +22,9 @@ presentation boundaries. Work proceeds in verified subsystem changes.
 | F24 | Exact-commit format/release gates, required jobs, complete native triggers | Implemented; regression and packaged MCP checks pass |
 | F28 | Built MCP startup and worker acceptance | Executable smoke tests implemented; installed Electron and native GPU acceptance pending |
 | F22 | Supported dependencies and advisory gates | Updated; verification recorded in dependency maintenance notes |
-| F01, F23, F25-F27 | Repository, resource budgets, release identity, docs, performance | Pending |
+| F23 | Worker isolation, import budgets, playback bounds | Implemented; recovery retention remains pending |
+| F27 | Performance | Layered atlas allocation reduced; broader profiling pending |
+| F01, F25-F26 | Repository, release identity, docs | Pending |
 
 ## Evidence and environment
 
@@ -142,3 +144,19 @@ The intermediate full suite passed 4,870 tests after the playback/layered change
 The subsequent atlas-worker and shared atlas-file-store changes are a checkpoint:
 full regression, built-worker startup/termination, and desktop acceptance have not yet
 been rerun for those final edits. F23 remains in progress. No release or merge performed.
+
+## Resumed resource-limit verification (September 11)
+
+- Full workspace: 4,873 tests pass across 12 packages, including new read-budget,
+  fail-fast/drain, queue-boundary, ORA expansion/nesting, and deterministic compact-page cases.
+- Built atlas/layered workers import original artwork, reject oversized/corrupt inputs,
+  and exit cleanly. PNG/GIF/APNG media and packaged 208-tool MCP startup checks pass.
+- Atlas failures preserve typed diagnostics; concurrent reads stop and drain before cleanup.
+- Small layered imports allocate 16 KiB pages instead of 64 MiB, with repeated-import
+  byte equality. Details and limits are in `../dev/import-resource-limits.md`.
+- Recovery retention, native GPU rendering, and interactive acceptance are still separate work.
+
+Local September 11 checks used the available Node 24.19.0 runtime. The downloaded
+24.20.0 binary could not run in this container. CI now regenerates every fixture
+on the pinned toolchain and rejects byte drift as a required job; local tolerance
+tests are not substituted for that gate. Full build/type checks pass (22 tasks).

@@ -1,6 +1,6 @@
 import { parentPort, workerData } from 'node:worker_threads';
 import { join } from 'node:path';
-import { createNodeFileStore, runAtlasPipeline } from '@marionette/atlas-pack';
+import { createNodeFileStore, runAtlasPipeline, isAtlasError } from '@marionette/atlas-pack';
 
 const port = parentPort;
 if (!port || typeof workerData?.sourceDir !== 'string' || typeof workerData?.outputDir !== 'string')
@@ -24,6 +24,7 @@ void runAtlasPipeline({
   .catch((error: unknown) => {
     port.postMessage({
       status: 'failed',
+      code: isAtlasError(error) ? error.code : 'ATLAS_IMPORT_FAILED',
       message: error instanceof Error ? error.message : 'Atlas import failed',
     });
     port.close();
