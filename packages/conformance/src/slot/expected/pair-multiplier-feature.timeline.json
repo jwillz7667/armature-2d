@@ -6,7 +6,7 @@
   "sceneHash": "sha256:1156f50c48941e1373a40955d2e0dcf394c5b42044547e7f6a107b661dc8aaeb",
   "specHash": "sha256:f96d6605347e631965daad7975f7c90ca67359868e8734f887003bd3091918da",
   "coreVersion": "runtime-core@0.0.0",
-  "toolchain": "node-22.13.1-v8",
+  "toolchain": "node-24.20.0-v8",
   "generatedBy": "generate-slot.ts",
   "sampleMs": [
     0,

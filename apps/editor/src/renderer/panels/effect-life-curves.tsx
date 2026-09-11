@@ -75,14 +75,12 @@ export function EffectLifeCurves({
                       onChange={(value) =>
                         run(() => {
                           if (typeof stop.value !== 'number')
-                            documentHost
-                              .current()
-                              .history.execute(
-                                new SetLifeStopValueCommand(effectId, layer.id, stop.id, {
-                                  ...stop.value,
-                                  [channel]: value,
-                                }),
-                              );
+                            documentHost.current().history.execute(
+                              new SetLifeStopValueCommand(effectId, layer.id, stop.id, {
+                                ...stop.value,
+                                [channel]: value,
+                              }),
+                            );
                         })
                       }
                     />

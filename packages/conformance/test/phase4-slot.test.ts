@@ -105,10 +105,13 @@ describe('Phase 4 slot golden-playback conformance', () => {
         }
       });
 
-      it('durationMs equals the max atMs across directives (or 0 for an empty timeline)', () => {
+      it('durationMs includes the last directive and every counter endpoint', () => {
         const committed = loadSlotFixture(pairId);
         const directives = committed.timeline.directives;
-        const maxAtMs = directives.reduce((acc, d) => (d.atMs > acc ? d.atMs : acc), 0);
+        const maxAtMs = directives.reduce(
+          (acc, d) => Math.max(acc, d.atMs, d.kind === 'counterRollup' ? d.endMs : 0),
+          0,
+        );
         expect(committed.timeline.durationMs).toBe(maxAtMs);
       });
 

@@ -35,7 +35,14 @@ interface MapMemento {
 // Add a skeletonRef to refs.skeletons if absent (a map that introduces a new skeleton). Returns the same
 // refs object when already present (no change), else a fresh refs with the entry appended.
 function withSkeletonRef(refs: SceneRefs, name: string, hash: string): SceneRefs {
-  if (refs.skeletons.some((entry) => entry.name === name)) return refs;
+  if (refs.skeletons.some((entry) => entry.name === name)) {
+    if (hash === '' || refs.skeletons.some((entry) => entry.name === name && entry.hash === hash))
+      return refs;
+    return {
+      ...refs,
+      skeletons: refs.skeletons.map((entry) => (entry.name === name ? { name, hash } : entry)),
+    };
+  }
   return { skeletons: [...refs.skeletons, { name, hash }], vfxPresets: refs.vfxPresets.slice() };
 }
 
@@ -110,9 +117,22 @@ export class MapSymbolAnimSetCommand implements Command {
 
   // Set/replace the mapping, then add the skeletonRef to refs.skeletons if it is new (one composite step).
   private setMapping(ctx: CommandContext, set: SymbolAnimSet): void {
+    const prior = ctx.mutate.getSymbolAnimSet(this.symbolId);
     ctx.mutate.setSymbolAnimSet(this.symbolId, set);
     const refs = ctx.mutate.slotScene().refs;
-    const next = withSkeletonRef(refs, set.skeletonRef, this.skeletonHash);
+    let next = withSkeletonRef(refs, set.skeletonRef, this.skeletonHash);
+    if (
+      prior &&
+      prior.skeletonRef !== set.skeletonRef &&
+      !Object.values(ctx.mutate.slotScene().symbols).some(
+        (symbol) => symbol.skeletonRef === prior.skeletonRef,
+      )
+    ) {
+      next = {
+        ...next,
+        skeletons: next.skeletons.filter((entry) => entry.name !== prior.skeletonRef),
+      };
+    }
     if (next !== refs) ctx.mutate.setSceneRefs(next);
   }
 

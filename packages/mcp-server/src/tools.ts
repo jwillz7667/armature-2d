@@ -1,4 +1,9 @@
 import {
+  SetWinSequencerCommand,
+  SetFeatureFlowGraphCommand,
+  SetSceneRefsCommand,
+} from '@marionette/document-core';
+import {
   AddBoneToMeshBindingCommand,
   AddMeshVertexCommand,
   AddPathCurveCommand,
@@ -1708,6 +1713,27 @@ const tumbleChoreographySchema = z
   })
   .strict();
 
+const winSequenceConfigSchema = z
+  .object({
+    sequences: z.record(z.object({ steps: z.array(winSequenceStepSchema) }).strict()),
+    thresholds: escalationThresholdsSchema,
+    defaultSequence: z.string().min(1),
+  })
+  .strict();
+const featureFlowGraphSchema = z
+  .object({
+    states: z.record(featureFlowNodeSchema),
+    transitions: z.array(featureFlowTransitionSchema),
+    entry: z.string().min(1),
+  })
+  .strict();
+const sceneRefEntrySchema = z
+  .object({ name: z.string().min(1), hash: z.string().regex(/^[0-9a-f]{64}$/) })
+  .strict();
+const sceneRefsSchema = z
+  .object({ skeletons: z.array(sceneRefEntrySchema), vfxPresets: z.array(sceneRefEntrySchema) })
+  .strict();
+
 const effectsTools: readonly ToolDefinition[] = [
   // ----- effects: library + effect meta (each drives the WP-3.7 command on the shared History, LAW 2) -----
   defineTool(
@@ -2364,6 +2390,51 @@ const effectsTools: readonly ToolDefinition[] = [
 
 const slotSceneTools: readonly ToolDefinition[] = [
   // ----- slot composer: grid (each drives the WP-4.5+ command on the shared History, LAW 2) -----
+  defineTool(
+    {
+      name: 'slot.winseq.setConfig',
+      title: 'Set complete win sequencer',
+      description:
+        'Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.',
+      input: z.object({ documentId, config: winSequenceConfigSchema }).strict(),
+    },
+    (deps, input) => ({
+      revision: executeSlotEdit(
+        deps.sessions.get(input.documentId),
+        new SetWinSequencerCommand(input.config),
+      ),
+    }),
+  ),
+  defineTool(
+    {
+      name: 'slot.flow.setGraph',
+      title: 'Set complete feature flow',
+      description:
+        'Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.',
+      input: z.object({ documentId, graph: featureFlowGraphSchema }).strict(),
+    },
+    (deps, input) => ({
+      revision: executeSlotEdit(
+        deps.sessions.get(input.documentId),
+        new SetFeatureFlowGraphCommand(input.graph),
+      ),
+    }),
+  ),
+  defineTool(
+    {
+      name: 'slot.scene.setRefs',
+      title: 'Set scene artifact references',
+      description:
+        'Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.',
+      input: z.object({ documentId, refs: sceneRefsSchema }).strict(),
+    },
+    (deps, input) => ({
+      revision: executeSlotEdit(
+        deps.sessions.get(input.documentId),
+        new SetSceneRefsCommand(input.refs),
+      ),
+    }),
+  ),
   defineTool(
     {
       name: 'slot.grid.set',
@@ -3454,8 +3525,11 @@ export const TOOLS: readonly ToolDefinition[] = [
       name: 'import.spineProject',
       title: 'Import Spine project',
       description:
-        'Import a user-owned exported Spine project (a .json or a .skel binary) through the clean-room ' +
-        'importer, open it as a new editable document, and return a summary plus any lossy-conversion ' +
+        'Import a user-owned Spine JSON export through the clean-room importer. Real .skel binary ' +
+        'exports are gated until verified; export JSON from Spine instead. This tool imports data ' +
+        'with placeholder atlas geometry and returns an explicit loss report; the editor import ' +
+        'flow additionally loads sibling atlas/images. Open the result as a new editable document ' +
+        'and return a summary plus any lossy-conversion ' +
         'warnings. Import only: this never writes or exports any Spine format (LAW 4 / PP-A5).',
       input: z.object({ path: z.string().min(1), name: z.string().min(1).optional() }).strict(),
     },

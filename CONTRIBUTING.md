@@ -55,7 +55,7 @@ PR is mergeable only when all of these hold:
   changes do not bump the version.
 - No per-frame allocation in solve or render loops; pool particles, sprites, and mesh buffers.
 - Solve-behavior changes regenerate conformance fixtures in the same PR, on the pinned Node
-  (22.13.1), behind the `behavior-change` label and fixtures CODEOWNERS review.
+  (24.20.0), behind the `behavior-change` label and fixtures CODEOWNERS review.
 - The math boundary stays intact: presentation code never reads RNG or decides an outcome.
 - No em-dashes or en-dashes anywhere (docs, comments, UI copy); `pnpm check:dashes` is green.
 

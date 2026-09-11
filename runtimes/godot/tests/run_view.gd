@@ -50,6 +50,13 @@ func _init() -> void:
 			print("       %s" % units.failures[i])
 
 	print("")
+	var clipping = ViewHarness.run_clipping_units()
+	if not clipping.ok():
+		all_ok = false
+		for failure in clipping.failures:
+			print("FAIL clipping: %s" % failure)
+	else:
+		print("PASS clipping geometry and UVs: %d comparisons" % clipping.comparisons)
 	print("-- drawable rigs (draw items vs fixtures) --")
 	for rig_id in DRAWABLE_RIGS:
 		var result = ViewHarness.run(rig_id)

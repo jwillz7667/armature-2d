@@ -3,7 +3,7 @@
   "rigHash": "sha256:f1d8a41b724870776186ff32f0deb381bacb236c269d3d82590558493089e409",
   "specHash": "sha256:b20af76865dbbbc7409e77d7d2cc1cb7cbe3370d941b6ac645608943ab0fe24f",
   "coreVersion": "runtime-core@0.0.0",
-  "toolchain": "node-22.13.1-v8",
+  "toolchain": "node-24.20.0-v8",
   "generatedBy": "generate.ts",
   "samples": [
     {

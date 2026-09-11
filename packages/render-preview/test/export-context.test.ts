@@ -65,8 +65,14 @@ describe('complete skeletal export context', () => {
       to: { frame: 30 },
     };
     const full = pixels(options);
-    expect(pixels({ ...options, from: { frame: 7 } })).toEqual(full.slice(7));
-    expect(pixels(options)).toEqual(full);
+    const expectSameFrames = (actual: Uint8Array[], expected: Uint8Array[]): void => {
+      expect(actual.length).toBe(expected.length);
+      actual.forEach((frame, index) => {
+        expect(Buffer.compare(frame, expected[index]!), `frame ${index}`).toBe(0);
+      });
+    };
+    expectSameFrames(pixels({ ...options, from: { frame: 7 } }), full.slice(7));
+    expectSameFrames(pixels(options), full);
     expect(
       pixels({
         ...options,

@@ -26,12 +26,8 @@ migrations), regardless of app release cadence.
    `src/version/migrations/`, test it (the registry holds `0.1.x -> 0.2.0`, `0.2.x -> 0.3.0`,
    `0.3.x -> 0.4.0`, `0.4.x -> 0.5.0`, and `0.5.x -> 0.6.0` as the pattern to follow), and add a
    `CHANGELOG.md` entry in the format package.
-3. A non-schema change (validator refactor, error wording, comments) must NOT bump the version.
-4. CI enforces both directions: `check:format-semver` fails a PR that touches
-   `packages/format/src` without touching the constants file, and `check:format-version-stable`
-   fails an unjustified bump.
-5. Format changes that alter solve semantics also regenerate conformance fixtures in the same PR
-   behind the behavior-change gate.
+3. Formatting/comments and public reexports do not change the serialized format. Implementation changes require compatibility review; the gate conservatively requires a classified transition.
+4. CI compares exact commits and actual version values, and requires changed classification, ADR, regression and migration evidence. See [CI and format gates](ci-and-format-gates.md).
 
 Stage F4 concludes the F1 to F4 format staging of `docs/plan/pro-parity-execution-plan.md`: 0.6.0
 (physics constraints, the optional skeleton physics settings block, and the per-animation physics
@@ -44,16 +40,16 @@ change is planned; the next format bump would be a new capability with its own A
 ## Changing solve behavior
 
 Any change that alters numeric output of the per-frame solve, the effects simulation, or the slot
-sequencer requires regenerating the affected conformance fixtures on the pinned Node (22.13.1) in
+sequencer requires regenerating the affected conformance fixtures on the pinned Node (24.20.0) in
 the same PR, under the `behavior-change` label with CODEOWNERS review on `fixtures/**` and an ADR
 or CHANGELOG entry. Drift without regeneration fails CI by design.
 
 ## Toolchain pins
 
-- Node `22.13.1` (`.node-version`): the fixture-generation toolchain. Bumping it is a deliberate
+- Node `24.20.0` (`.node-version`): the fixture-generation toolchain. Bumping it is a deliberate
   act that regenerates every byte-locked artifact (fixtures, lock manifests, golden PNGs) in one
   reviewed PR.
-- pnpm `11.8.0` (`packageManager`): bump together with a green `pnpm ci:local` and lockfile diff
+- pnpm `11.19.0` (`packageManager`): bump together with a green `pnpm ci:local` and lockfile diff
   review.
 - Dependency policy: exact pins for load-bearing runtime deps (`zod`, `@noble/hashes`,
   `pixi.js 8.19.0`), caret ranges elsewhere, `--frozen-lockfile` in CI, weekly audit review.

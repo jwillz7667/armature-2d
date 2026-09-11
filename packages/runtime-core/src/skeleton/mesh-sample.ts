@@ -13,6 +13,7 @@ import { findSegmentIndex, segmentComponent, segmentFraction } from './curve';
 import type { Pose } from './pose';
 import type { PreparedDeformChannel, PreparedTrack } from './prepared';
 import { AnimationNotFoundError, getPreparedAnimation } from './sample';
+import type { AnimationState, InternalEntry } from './animation-state';
 
 // Why a mesh attachment could not be sampled. `not-found` = no attachment under (skin, slot, name);
 // `not-a-mesh` = the attachment exists but is a different kind (region/clipping/...). A discriminated
@@ -118,6 +119,80 @@ export function sampleMeshVertices(
     applyDeform(out, offsets, out, vertexCount);
   }
   return vertexCount;
+}
+
+// ADR-0016: blend world-space deform offsets over one state-solved skin. Crossfade entries
+// contribute to the same lower-layer reference, so equal clips do not collapse toward zero.
+// Missing channels contribute no weight. Linked meshes use their resolved sharing source.
+export function sampleMeshVerticesWithState(
+  state: AnimationState,
+  pose: Pose,
+  skinName: string,
+  slotName: string,
+  attachmentName: string,
+  out: Float32Array,
+): number {
+  const resolved = resolveMeshGeometry(state.document, skinName, slotName, attachmentName);
+  const slotIndex = pose.slotNames.indexOf(slotName);
+  const slotBoneIndex = slotIndex >= 0 ? pose.slotBoneIndices[slotIndex]! : -1;
+  const vertexCount = skinMeshInto(resolved.geometry, pose, slotBoneIndex, out);
+  const length = vertexCount * 2;
+  const scratch = pose.deformScratch;
+  if (scratch.mixed.length < length) scratch.mixed = new Float64Array(length);
+  if (scratch.outgoing.length < length) scratch.outgoing = new Float64Array(length);
+  const incoming = ensureDeformScratch(pose, length);
+  const mixed = scratch.mixed;
+  mixed.fill(0, 0, length);
+  for (const entry of state.tracks) {
+    if (!entry) continue;
+    const from = entry.mixFrom;
+    const fraction =
+      from === null
+        ? 1
+        : entry.mixDuration > 0
+          ? Math.min(1, Math.max(0, entry.mixTime / entry.mixDuration))
+          : 1;
+    const incomingWeight = deformEntryWeight(entry, slotName) * fraction;
+    const outgoingWeight = from === null ? 0 : deformEntryWeight(from, slotName) * (1 - fraction);
+    const incomingChannel =
+      incomingWeight > 0
+        ? findDeformChannel(
+            getPreparedAnimation(pose, entry.animation).deformChannels,
+            resolved.deformSkin,
+            resolved.deformSlot,
+            resolved.deformName,
+          )
+        : null;
+    const outgoingChannel =
+      outgoingWeight > 0 && from
+        ? findDeformChannel(
+            getPreparedAnimation(pose, from.animation).deformChannels,
+            resolved.deformSkin,
+            resolved.deformSlot,
+            resolved.deformName,
+          )
+        : null;
+    if (!incomingChannel && !outgoingChannel) continue;
+    if (incomingChannel) sampleDeformInto(incomingChannel.track, entry.trackTime, incoming);
+    if (outgoingChannel && from)
+      sampleDeformInto(outgoingChannel.track, from.trackTime, scratch.outgoing);
+    const wi = incomingChannel ? incomingWeight : 0;
+    const wo = outgoingChannel ? outgoingWeight : 0;
+    const referenceWeight = 1 - (entry.additive ? 0 : wi) - (from?.additive ? 0 : wo);
+    for (let i = 0; i < length; i += 1)
+      mixed[i] =
+        mixed[i]! * referenceWeight +
+        (wi ? incoming[i]! * wi : 0) +
+        (wo ? scratch.outgoing[i]! * wo : 0);
+  }
+  applyDeform(out, mixed, out, vertexCount);
+  return vertexCount;
+}
+
+function deformEntryWeight(entry: InternalEntry, slotName: string): number {
+  if (!Number.isFinite(entry.alpha) || entry.alpha < 0 || entry.alpha > 1)
+    throw new RangeError('Deform track alpha must be finite and between 0 and 1');
+  return entry.deformSlots === null || entry.deformSlots.includes(slotName) ? entry.alpha : 0;
 }
 
 // The geometry mesh to skin plus the (skin, slot, name) key whose deform timeline applies (ADR-0011

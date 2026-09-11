@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Marionette.Runtime.Core.Document;
 
 namespace Marionette.Runtime.View
 {
@@ -138,10 +139,11 @@ namespace Marionette.Runtime.View
         Mesh,
         LinkedMesh,
 
-        // A non-drawing attachment (clipping, boundingbox, point, path): present in the skin but never
+        // A non-drawing attachment (boundingbox, point, path): present in the skin but never
         // emitted as a draw item. The reader records the kind so the builder can skip it explicitly rather
         // than treating an unknown member as a drawable.
         NonDrawing,
+        Clipping,
     }
 
     // One attachment in a skin's render table: the kind plus exactly one populated payload (or none for a
@@ -156,14 +158,17 @@ namespace Marionette.Runtime.View
         // A region or mesh attachment MAY carry a sequence block (ADR-0011 section 2); when present, the
         // drawn atlas region is the sequence-resolved frame's name rather than Path. Null when absent.
         public RenderSequence? Sequence { get; }
+        public ClippingAttachment? Clipping { get; }
 
         private RenderAttachment(
             RenderAttachmentKind kind,
             RenderRegion? region,
             RenderMesh? mesh,
             RenderLinkedMesh? linkedMesh,
-            RenderSequence? sequence)
+            RenderSequence? sequence,
+            ClippingAttachment? clipping = null)
         {
+            Clipping = clipping;
             Kind = kind;
             Region = region;
             Mesh = mesh;
@@ -179,6 +184,9 @@ namespace Marionette.Runtime.View
 
         public static RenderAttachment OfLinkedMesh(RenderLinkedMesh linkedMesh) =>
             new RenderAttachment(RenderAttachmentKind.LinkedMesh, null, null, linkedMesh, null);
+
+        public static RenderAttachment OfClipping(ClippingAttachment clipping) =>
+            new RenderAttachment(RenderAttachmentKind.Clipping, null, null, null, null, clipping);
 
         public static RenderAttachment NonDrawing() =>
             new RenderAttachment(RenderAttachmentKind.NonDrawing, null, null, null, null);

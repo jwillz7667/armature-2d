@@ -173,16 +173,14 @@ function BundleItems({ bundle }: { bundle: BundleEntity }): ReactElement {
           run(() => {
             const effect = effects[0];
             if (effect)
-              documentHost
-                .current()
-                .history.execute(
-                  new AddBundleItemCommand(bundle.name, {
-                    effect: effect.id,
-                    startOffset: 0,
-                    anchorRole: 'center',
-                    seedSalt: bundle.itemOrder.length,
-                  }),
-                );
+              documentHost.current().history.execute(
+                new AddBundleItemCommand(bundle.name, {
+                  effect: effect.id,
+                  startOffset: 0,
+                  anchorRole: 'center',
+                  seedSalt: bundle.itemOrder.length,
+                }),
+              );
           })
         }
       >

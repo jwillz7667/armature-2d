@@ -5,6 +5,7 @@
 // migration framework land in later phases and extend this surface without breaking it.
 
 export { validateDocument, parseDocument } from './validate';
+export { inspectPng } from './assets/png';
 export type { ValidateOptions } from './validate';
 export { FormatValidationError } from './validate/errors';
 export type {
