@@ -22,7 +22,7 @@ presentation boundaries. Work proceeds in verified subsystem changes.
 | F24 | Exact-commit format/release gates, required jobs, complete native triggers | Implemented; regression and packaged MCP checks pass |
 | F28 | Built MCP startup and worker acceptance | Executable smoke tests implemented; installed Electron and native GPU acceptance pending |
 | F22 | Supported dependencies and advisory gates | Updated; verification recorded in dependency maintenance notes |
-| F23 | Worker isolation, import budgets, playback bounds | Implemented; recovery retention remains pending |
+| F23 | Worker isolation, import budgets, playback and recovery storage bounds | Implemented; recovery preserves copies at capacity rather than evicting unsaved work |
 | F27 | Performance | Layered atlas allocation reduced; broader profiling pending |
 | F01, F25-F26 | Repository, release identity, docs | Pending |
 
@@ -178,3 +178,19 @@ tests are not substituted for that gate. Full build/type checks pass (22 tasks).
 - Focused regression: 22 tests pass across worker lifecycle, native-dialog cancellation, file commit,
   bounded reads, portable project assets, and media encoding. These are automated host-seam checks;
   actual installed Electron dialog and GPU acceptance are not claimed.
+
+## Recovery discovery and storage limits (September 11)
+
+- Startup offers recovery once per process when a regular project or backup copy exists. Choosing
+  Later or canceling the picker leaves all copies intact. File > Recover Unsaved Project remains
+  available afterward; backup-only recovery files are discoverable.
+- The renderer uses the existing validated project-install transaction, unsaved-change confirmation,
+  and identity guard. Recovery keeps a fresh session id and requires Save As.
+- Recovery storage is bounded to 20 project identities and 2 GiB, including backups, abandoned
+  staging files, and temporary overlap during atomic writes. At capacity, the attempted recovery
+  save fails visibly and existing copies remain intact. Normal project Save is unaffected.
+- There is no automatic eviction of unsaved copies. Remove unwanted copies explicitly from the
+  recovery folder, accessible through the recovery picker. A richer recovery-management UI and
+  persistence of invalid transient drafts remain follow-up work.
+- Startup/dialog, backup recovery, IPC option validation, storage budgeting, and renderer attachment
+  have automated coverage. Installed Electron interaction remains an acceptance requirement.
