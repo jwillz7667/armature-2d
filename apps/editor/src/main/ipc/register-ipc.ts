@@ -18,6 +18,7 @@ import {
   exportProjectRequestSchema,
   exportWriteVideoRequestSchema,
   fileOpenRequestSchema,
+  recoveryOpenRequestSchema,
   fileSaveRequestSchema,
   fileSessionRequestSchema,
   getVersionRequestSchema,
@@ -126,8 +127,8 @@ export function registerIpc(): void {
     return saveRecovery(request.data.document, request.data.pages, request.data.options);
   });
   handle(IpcChannel.fileRecoveryOpen, async (_event, payload) => {
-    const request = validateWith(fileOpenRequestSchema, payload, 'IPC_BAD_REQUEST');
-    return request.ok ? openRecovery() : request;
+    const request = validateWith(recoveryOpenRequestSchema, payload, 'IPC_BAD_REQUEST');
+    return request.ok ? openRecovery(request.data?.startup ?? false) : request;
   });
   handle(IpcChannel.fileRecoveryDiscard, async (_event, payload) => {
     const request = validateWith(fileSessionRequestSchema, payload, 'IPC_BAD_REQUEST');

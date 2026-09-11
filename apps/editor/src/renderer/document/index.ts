@@ -234,10 +234,15 @@ export async function closeDocumentSafely(): Promise<void> {
     }
   }
 }
-export async function openDocumentFromDialog(recovery = false): Promise<FileActionOutcome> {
+export async function openDocumentFromDialog(
+  recovery = false,
+  startup = false,
+): Promise<FileActionOutcome> {
   const original = documentHost.current();
   try {
-    const result = recovery ? await bridge().openRecovery() : await bridge().openDocument();
+    const result = recovery
+      ? await bridge().openRecovery(startup ? { startup: true } : undefined)
+      : await bridge().openDocument();
     if (!result.ok) return fail(result.error.message);
     if (result.data.status === 'canceled' || original !== documentHost.current())
       return { kind: 'canceled' };
@@ -288,6 +293,7 @@ export async function installOpenedProject(
   }
 }
 export function attachProjectRecovery(): () => void {
+  void openDocumentFromDialog(true, true);
   let busy = false;
   let last = '';
   const timer = setInterval(() => {
