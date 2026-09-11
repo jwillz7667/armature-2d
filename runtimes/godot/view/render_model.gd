@@ -7,12 +7,13 @@ extends RefCounted
 # table. Both are read from the SAME format JSON. Reading it is render_model_reader.gd's job; consuming it
 # (with a solved pose) is draw_item_builder.gd's job. No Node, no RenderingServer: this is headless-testable.
 
-# The attachment kinds. A closed set mirroring the format's attachment union; NON_DRAWING covers clipping,
+# The attachment kinds. A closed set mirroring the format's attachment union; NON_DRAWING covers
 # boundingbox, point, and path (present in a skin but never emitted as a draw item).
 const KIND_REGION := 0
 const KIND_MESH := 1
 const KIND_LINKED := 2
 const KIND_NON_DRAWING := 3
+const KIND_CLIPPING := 4
 
 
 # A region attachment (a single textured quad): the local (x, y, rotation, scale_x, scale_y) offset in the
@@ -63,6 +64,12 @@ class RenderSequence:
 
 # One attachment in a skin's render table: the kind plus exactly one populated payload (or none for a
 # non-drawing attachment) and an optional sequence block.
+class RenderClipping:
+	extends RefCounted
+	var end: String
+	var clip_vertices: PackedFloat64Array
+
+
 class RenderAttachment:
 	extends RefCounted
 	var kind: int
@@ -70,6 +77,7 @@ class RenderAttachment:
 	var mesh  # RenderMesh or null
 	var linked_mesh  # RenderLinkedMesh or null
 	var sequence  # RenderSequence or null
+	var clipping  # RenderClipping or null
 
 
 # One skin's render table: slot name -> Dictionary(attachment name -> RenderAttachment), insertion order
