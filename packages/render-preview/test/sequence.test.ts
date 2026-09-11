@@ -144,6 +144,23 @@ describe('renderSequence AnimationState source', () => {
     expect(opaque).toBeGreaterThan(0);
   });
 
+  it('exports the same deformation pixels from a sparse track as the base track', () => {
+    const base = buildState();
+    const sparse: RenderSequenceOptions = {
+      ...base,
+      animationState: (document) => {
+        const state = makeAnimationState(document);
+        setAnimation(state, 2, 'wave', false);
+        return state;
+      },
+    };
+    const expected = collectFramePngs(renderSequence(base));
+    const actual = collectFramePngs(renderSequence(sparse));
+    expect(actual.length).toBe(expected.length);
+    for (let i = 0; i < expected.length; i += 1)
+      expect(bytesEqual(actual[i]!, expected[i]!)).toBe(true);
+  });
+
   it('requires an explicit `to` for an AnimationState clip', () => {
     expect(() =>
       renderSequence({

@@ -64,6 +64,8 @@ export type LayeredParseErrorCode =
   | 'PSD_PARSE_FAILED'
   // The ORA file is not a readable zip archive.
   | 'ORA_NOT_A_ZIP'
+  | 'ORA_RESOURCE_LIMIT'
+  | 'PSD_RESOURCE_LIMIT'
   // The ORA archive has no stack.xml (not a valid OpenRaster file).
   | 'ORA_NO_STACK'
   // stack.xml could not be parsed or has no <image> root.

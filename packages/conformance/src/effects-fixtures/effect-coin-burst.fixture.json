@@ -6,7 +6,7 @@
   "seed": 12345,
   "simulationDt": 0.016666666666666666,
   "coreVersion": "runtime-core@0.0.0",
-  "toolchain": "node-22.13.1-v8",
+  "toolchain": "node-24.20.0-v8",
   "generatedBy": "generate-effects.ts",
   "prngStreamHead": [
     3944325046,

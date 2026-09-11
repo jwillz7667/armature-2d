@@ -5,6 +5,7 @@ import { defineConfig } from 'vitest/config';
 // context is involved. Tests use the in-memory AtlasFileStore and synthetic sprites (src/testing.ts).
 export default defineConfig({
   test: {
+    maxWorkers: 2,
     environment: 'node',
     include: ['test/**/*.test.ts'],
   },

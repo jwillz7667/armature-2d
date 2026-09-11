@@ -78,7 +78,15 @@ static func run(rig_id: String) -> Result:
 
 		DrawItemBuilder.build_into(document, render_model, atlas, pose, DEFAULT_SKIN, animation_id, time, draw_list)
 
-		_compare_meshes(result, rig_id, time, sample, pose, draw_list, slot_index_by_name)
+		if rig_id == "rig-clipping":
+			# Keep raw skinning coverage separate from post-clip geometry and UV checks.
+			var clip_name = pose.slot_attachment[slot_index_by_name["clipper"]]
+			pose.slot_attachment[slot_index_by_name["clipper"]] = null
+			var raw_items = DrawItemBuilder.build(document, render_model, atlas, pose, DEFAULT_SKIN, animation_id, time)
+			_compare_meshes(result, rig_id, time, sample, pose, raw_items, slot_index_by_name)
+			pose.slot_attachment[slot_index_by_name["clipper"]] = clip_name
+		else:
+			_compare_meshes(result, rig_id, time, sample, pose, draw_list, slot_index_by_name)
 		_compare_draw_order(result, rig_id, time, draw_list, pose)
 		_compare_slots(result, rig_id, time, sample, pose, draw_list, slot_index_by_name, render_model)
 		_compare_sequences(result, rig_id, time, sample, pose, draw_list, slot_index_by_name, render_model)
@@ -307,3 +315,74 @@ static func _expect_uv(result: Result, label: String, actual: Vector2, u: float,
 	result.comparisons += 1
 	if abs(actual.x - u) > 1e-6 or abs(actual.y - v) > 1e-6:
 		result.fail("%s: expected (%s, %s), got (%s, %s)" % [label, u, v, actual.x, actual.y])
+
+
+static func run_clipping_units() -> Result:
+	var result := Result.new()
+	var text := FileAccess.get_file_as_string(RepoPaths.rig_json("rig-clipping"))
+	var document = RigReader.parse(text)
+	var model = RenderModelReader.parse(text)
+	var atlas := AtlasIndex.new(model.atlas)
+	var pose := BuildPose.build(document)
+	var spec = JSON.parse_string(FileAccess.get_file_as_string(RepoPaths.sample_spec("rig-clipping")))
+	Sample.sample_skeleton(document, spec.animation, 0.0, pose)
+	var list = DrawItemBuilder.build(document, model, atlas, pose, "default", spec.animation, 0.0)
+	if list.count != 1:
+		result.fail("Clipping should produce one drawable")
+		return result
+	var item = list.item(0)
+	result.comparisons += 1
+	if not is_equal_approx(_triangle_area(item), 900.0):
+		result.fail("Clipped area must be 900 square units")
+	for v in range(item.vertex_count):
+		var x: float = item.world_positions[v * 2]
+		var y: float = item.world_positions[v * 2 + 1]
+		result.comparisons += 4
+		if x < 10.0 - 1e-8 or x > 40.0 + 1e-8 or y < 10.0 - 1e-8 or y > 40.0 + 1e-8:
+			result.fail("Clipped vertex lies outside intersection")
+		if not is_equal_approx(item.page_uvs[v * 2], x / 40.0) or not is_equal_approx(item.page_uvs[v * 2 + 1], y / 40.0):
+			result.fail("Clipped UV must preserve the original texture mapping")
+	pose.draw_order[0] = 2
+	pose.draw_order[1] = 1
+	pose.draw_order[2] = 0
+	DrawItemBuilder.build_into(document, model, atlas, pose, "default", spec.animation, 0.0, list)
+	result.comparisons += 2
+	if list.item(0).vertex_count != 4 or not is_equal_approx(_triangle_area(list.item(0)), 1600.0):
+		result.fail("End slot before clip must remain uncut")
+	Sample.sample_skeleton(document, spec.animation, 0.0, pose)
+	DrawItemBuilder.build_into(document, model, atlas, pose, "default", spec.animation, 0.0, list)
+	result.comparisons += 1
+	if not is_equal_approx(_triangle_area(list.item(0)), 900.0):
+		result.fail("Reused clipping buffers must restore the clipped area")
+	# Replace the attachment to exercise preparation-cache invalidation with a concave L.
+	var original = model.find_skin("default").find("clipper", pose.slot_attachment[0])
+	var concave = RenderModel.RenderClipping.new()
+	concave.end = original.clipping.end
+	concave.clip_vertices = PackedFloat64Array([-30, -30, 0, -30, 0, -20, -20, -20, -20, 0, -30, 0])
+	original.clipping = concave
+	DrawItemBuilder.build_into(document, model, atlas, pose, "default", spec.animation, 0.0, list)
+	result.comparisons += 1
+	if not is_equal_approx(_triangle_area(list.item(0)), 500.0):
+		result.fail("Concave clipping must preserve the L-shaped intersection")
+	var distant = RenderModel.RenderClipping.new()
+	distant.end = concave.end
+	distant.clip_vertices = PackedFloat64Array([100, 100, 110, 100, 110, 110, 100, 110])
+	original.clipping = distant
+	DrawItemBuilder.build_into(document, model, atlas, pose, "default", spec.animation, 0.0, list)
+	var batches = MeshBufferAssembler.RenderBatchSet.new()
+	MeshBufferAssembler.assemble(list, batches)
+	result.comparisons += 1
+	if list.item(0).triangle_index_count != 0 or batches.count != 0:
+		result.fail("Fully clipped geometry must not produce a render batch")
+	return result
+
+
+static func _triangle_area(item) -> float:
+	var area := 0.0
+	for i in range(0, item.triangle_index_count, 3):
+		var a: int = item.triangles[i] * 2
+		var b: int = item.triangles[i + 1] * 2
+		var c: int = item.triangles[i + 2] * 2
+		var p: PackedFloat64Array = item.world_positions
+		area += absf((p[b] - p[a]) * (p[c + 1] - p[a + 1]) - (p[c] - p[a]) * (p[b + 1] - p[a + 1])) * 0.5
+	return area

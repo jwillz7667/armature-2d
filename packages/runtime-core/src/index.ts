@@ -79,7 +79,12 @@ export type { PreparedEventTimeline, PreparedDrawOrderTimeline } from './skeleto
 // Mesh-vertex sampling (solve-order step 5): skin + deform a mesh attachment into world space, reusing
 // a pose already solved by sampleSkeleton. The behavioral source of truth the conformance harness and
 // runtime-web mesh rendering build on.
-export { sampleMeshVertices, skinMeshInto, MeshAttachmentError } from './skeleton/mesh-sample';
+export {
+  sampleMeshVertices,
+  sampleMeshVerticesWithState,
+  skinMeshInto,
+  MeshAttachmentError,
+} from './skeleton/mesh-sample';
 export type { MeshAttachmentErrorReason } from './skeleton/mesh-sample';
 // The public linked-mesh render resolver (ADR-0009 section 2, ADR-0011 section 1): the SOURCE geometry to
 // skin plus the origin attachment's own path/color/size/sequence. The single twin of the internal geometry
