@@ -18,8 +18,13 @@ presentation boundaries. Work proceeds in verified subsystem changes.
 | F19 | Slot controls, bindings, feature graph, and composed scenario preview | Implemented; command/workflow/timing tests pass; desktop acceptance pending |
 | F16 | Explicit import profiles, sibling atlas transaction, loss reports, worker budgets | Implemented safeguards and JSON asset workflow; real-export binary profile/corpus and desktop fidelity acceptance pending |
 | F29 | Deform crossfades, additive layers, masks, linked-skin resolution | Implemented in TS state playback; native AnimationState API not present |
-| F14 | Native pixels | Pending |
-| F01, F22-F28 | Repository, dependencies, CI, release, docs, performance, acceptance | Pending |
+| F14 | Native pixels | Clipping implemented in C#/Godot and native conformance passes; Unity tint/alpha upload implemented; GPU acceptance and Godot color/blend parity pending |
+| F24 | Exact-commit format/release gates, required jobs, complete native triggers | Implemented; regression and packaged MCP checks pass |
+| F28 | Built MCP startup and worker acceptance | Executable smoke tests implemented; installed Electron and native GPU acceptance pending |
+| F22 | Supported dependencies and advisory gates | Updated; verification recorded in dependency maintenance notes |
+| F23 | Worker isolation, import budgets, playback and recovery storage bounds | Implemented; recovery preserves copies at capacity rather than evicting unsaved work |
+| F27 | Performance | Layered atlas allocation reduced; broader profiling pending |
+| F01, F25-F26 | Repository, release identity, docs | Pending |
 
 ## Evidence and environment
 
@@ -103,3 +108,89 @@ because an unsupported-feature label or a plan exists.
 - Live web meshes and software exports call the same state deformation sampler. Linked meshes resolve their timeline-sharing source before blending.
 - 407 runtime-core, 163 runtime-web, and 110 render-preview tests pass, including identical-clip continuity, sparse-track pixels, outgoing alpha/masks, and scratch reuse.
 - Native wrappers still expose single-clip playback; native multi-track equivalence is not claimed.
+
+
+## CI integrity verification
+
+- 58 tooling tests pass, including 16 format-gate adversarial cases and 14 release-proof cases. Missing refs, shell metacharacters, comment-spoofed constants, stale ADRs, rollbacks, wrong commits and superseded successful runs are covered.
+- The packaged MCP CLI previously crashed on a dynamic CommonJS require inside ESM. Its explicit Node bridge now completes initialize and two 208-tool catalog requests outside the workspace. CI runs that executable smoke check.
+- GitHub import branch verification: native conformance, full workspace tests, lint, build/workers, types and particle acceptance pass. The old blanket format gate rejected PNG preflight and a public reexport; the new gate checks their actual non-wire scope while enforcing version movement for contract changes.
+- Required aggregators reject skipped jobs, include commit lint, and run native checks on every PR. Release packaging requires CI on the exact tagged main commit and reruns native conformance. Release identity/signing still require the subsequent release work.
+
+## F22 dependency verification (September 9)
+
+Supported dependency updates and scoped transitive security floors produce zero
+known advisories (`pnpm audit`, 709 dependencies). The workspace suite passes
+4,865 tests in 12 packages. All 19 type-check/build prerequisites pass; production
+build, lint, boundary guards, and built video/media/Spine/MCP startup checks pass.
+The MCP executable exposes 208 tools. See `../dev/dependency-maintenance.md` for
+the exact toolchain, fixture drift analysis, and maintenance policy. These results
+do not establish Electron desktop, native GPU, or installer acceptance.
+
+## Resource-budget checkpoint (September 9, paused at user request)
+
+Work in progress on `fix/audit-runtime-budgets-20260909`:
+
+- Reject non-finite playback arguments, bound track indices and per-update loop/event work,
+  and validate updates before mutating clocks. Queue transitions after multiple loops now
+  wait for the next boundary and fire events from the old/new active segments.
+- Move layered PSD/ORA import and sprite-atlas packing into timed workers. Add ORA
+  expanded-size, entry, XML nesting, and decoded-pixel limits; PSD bitmap memory limits
+  and explicit rejection of the decoder's unbounded CMYK path.
+- Bound atlas file reads and aggregate source bytes/pixels; limit renderer image requests,
+  serialize atlas imports, and remove temporary packed output after delivering page bytes.
+
+The intermediate full suite passed 4,870 tests after the playback/layered changes.
+The subsequent atlas-worker and shared atlas-file-store changes are a checkpoint:
+full regression, built-worker startup/termination, and desktop acceptance have not yet
+been rerun for those final edits. F23 remains in progress. No release or merge performed.
+
+## Resumed resource-limit verification (September 11)
+
+- Full workspace: 4,873 tests pass across 12 packages, including new read-budget,
+  fail-fast/drain, queue-boundary, ORA expansion/nesting, and deterministic compact-page cases.
+- Built atlas/layered workers import original artwork, reject oversized/corrupt inputs,
+  and exit cleanly. PNG/GIF/APNG media and packaged 208-tool MCP startup checks pass.
+- Atlas failures preserve typed diagnostics; concurrent reads stop and drain before cleanup.
+- Small layered imports allocate 16 KiB pages instead of 64 MiB, with repeated-import
+  byte equality. Details and limits are in `../dev/import-resource-limits.md`.
+- Recovery retention, native GPU rendering, and interactive acceptance are still separate work.
+
+Local September 11 checks used the available Node 24.19.0 runtime. The downloaded
+24.20.0 binary could not run in this container. CI now regenerates every fixture
+on the pinned toolchain and rejects byte drift as a required job; local tolerance
+tests are not substituted for that gate. Full build/type checks pass (22 tasks).
+
+## Native rendering checkpoint and export cancellation (September 11)
+
+- PR #42 implements native clipping with atlas UV interpolation and current draw-order end
+  boundaries. Godot tests include concave intersections, fully clipped output, and reused buffers.
+  Both CI and native conformance pass for commit b66c2c3e0e897e9be9b934a92027185abc383bd9.
+- Unity forwards dark tint and explicit atlas alpha policy, configures separate RGB/alpha blend
+  factors, recalculates mesh bounds, supports larger index buffers, and releases owned resources.
+  The Unity-specific uploader/shader is not compiled by the headless C# suite. Engine pixel
+  verification remains required. Godot dark tint/PMA/screen parity is still pending.
+- Media cancellation drains active writes and awaits worker termination before cleanup. Cancellation
+  after a native dialog returns is checked before starting work. Single-file cancellation remains
+  effective through staging; once atomic commit begins, cancellation correctly reports false.
+- Project reads allocate only the checked size and reject growth/truncation, closing the gap between
+  checking file size and an unbounded `readFile()` call. Existing project assets still round-trip.
+- Focused regression: 22 tests pass across worker lifecycle, native-dialog cancellation, file commit,
+  bounded reads, portable project assets, and media encoding. These are automated host-seam checks;
+  actual installed Electron dialog and GPU acceptance are not claimed.
+
+## Recovery discovery and storage limits (September 11)
+
+- Startup offers recovery once per process when a regular project or backup copy exists. Choosing
+  Later or canceling the picker leaves all copies intact. File > Recover Unsaved Project remains
+  available afterward; backup-only recovery files are discoverable.
+- The renderer uses the existing validated project-install transaction, unsaved-change confirmation,
+  and identity guard. Recovery keeps a fresh session id and requires Save As.
+- Recovery storage is bounded to 20 project identities and 2 GiB, including backups, abandoned
+  staging files, and temporary overlap during atomic writes. At capacity, the attempted recovery
+  save fails visibly and existing copies remain intact. Normal project Save is unaffected.
+- There is no automatic eviction of unsaved copies. Remove unwanted copies explicitly from the
+  recovery folder, accessible through the recovery picker. A richer recovery-management UI and
+  persistence of invalid transient drafts remain follow-up work.
+- Startup/dialog, backup recovery, IPC option validation, storage budgeting, and renderer attachment
+  have automated coverage. Installed Electron interaction remains an acceptance requirement.

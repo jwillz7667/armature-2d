@@ -68,6 +68,7 @@ export interface InternalEntry {
   mixFrom: InternalEntry | null;
   next: InternalEntry | null;
   queueDelay: number;
+  queueStart: number;
 }
 
 // A skeleton animation-state machine bound to a document. `tracks` is a growable, sparse array indexed by
@@ -126,13 +127,14 @@ function makeEntry(state: AnimationState, animationId: string, loop: boolean): I
     mixFrom: null,
     next: null,
     queueDelay: 0,
+    queueStart: 0,
   };
 }
 
 function assertTrackIndex(trackIndex: number): void {
-  if (!Number.isInteger(trackIndex) || trackIndex < 0) {
+  if (!Number.isInteger(trackIndex) || trackIndex < 0 || trackIndex >= 64) {
     throw new AnimationStateArgumentError(
-      `track index must be a non-negative integer, got ${trackIndex}`,
+      `track index must be an integer in [0, 63], got ${trackIndex}`,
     );
   }
 }
@@ -150,8 +152,8 @@ export function setAnimation(
   loop: boolean,
 ): TrackEntry {
   assertTrackIndex(trackIndex);
-  ensureTrackSlot(state, trackIndex);
   const entry = makeEntry(state, animationId, loop);
+  ensureTrackSlot(state, trackIndex);
   state.tracks[trackIndex] = entry;
   return entry;
 }
@@ -168,12 +170,14 @@ export function crossfadeTo(
   mixDuration: number,
 ): TrackEntry {
   assertTrackIndex(trackIndex);
-  if (mixDuration < 0) {
-    throw new AnimationStateArgumentError(`mixDuration must be >= 0, got ${mixDuration}`);
+  if (!Number.isFinite(mixDuration) || mixDuration < 0) {
+    throw new AnimationStateArgumentError(
+      `mixDuration must be finite and >= 0, got ${mixDuration}`,
+    );
   }
+  const entry = makeEntry(state, animationId, loop);
   ensureTrackSlot(state, trackIndex);
   const current = state.tracks[trackIndex] ?? null;
-  const entry = makeEntry(state, animationId, loop);
   if (current === null || mixDuration === 0) {
     state.tracks[trackIndex] = entry;
     return entry;
@@ -199,12 +203,21 @@ export function queueAnimation(
   delay: number,
 ): TrackEntry {
   assertTrackIndex(trackIndex);
-  if (delay < 0) {
-    throw new AnimationStateArgumentError(`queue delay must be >= 0, got ${delay}`);
+  if (!Number.isFinite(delay) || delay < 0) {
+    throw new AnimationStateArgumentError(`queue delay must be finite and >= 0, got ${delay}`);
+  }
+  const queued = makeEntry(state, animationId, loop);
+  const current = state.tracks[trackIndex] ?? null;
+  queued.queueStart =
+    current === null
+      ? 0
+      : (current.loop && current.duration > 0
+          ? current.elapsed + (current.duration - current.trackTime)
+          : current.duration) + delay;
+  if (!Number.isFinite(queued.queueStart)) {
+    throw new AnimationStateArgumentError('queue start must be finite');
   }
   ensureTrackSlot(state, trackIndex);
-  const current = state.tracks[trackIndex] ?? null;
-  const queued = makeEntry(state, animationId, loop);
   queued.queueDelay = delay;
   if (current === null) {
     state.tracks[trackIndex] = queued;
@@ -231,8 +244,23 @@ export function getTrackEntry(state: AnimationState, trackIndex: number): TrackE
 // clock, no random: the state advances ONLY here, by the caller's explicit dt, so the same (document,
 // call sequence, dt steps) is identical everywhere (Law 1). dt must be >= 0.
 export function updateAnimationState(state: AnimationState, dt: number): void {
-  if (dt < 0) {
-    throw new AnimationStateArgumentError(`dt must be >= 0, got ${dt}`);
+  if (!Number.isFinite(dt) || dt < 0) {
+    throw new AnimationStateArgumentError(`dt must be finite and >= 0, got ${dt}`);
+  }
+  // Validate the complete update before changing clocks or clearing the previous event queue.
+  let eventBudget = 0;
+  for (const entry of state.tracks) {
+    if (entry == null) continue;
+    const activeDt =
+      entry.next === null ? dt : Math.min(dt, Math.max(0, entry.next.queueStart - entry.elapsed));
+    eventBudget += validateAdvance(entry, activeDt);
+    if (entry.mixFrom !== null) eventBudget += validateAdvance(entry.mixFrom, activeDt);
+    if (entry.next !== null) eventBudget += validateAdvance(entry.next, dt - activeDt);
+    if (eventBudget > 65536) {
+      throw new AnimationStateArgumentError(
+        'update exceeds 65536 potential event records; use smaller steps',
+      );
+    }
   }
   // Drain-per-update (ADR-0008): the queue holds only THIS update's fired events. Cleared without
   // releasing capacity, so a steady per-update fire count allocates nothing (the allocation probe pins it).
@@ -246,15 +274,15 @@ export function updateAnimationState(state: AnimationState, dt: number): void {
     // outgoing (crossfading-out) entry and the incoming entry fire (a playing animation fires its events
     // regardless of blend weight: an event is a discrete logical/audio marker, not a weighted value, so
     // "half faded" cannot fire "half an event"). Order: outgoing before incoming, matching apply order.
-    fireEntryEvents(state, entry, dt);
-
-    advanceEntry(entry, dt);
-
     const queued = entry.next;
-    if (queued !== null && entry.elapsed >= entry.duration + queued.queueDelay) {
-      const leftover = entry.elapsed - (entry.duration + queued.queueDelay);
-      queued.elapsed = leftover;
-      queued.trackTime = sampleTimeFor(queued, leftover);
+    const activeDt =
+      queued === null ? dt : Math.min(dt, Math.max(0, queued.queueStart - entry.elapsed));
+    fireEntryEvents(state, entry, activeDt);
+    advanceEntry(entry, activeDt);
+    if (queued !== null && entry.elapsed >= queued.queueStart) {
+      const leftover = dt - activeDt;
+      fireEntryEvents(state, queued, leftover);
+      advanceEntry(queued, leftover);
       tracks[i] = queued;
     }
   }
@@ -319,15 +347,25 @@ function advanceWrapped(trackTime: number, dt: number, loop: boolean, duration: 
   return tt;
 }
 
-// The wrapped/clamped sample time for a raw elapsed value (used when a queued entry starts mid-step and
-// inherits the leftover time past its trigger).
-function sampleTimeFor(entry: InternalEntry, raw: number): number {
-  if (entry.loop && entry.duration > 0) {
-    let tt = raw;
-    while (tt >= entry.duration) tt -= entry.duration;
-    return tt;
+// Bound repeated-subtraction work without changing the canonical wrap arithmetic.
+// Event counts are a conservative upper bound, checked before any track mutation.
+function validateAdvance(entry: InternalEntry, dt: number): number {
+  if (
+    !Number.isFinite(entry.duration) ||
+    entry.duration < 0 ||
+    !Number.isFinite(entry.elapsed + dt) ||
+    !Number.isFinite(entry.trackTime + dt)
+  ) {
+    throw new AnimationStateArgumentError(
+      'animation duration and clocks must remain finite and non-negative',
+    );
   }
-  return raw < entry.duration ? raw : entry.duration;
+  const periods =
+    entry.loop && entry.duration > 0 ? Math.floor((entry.trackTime + dt) / entry.duration) : 0;
+  if (periods > 4096) {
+    throw new AnimationStateArgumentError('update exceeds 4096 loop crossings; use smaller steps');
+  }
+  return dt === 0 ? 0 : (entry.animation.events?.length ?? 0) * (periods + 1);
 }
 
 // Solve the skeleton with every track blended into step 2 (ADR-0005). Tracks apply in ascending index
@@ -351,6 +389,22 @@ export function applyAnimationState(
   // animation. Default 0: a rig with no physics constraints is byte-identical to the pre-physics path.
   frameDt = 0,
 ): void {
+  if (!Number.isFinite(frameDt) || frameDt < 0)
+    throw new AnimationStateArgumentError('frameDt must be finite and non-negative');
+  for (const entry of state.tracks) {
+    if (entry == null) continue;
+    if (
+      !Number.isFinite(entry.alpha) ||
+      entry.alpha < 0 ||
+      entry.alpha > 1 ||
+      (entry.mixFrom !== null &&
+        (!Number.isFinite(entry.mixFrom.alpha) ||
+          entry.mixFrom.alpha < 0 ||
+          entry.mixFrom.alpha > 1))
+    ) {
+      throw new AnimationStateArgumentError('track alpha must be finite and in [0, 1]');
+    }
+  }
   resetToSetupPose(pose);
   resetSlotsToSetup(pose);
   resetConstraintsToBase(pose);

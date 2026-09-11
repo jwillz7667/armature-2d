@@ -22,6 +22,8 @@ import type {
 } from '../shared';
 import { confinePagePath, texturesDirFor } from './project-textures';
 import { atomicWriteFile } from './atomic-file';
+import { readBoundedFile } from './bounded-file';
+import { checkRecoveryStorage } from './recovery-storage';
 
 const FILE_FILTERS = [
   { name: 'Armature 2D Project or Skeleton', extensions: ['json'] },
@@ -47,18 +49,6 @@ function handlerError(error: unknown): IpcResult<never> {
   };
 }
 
-async function readBoundedFile(path: string): Promise<Uint8Array<ArrayBuffer>> {
-  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
-  try {
-    const stat = await file.stat();
-    if (!stat.isFile() || stat.size > MAX_PROJECT_BYTES)
-      throw new Error('Project file is not a regular file or exceeds 512 MiB');
-    return new Uint8Array(await file.readFile());
-  } finally {
-    await file.close();
-  }
-}
-
 export function projectWithAssets(
   document: unknown,
   pages: readonly AtlasImportPage[],
@@ -76,13 +66,19 @@ export function projectWithAssets(
   );
 }
 
-async function writeProject(path: string, project: ProjectDocument): Promise<void> {
+async function writeProject(
+  path: string,
+  project: ProjectDocument,
+  beforeWrite?: (serializedBytes: number) => Promise<void>,
+): Promise<void> {
   const serialized = `${JSON.stringify(project)}\n`;
-  if (Buffer.byteLength(serialized) > MAX_PROJECT_BYTES) throw new Error('Project exceeds 512 MiB');
+  const serializedBytes = Buffer.byteLength(serialized);
+  if (serializedBytes > MAX_PROJECT_BYTES) throw new Error('Project exceeds 512 MiB');
+  await beforeWrite?.(serializedBytes);
   // Keep the last successful document as a recoverable sibling before committing the new one.
   let previous: Uint8Array | undefined;
   try {
-    previous = await readBoundedFile(path);
+    previous = await readBoundedFile(path, MAX_PROJECT_BYTES);
   } catch (error) {
     if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
   }
@@ -148,7 +144,7 @@ async function readLegacyPages(
           process.platform === 'linux' ? `/proc/self/fd/${directory.fd}/${name}` : filePath;
         if (process.platform !== 'linux' && (await realpath(root)) !== resolve(root))
           throw new Error('linked texture directory is not allowed');
-        pages.push({ file: name, data: await readBoundedFile(source) });
+        pages.push({ file: name, data: await readBoundedFile(source, MAX_PROJECT_BYTES) });
       } finally {
         await directory.close();
       }
@@ -164,7 +160,7 @@ async function readLegacyPages(
 export async function readProjectFile(
   path: string,
 ): Promise<Extract<FileOpenResponse, { status: 'opened' }>> {
-  const bytes = await readBoundedFile(path);
+  const bytes = await readBoundedFile(path, MAX_PROJECT_BYTES);
   const input: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   if (isProjectDocument(input)) {
     const project = parseProjectDocument(input, { requireAssets: true });
@@ -227,8 +223,11 @@ export async function saveRecovery(
   return queued(async () => {
     try {
       const path = recoveryPath(options.documentId);
-      await mkdir(join(app.getPath('userData'), 'recovery'), { recursive: true });
-      await writeProject(path, projectWithAssets(document, pages));
+      const directory = join(app.getPath('userData'), 'recovery');
+      await mkdir(directory, { recursive: true });
+      await writeProject(path, projectWithAssets(document, pages), (bytes) =>
+        checkRecoveryStorage(directory, basename(path), bytes),
+      );
       return { ok: true, data: { status: 'saved', path } };
     } catch (error) {
       return handlerError(error);
@@ -253,19 +252,44 @@ export async function discardRecovery(
   });
 }
 
-export async function openRecovery(): Promise<IpcResult<FileOpenResponse>> {
+let startupRecoveryOffered = false;
+export async function openRecovery(startup = false): Promise<IpcResult<FileOpenResponse>> {
+  if (startup) {
+    if (startupRecoveryOffered) return { ok: true, data: { status: 'canceled' } };
+    startupRecoveryOffered = true;
+  }
   try {
     const directory = join(app.getPath('userData'), 'recovery');
     await mkdir(directory, { recursive: true });
-    const files = await readdir(directory);
-    if (!files.some((file) => file.endsWith('.armature.json')))
+    const files = await readdir(directory, { withFileTypes: true });
+    if (!files.some((file) => file.isFile() && /\.armature\.json(?:\.bak)?$/.test(file.name)))
       return { ok: true, data: { status: 'canceled' } };
     const focused = BrowserWindow.getFocusedWindow();
+    if (startup) {
+      const prompt = {
+        type: 'question' as const,
+        title: 'Recover Unsaved Work',
+        message: 'A recovery copy is available.',
+        detail:
+          'Choose a project to recover, or continue working and use File > Recover Unsaved Project later. Your recovery copies will be kept.',
+        buttons: ['Choose Recovery Copy', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+      };
+      const choice = focused
+        ? await dialog.showMessageBox(focused, prompt)
+        : await dialog.showMessageBox(prompt);
+      if (choice.response !== 0) return { ok: true, data: { status: 'canceled' } };
+    }
     const options = {
       title: 'Recover Unsaved Project',
       defaultPath: directory,
       properties: ['openFile' as const],
-      filters: FILE_FILTERS,
+      filters: [
+        { name: 'Recovery Project or Backup', extensions: ['json', 'bak'] },
+        ...FILE_FILTERS,
+      ],
     };
     const result = focused
       ? await dialog.showOpenDialog(focused, options)

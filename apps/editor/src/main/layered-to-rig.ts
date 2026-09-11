@@ -74,9 +74,18 @@ export function packNamedLayers(layers: readonly NamedLayer[]): {
     };
   });
 
-  // Layered sources often carry large full-canvas layers, so pack onto the largest allowed page (4096) to
-  // reduce page count and keep a big background layer packable.
-  const { atlas, pageBitmaps } = packAtlas(sprites, { maxPageSize: 4096 });
+  // Choose a deterministic power-of-two page for the actual trimmed artwork. Tiny imports
+  // should not allocate/encode a 64 MiB 4096-square bitmap. Large layers retain the 4096 cap.
+  let largest = 0;
+  let area = 0;
+  for (const sprite of sprites) {
+    largest = Math.max(largest, sprite.trimmedW + 4, sprite.trimmedH + 4);
+    area += (sprite.trimmedW + 4) * (sprite.trimmedH + 4);
+  }
+  const target = Math.max(largest, Math.ceil(Math.sqrt(area) * 1.2));
+  let maxPageSize = 64;
+  while (maxPageSize < target && maxPageSize < 4096) maxPageSize *= 2;
+  const { atlas, pageBitmaps } = packAtlas(sprites, { maxPageSize });
   const pages: AtlasImportPage[] = atlas.pages.map((page, index) => {
     const bitmap = pageBitmaps[index];
     if (bitmap === undefined) {

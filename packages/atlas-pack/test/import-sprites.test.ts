@@ -97,3 +97,19 @@ describe('importSprites', () => {
     expect(getMaxInFlight()).toBe(MAX_IMPORT_CONCURRENCY);
   });
 });
+
+it('rejects too many images before starting any reads', async () => {
+  let reads = 0;
+  const store: AtlasFileStore = {
+    listDir: async () => Array.from({ length: 4097 }, (_, i) => `${i}.png`),
+    readBytes: async () => {
+      reads += 1;
+      return new Uint8Array();
+    },
+    writeBytes: async () => undefined,
+  };
+  await expect(importSprites('assets', store)).rejects.toMatchObject({
+    code: 'ATLAS_RESOURCE_LIMIT',
+  });
+  expect(reads).toBe(0);
+});
