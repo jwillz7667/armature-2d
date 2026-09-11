@@ -336,6 +336,7 @@ export class DeformError extends Error {
 // The author-time equivalent of the format validator's EFFECT_* / BUNDLE_* codes; the dangling-region case
 // for SetEffectsAtlas is surfaced through EffectsAtlasDanglingRegionError below (it carries the full report).
 export type EffectEditErrorReason =
+  | 'bundleName'
   | 'notFound'
   | 'simulationDt'
   | 'lifeCurveMinStops'

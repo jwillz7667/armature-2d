@@ -5,6 +5,7 @@ import { defineConfig } from 'vitest/config';
 // committed scenario fixtures the mock reads.
 export default defineConfig({
   test: {
+    maxWorkers: 2,
     environment: 'node',
     include: ['test/**/*.test.ts'],
   },

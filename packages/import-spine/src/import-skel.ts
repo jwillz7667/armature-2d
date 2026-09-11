@@ -32,6 +32,21 @@ export function importSpineSkel(
     return { ok: false, errors: [error], warnings: [] };
   }
 
+  if (!options?.allowUnverifiedBinary) {
+    return {
+      ok: false,
+      errors: [
+        {
+          code: 'SPINE_BINARY_UNVERIFIED',
+          path: '',
+          message:
+            'Real Spine binary exports are not verified by this importer. Export JSON plus its atlas/images from Spine and import the JSON. The development binary codec is covered only by synthetic fixtures.',
+        },
+      ],
+      warnings: [],
+    };
+  }
+
   let intermediate: unknown;
   try {
     intermediate = decodeSkel(bytes);

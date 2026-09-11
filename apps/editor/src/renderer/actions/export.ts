@@ -1,3 +1,4 @@
+import { useSkinPreviewStore } from '../editor-state/skin-preview-store';
 import { documentHost, exportDocument } from '../document';
 import { atlasTextureStore } from '../editor-state/atlas-texture-store';
 import { useExportStore } from '../editor-state/export-store';
@@ -102,7 +103,10 @@ async function runRasterExport(
     return;
   }
   const pages = atlasTextureStore.getPageBytes();
-  const options = toMediaExportOptions(media, animations);
+  const options = {
+    ...toMediaExportOptions(media, animations),
+    activeSkin: useSkinPreviewStore.getState().activeSkin,
+  };
   const jobId = crypto.randomUUID();
 
   store.startJob(jobId);
@@ -146,6 +150,10 @@ function startVideoExport(
   container: ExportVideoContainer,
 ): void {
   const store = useExportStore.getState();
+  if (store.jobId !== null || activeVideoWorker !== null) {
+    store.setStatus('Finish or cancel the current export first.');
+    return;
+  }
   const range = resolveFrameRange(media, animations);
   const problems = validateVideoTiming({
     fps: media.fps,
@@ -175,6 +183,7 @@ function startVideoExport(
   activeVideoWorker = worker;
 
   worker.addEventListener('message', (event: MessageEvent<VideoWorkerMessage>) => {
+    if (activeVideoWorker !== worker || useExportStore.getState().jobId !== jobId) return;
     const message = event.data;
     const live = useExportStore.getState();
     if (message.type === 'progress') {
@@ -199,6 +208,17 @@ function startVideoExport(
       `${mediaBaseName(media)}.${container}`,
     );
   });
+  const workerFailure = (message: string): void => {
+    if (activeVideoWorker !== worker) return;
+    teardownWorker(worker);
+    useExportStore.getState().finishJob(`Export failed: ${message}`);
+  };
+  worker.addEventListener('error', (event) =>
+    workerFailure(event.message || 'Video worker could not start'),
+  );
+  worker.addEventListener('messageerror', () =>
+    workerFailure('Video worker response could not be decoded'),
+  );
 
   worker.postMessage({
     type: 'encode',
@@ -206,6 +226,7 @@ function startVideoExport(
     pages: pages.map((page) => ({ file: page.file, data: page.data })),
     container,
     animation: media.animation,
+    activeSkin: useSkinPreviewStore.getState().activeSkin,
     fps: media.fps,
     width: media.width,
     height: media.height,
@@ -247,7 +268,8 @@ function teardownWorker(worker: Worker): void {
 export function cancelActiveExport(): void {
   const store = useExportStore.getState();
   if (activeVideoWorker !== null) {
-    activeVideoWorker.postMessage({ type: 'cancel' });
+    teardownWorker(activeVideoWorker);
+    store.finishJob('Export canceled.');
     return;
   }
   if (store.jobId !== null) {

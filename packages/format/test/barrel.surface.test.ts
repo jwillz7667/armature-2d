@@ -6,6 +6,19 @@ import * as typesModule from '../src/types';
 // WP-F.9, Phase-0 subset). Type-only exports erase at runtime and so are not keys here; this guards
 // against an internal helper leaking into the public surface or a public value going missing.
 const ALLOWED_VALUE_EXPORTS = [
+  'inspectPng',
+  'atlasRefSchema',
+  'PROJECT_FORMAT_VERSION',
+  'MAX_PROJECT_ASSET_BYTES',
+  'MAX_PROJECT_BYTES',
+  'projectDocumentSchema',
+  'parseProjectDocument',
+  'isProjectDocument',
+  'computeProjectContentHash',
+  'encodeProjectAsset',
+  'decodeProjectAsset',
+  'isSafeAssetPath',
+  'ProjectValidationError',
   'BINARY_DECODE_ERROR_CODES',
   'BinaryDecodeError',
   'CURRENT_FORMAT_VERSION',

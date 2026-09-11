@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IpcResult, MarionetteApi, SpineImportResponse } from '../../shared';
 import { CreateBoneCommand, documentHost, exportDocument } from '../document';
 import { useSpineImportStore } from '../editor-state/spine-import-store';
@@ -9,8 +9,15 @@ import { importSpineProjectFromDialog } from './import-spine';
 // publishing the report) without Electron. Node env, no DOM render (the results component is presentation
 // only and not collected by the .test.ts glob).
 
-function installBridge(response: () => IpcResult<SpineImportResponse>): void {
-  const api = { importSpineProject: async () => response() } as unknown as MarionetteApi;
+function installBridge(
+  response: () => IpcResult<SpineImportResponse>,
+  choice: 'discard' | 'cancel' = 'discard',
+): void {
+  const api = {
+    importSpineProject: async () => response(),
+    confirmUnsaved: async () => ({ ok: true, data: choice }),
+    discardRecovery: async () => ({ ok: true, data: undefined }),
+  } as unknown as MarionetteApi;
   vi.stubGlobal('window', { marionette: api });
 }
 
@@ -36,12 +43,29 @@ function validExportedDocument(): unknown {
   return exportDocument(document.model);
 }
 
+beforeEach(() => documentHost.newDocument());
+
 afterEach(() => {
   vi.unstubAllGlobals();
   useSpineImportStore.setState({ open: false, report: null });
 });
 
 describe('importSpineProjectFromDialog', () => {
+  it('retains dirty work when the user cancels replacement', async () => {
+    const document = validExportedDocument();
+    const original = documentHost.current();
+    installBridge(
+      () => ({ ok: true, data: { status: 'imported', name: 'hero', document, warnings: [] } }),
+      'cancel',
+    );
+
+    expect(await importSpineProjectFromDialog()).toEqual({ kind: 'canceled' });
+    expect(documentHost.current()).toBe(original);
+    expect(documentHost.isDirty()).toBe(true);
+    expect(original.history.canUndo).toBe(true);
+    expect(useSpineImportStore.getState().open).toBe(false);
+  });
+
   it('loads a converted document and publishes an imported report with warnings', async () => {
     const document = validExportedDocument();
     const warnings = [

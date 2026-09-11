@@ -82,14 +82,14 @@ describe('convertSpineProject', () => {
     expect(response.document).toBeDefined();
   });
 
-  it('imports a Spine .skel binary project through the same pipeline', () => {
+  it('gates real binary imports until export fixtures establish compatibility', () => {
     const response = convertSpineProject('/projects/hero.skel', {
       kind: 'skel',
       bytes: minimalSkel(),
     });
-    expect(response.status).toBe('imported');
-    if (response.status !== 'imported') return;
-    expect(response.name).toBe('hero');
+    expect(response.status).toBe('failed');
+    if (response.status !== 'failed') return;
+    expect(response.errors[0]?.code).toBe('SPINE_BINARY_UNVERIFIED');
   });
 
   it('maps an unsupported Spine version to a failed response with the typed importer error', () => {
@@ -114,6 +114,6 @@ describe('convertSpineProject', () => {
     const response = convertSpineProject('/truncated.skel', { kind: 'skel', bytes: truncated });
     expect(response.status).toBe('failed');
     if (response.status !== 'failed') return;
-    expect(response.errors.some((e) => e.code === 'SPINE_BINARY_TRUNCATED')).toBe(true);
+    expect(response.errors.some((e) => e.code === 'SPINE_BINARY_UNVERIFIED')).toBe(true);
   });
 });

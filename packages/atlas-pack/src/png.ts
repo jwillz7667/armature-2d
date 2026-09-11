@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { PNG } from 'pngjs';
+import { inspectPng } from '@marionette/format';
 import { AtlasError } from './errors';
 
 // PNG codec wrapper over pngjs, a PURE-JS implementation. Determinism of the decoded-pixel contract
@@ -17,6 +18,7 @@ export interface DecodedImage {
 export function decodePng(bytes: Uint8Array): DecodedImage {
   let png;
   try {
+    inspectPng(bytes);
     png = PNG.sync.read(Buffer.from(bytes));
   } catch (cause) {
     throw new AtlasError('ATLAS_DECODE_FAILED', 'failed to decode PNG bytes', { cause });

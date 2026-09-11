@@ -23,7 +23,11 @@ export class ReorderBundleItemsCommand implements Command {
       if (!bundle)
         throw new EffectEditError('notFound', `bundle "${this.bundleName}" does not exist`);
       const current = new Set<string>(bundle.itemOrder);
-      if (this.order.length !== current.size || !this.order.every((id) => current.has(id))) {
+      if (
+        this.order.length !== current.size ||
+        new Set(this.order).size !== current.size ||
+        !this.order.every((id) => current.has(id))
+      ) {
         throw new EffectEditError(
           'notFound',
           'reorder order must be a permutation of the bundle item ids',

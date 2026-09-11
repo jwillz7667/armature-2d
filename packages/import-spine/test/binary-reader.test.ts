@@ -1,8 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { SkelReader } from '../src/binary/reader';
 import { decodeSkel } from '../src/binary/decode-skel';
-import { importSpineSkel } from '../src/index';
+import { importSpineSkel as importUnverifiedSkel } from '../src/index';
 import { SkelWriter, encodeSkel, type SkelModel } from './fixtures/skel-encoder';
+
+// Synthetic codec coverage is explicit; production binary import remains gated.
+const importSpineSkel: typeof importUnverifiedSkel = (input, options) =>
+  importUnverifiedSkel(input, { ...options, allowUnverifiedBinary: true });
 
 // Byte-level unit tests for the .skel primitive reader and the section decoder. Every buffer is built BY
 // HAND with the test encoder (which writes bytes per the published binary format spec), never from a real
@@ -18,7 +22,7 @@ describe('SkelReader primitives', () => {
   it('round-trips unsigned varints across the 1 to 5 byte boundaries', () => {
     const values = [0, 1, 127, 128, 300, 16383, 16384, 2097151, 2097152, 0x7fffffff];
     const r = reader((w) => values.forEach((v) => w.varint(v, true)));
-    for (const v of values) expect(r.count('/x', 'value')).toBe(v);
+    for (const v of values) expect(r.varint('/x', true, 'value')).toBe(v);
   });
 
   it('round-trips signed (zigzag) varints including negatives', () => {

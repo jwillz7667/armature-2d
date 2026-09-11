@@ -86,3 +86,17 @@ the win counter display right now" using the same pinned rollup math.
 5. Set tumble timing if the game cascades (`slot.tumble.set`).
 6. Run mock-engine scenarios through the sequencer and review the resulting timelines; because
    they are deterministic data, they diff cleanly and are directly assertable in tests.
+
+## 7.9 Authoring in the Slot panel
+
+The Slot panel contains editable grid/reel timing, a searchable symbol browser, named win sequences, feature flow states and transitions, and every tumble timing/easing field. Changes share the project undo history.
+
+1. Create artwork and idle/land/win clips in the project. In **Symbols**, enter the engine's symbol ID and choose **Map project artwork**. Select a mapped symbol to bind each phase to a real project clip; anticipation can reuse win. The scene preview renders these textures and animations. External skeleton references remain diagnosable but require an external asset resolver; this editor preview resolves the current project skeleton.
+2. Choose a grid preset, then set dimensions, cell size/gap, reel stop stagger, and anticipation symbols/counts. Invalid topology combinations are rejected before changing the document.
+3. In **Win sequences**, create, rename, or delete sequences; choose the default and escalation thresholds. Add steps, set their millisecond offsets, choose winning-cell/line/symbol targets, and bind animation, effect/bundle, counter, or banner actions. Reorder and remove steps. A line-win sequence has one counter rollup.
+4. In **Feature and free-spin flow**, create states and connect transitions. The diagram follows the state graph. Edit event types, optional typed equality predicates, transition priority, and state cinematics. Deleting a state removes connected transitions in one undoable change; base remains protected.
+5. Set explode, drop, refill stagger, settle, and gap times in **Tumble choreography**. A cascade begins after reel landing, shows the win animation before removal, interpolates survivor drops, then refills columns in order. Counter links meet at their endpoints and playback includes the final counter value.
+6. Preview a committed scenario or load a recorded result JSON (at most 1 MiB) matching the authored grid. Inspect scheduled event times below the preview. Results stay transient; they are not saved as project content. The effects preview seed affects visual particles only. Restart recreates the simulation.
+7. Save/reopen the project to preserve artwork, textures, symbol bindings, effects, win steps, flows, and choreography together. Embedded reference hashes track the current project content at save time.
+
+The workflow is covered by command, project, sequencer, seeded playback, and headless renderer tests. Installed desktop GPU verification remains a release gate.

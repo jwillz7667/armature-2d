@@ -1,5 +1,6 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, rename, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { RenderPreviewError } from '@marionette/render-preview';
 import { BrowserWindow, dialog, type WebContents } from 'electron';
 import {
@@ -10,14 +11,16 @@ import {
   type IpcResult,
   type MediaExportOptions,
 } from '../../shared';
-import { MediaExportAbortedError, runMediaExport, type MediaExportSink } from './media-export-core';
+import { MediaExportAbortedError, type MediaExportSink } from './media-export-core';
+import { runMediaExportInWorker } from './media-worker';
+import { atomicWriteFile } from '../atomic-file';
 
 // The Electron seam around the pure media-export core (PP-D6): it owns the save dialog (path-injection
 // defense, mirroring file-io.ts), the disk writes, the progress push (export:progress by job id), and the
 // cancel registry (export:cancel aborts the in-flight AbortController). One export per job id; only one is
 // realistically in flight at a time, but the registry is keyed so a stale cancel never aborts a new job.
 
-const inFlight = new Map<string, AbortController>();
+const inFlight = new Map<string, { controller: AbortController; committing: boolean }>();
 
 function handlerError(message: string): IpcResult<never> {
   return { ok: false, error: { code: 'IPC_HANDLER_ERROR', message } };
@@ -89,8 +92,16 @@ export async function exportMediaToFile(
   pages: readonly AtlasImportPage[],
   options: MediaExportOptions,
 ): Promise<IpcResult<ExportMediaResponse>> {
+  if (inFlight.size > 0)
+    return handlerError(
+      'An export is already running. Finish or cancel it before starting another.',
+    );
   const controller = new AbortController();
-  inFlight.set(jobId, controller);
+  const job = { controller, committing: false };
+  inFlight.set(jobId, job);
+  const checkCanceled = (): void => {
+    if (controller.signal.aborted) throw new MediaExportAbortedError();
+  };
 
   const onProgress = (completed: number, total: number): void => {
     if (!sender.isDestroyed()) {
@@ -101,6 +112,7 @@ export async function exportMediaToFile(
   try {
     if (options.medium === 'gif' || options.medium === 'apng') {
       const filePath = await pickSingleFilePath(options.medium, options);
+      checkCanceled();
       if (filePath === null) return { ok: true, data: { status: 'canceled' } };
 
       // The single-image encoders never call the sink; a defensive sink makes a stray call fail loudly.
@@ -108,7 +120,7 @@ export async function exportMediaToFile(
         writeFrame: () =>
           Promise.reject(new Error('unexpected frame sink call for single-image export')),
       };
-      const result = await runMediaExport({
+      const result = await runMediaExportInWorker({
         document,
         pages,
         options,
@@ -116,7 +128,12 @@ export async function exportMediaToFile(
         control: { signal: controller.signal, onProgress },
       });
       if (result.kind !== 'single') return handlerError('expected a single-image export result');
-      await writeFile(filePath, result.bytes);
+      if (controller.signal.aborted) throw new MediaExportAbortedError();
+      await atomicWriteFile(filePath, result.bytes, async (from, to) => {
+        checkCanceled();
+        job.committing = true;
+        await rename(from, to);
+      });
       return {
         ok: true,
         data: { status: 'saved', paths: [filePath], frameCount: result.frameCount },
@@ -124,38 +141,51 @@ export async function exportMediaToFile(
     }
 
     const outputDir = await pickOutputDirectory();
+    checkCanceled();
     if (outputDir === null) return { ok: true, data: { status: 'canceled' } };
     await mkdir(outputDir, { recursive: true });
 
+    const staging = await mkdtemp(join(outputDir, '.armature-frames-'));
     const written: string[] = [];
     const sink: MediaExportSink = {
       async writeFrame(index, png) {
         // frameCount is not known to the sink; pad on a running basis is unstable, so pad on index alone
         // to a fixed 5 digits (covers the render-preview MAX_SEQUENCE_FRAMES cap of 216000).
         const name = frameFileName(index, 100000);
-        const dest = join(outputDir, name);
-        await writeFile(dest, png);
+        const dest = join(staging, name);
+        await atomicWriteFile(dest, png);
         written.push(dest);
       },
     };
-    const result = await runMediaExport({
-      document,
-      pages,
-      options,
-      sink,
-      control: { signal: controller.signal, onProgress },
-    });
-    if (result.kind !== 'sequence' || written.length === 0) {
-      return handlerError('PNG sequence export produced no frames');
+    try {
+      const result = await runMediaExportInWorker({
+        document,
+        pages,
+        options,
+        sink,
+        control: { signal: controller.signal, onProgress },
+      });
+      if (result.kind !== 'sequence' || written.length === 0) {
+        return handlerError('PNG sequence export produced no frames');
+      }
+      if (controller.signal.aborted) throw new MediaExportAbortedError();
+      const destination = join(outputDir, `armature-frames-${randomUUID()}`);
+      job.committing = true;
+      await rename(staging, destination);
+      return {
+        ok: true,
+        data: {
+          status: 'saved',
+          paths: written.map((path) => join(destination, path.slice(staging.length + 1))) as [
+            string,
+            ...string[],
+          ],
+          frameCount: result.frameCount,
+        },
+      };
+    } finally {
+      await rm(staging, { recursive: true, force: true });
     }
-    return {
-      ok: true,
-      data: {
-        status: 'saved',
-        paths: written as [string, ...string[]],
-        frameCount: result.frameCount,
-      },
-    };
   } catch (error) {
     return mapExportError(error);
   } finally {
@@ -165,8 +195,8 @@ export async function exportMediaToFile(
 
 // Abort the in-flight export with this id, if any. Returns whether a job was actually aborted.
 export function cancelMediaExport(jobId: string): IpcResult<ExportCancelResponse> {
-  const controller = inFlight.get(jobId);
-  if (controller === undefined) return { ok: true, data: { canceled: false } };
-  controller.abort();
+  const job = inFlight.get(jobId);
+  if (job === undefined || job.committing) return { ok: true, data: { canceled: false } };
+  job.controller.abort();
   return { ok: true, data: { canceled: true } };
 }
