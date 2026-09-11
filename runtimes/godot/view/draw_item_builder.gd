@@ -13,6 +13,7 @@ const Pose = preload("res://core/pose.gd")
 const RenderModel = preload("res://view/render_model.gd")
 const AtlasIndex = preload("res://view/atlas_index.gd")
 const RegionGeometry = preload("res://view/region_geometry.gd")
+const DrawClipping = preload("res://view/draw_clipping.gd")
 const DrawItem = preload("res://view/draw_item.gd")
 
 # The linked-mesh chain is validator-guaranteed acyclic; this bound is a defensive stop for an unvalidated
@@ -25,12 +26,14 @@ const MAX_LINKED_MESH_DEPTH := 256
 # draw order).
 class SkeletonDrawList:
 	extends RefCounted
+	var clips = DrawClipping.new()
 	var count: int = 0
 	var vertex_scratch: PackedFloat32Array = PackedFloat32Array()
 	var _pool: Array = []  # Array[DrawItem]
 
 	func reset() -> void:
 		count = 0
+		clips.reset()
 
 	func item(index: int):
 		return _pool[index]
@@ -86,11 +89,22 @@ static func build_into(document, render_model: RenderModel.RenderModel, atlas: A
 			continue
 
 		var slot = document.slots[slot_index]
-		var attachment = skin.find(slot.name, active_name)
+		var owner_skin = skin
+		var attachment = owner_skin.find(slot.name, active_name)
+		if attachment == null:
+			var fallback = render_model.find_skin("default")
+			if fallback != null:
+				owner_skin = fallback
+				attachment = fallback.find(slot.name, active_name)
+		if attachment != null and attachment.clipping != null:
+			out_list.clips.add(pose, position, slot_index, attachment.clipping)
+			continue
 		if attachment == null or attachment.kind == RenderModel.KIND_NON_DRAWING:
 			continue
 
-		_emit_drawable(document, render_model, atlas, pose, skin, skin_name, animation_id, sample_time, position, slot_index, bone_index, slot, active_name, attachment, out_list)
+		_emit_drawable(document, render_model, atlas, pose, owner_skin, owner_skin.name, animation_id, sample_time, position, slot_index, bone_index, slot, active_name, attachment, out_list)
+
+	out_list.clips.apply(out_list)
 
 
 static func _emit_drawable(document, render_model: RenderModel.RenderModel, atlas: AtlasIndex, pose: Pose, skin, skin_name: String, animation_id, sample_time: float, render_position: int, slot_index: int, bone_index: int, slot, active_name: String, attachment: RenderModel.RenderAttachment, out_list: SkeletonDrawList) -> void:

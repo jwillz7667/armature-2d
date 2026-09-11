@@ -1,4 +1,5 @@
 import { Texture } from 'pixi.js';
+import { inspectPng } from '@marionette/format';
 import type { AtlasImportPage } from '../../shared';
 
 // Pixi-dependent page-texture loader. The editor vitest env is `node` (no DOM, no GL), so this glue is
@@ -20,11 +21,31 @@ import type { AtlasImportPage } from '../../shared';
 export async function loadPageTextures(
   pages: readonly AtlasImportPage[],
 ): Promise<Map<string, Texture>> {
-  const entries = await Promise.all(
-    pages.map(async (page): Promise<readonly [string, Texture]> => {
+  const textures = new Map<string, Texture>();
+  let pixels = 0;
+  try {
+    // Sequential decoding bounds peak bitmap allocation and gives every partial result an owner.
+    for (const page of pages) {
+      if (textures.has(page.file)) throw new Error(`Duplicate texture page: ${page.file}`);
+      const dimensions = inspectPng(page.data);
+      pixels += dimensions.width * dimensions.height;
+      if (pixels > 64 * 1024 * 1024)
+        throw new Error('Decoded textures exceed the 64 megapixel project limit');
       const bitmap = await createImageBitmap(new Blob([page.data], { type: 'image/png' }));
-      return [page.file, Texture.from(bitmap)];
-    }),
-  );
-  return new Map(entries);
+      try {
+        if (bitmap.width !== dimensions.width || bitmap.height !== dimensions.height)
+          throw new Error('Decoded PNG dimensions differ from its header');
+        const texture = Texture.from(bitmap);
+        texture.source.on('destroy', () => bitmap.close());
+        textures.set(page.file, texture);
+      } catch (error) {
+        bitmap.close();
+        throw error;
+      }
+    }
+    return textures;
+  } catch (error) {
+    for (const texture of textures.values()) texture.destroy(true);
+    throw error;
+  }
 }

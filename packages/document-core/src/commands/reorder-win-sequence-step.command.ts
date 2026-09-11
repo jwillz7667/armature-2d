@@ -76,7 +76,10 @@ export class ReorderWinSequenceStepCommand implements Command {
 
   coalesceWith(prev: Command): Command | null {
     if (prev instanceof ReorderWinSequenceStepCommand && prev.sequenceName === this.sequenceName) {
-      const merged = new ReorderWinSequenceStepCommand(this.sequenceName, this.order);
+      const merged = new ReorderWinSequenceStepCommand(
+        this.sequenceName,
+        this.order.map((index) => prev.order[index]!),
+      );
       merged.before = prev.before; // original before so one undo restores the pre-session order
       return merged;
     }

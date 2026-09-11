@@ -25,11 +25,11 @@
     "@marionette/format": "workspace:*",
     "@marionette/math-bridge": "workspace:*",
     "@marionette/runtime-core": "workspace:*",
-    "zod": "3.23.8"
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "tsx": "^4.19.2",
-    "vitest": "^2.1.8"
+    "vitest": "4.1.11"
   }
 }

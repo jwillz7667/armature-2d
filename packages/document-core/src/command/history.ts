@@ -158,6 +158,18 @@ export class History {
     return this.maxDepthValue;
   }
 
+  // A save is a user-visible undo boundary. Later edits must not coalesce across it, otherwise the
+  // saved state can become unreachable with Undo. An active gesture must finish before saving.
+  checkpoint(): void {
+    this.assertNotNotifying('checkpoint');
+    if (this.session !== null) throw new Error('Finish the current gesture before saving');
+    this.lastAt = Number.NEGATIVE_INFINITY;
+  }
+
+  get inInteraction(): boolean {
+    return this.session !== null;
+  }
+
   subscribe(fn: (event: HistoryEvent) => void): () => void {
     this.listeners.add(fn);
     return () => this.listeners.delete(fn);

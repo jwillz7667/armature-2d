@@ -65,8 +65,10 @@ export function convertDocument(
 
   const events = convertEvents(input['events'], '/events', diag);
 
+  const metadata = convertMetadata(input, diag);
   const ctx: AnimationContext = {
-    skinsByName: new Map(skins.map((skin) => [skin.name, skin])),
+    slotNames: slots.map((slot) => slot.name),
+    fps: metadata?.fps ?? 30,
     slotsWithDark: new Set(
       slots.filter((slot) => slot.darkColor !== undefined).map((slot) => slot.name),
     ),
@@ -74,8 +76,6 @@ export function convertDocument(
   };
   const animations = convertAnimations(input['animations'], '/animations', diag, ctx);
   synthesizeDarkColors(slots, ctx.needsDark);
-
-  const metadata = convertMetadata(input, diag);
 
   const document: SkeletonDocument = {
     formatVersion: CURRENT_FORMAT_VERSION,
@@ -97,7 +97,7 @@ export function convertDocument(
 }
 
 // The version gate. The version lives in `skeleton.spine`. An absent skeleton block or version string is
-// SPINE_VERSION_MISSING; a present but non-4.x version is SPINE_VERSION_UNSUPPORTED. Both stop the import.
+// SPINE_VERSION_MISSING; unknown minor profiles are SPINE_VERSION_UNSUPPORTED. Both stop import.
 function gateVersion(input: JsonRecord, diag: Diagnostics): boolean {
   const skeleton = input['skeleton'];
   const skeletonRec = skeleton === undefined ? undefined : asRecord(skeleton, '/skeleton', diag);
@@ -117,7 +117,7 @@ function gateVersion(input: JsonRecord, diag: Diagnostics): boolean {
     diag.error(
       'SPINE_VERSION_UNSUPPORTED',
       '/skeleton/spine',
-      `Spine version "${version}" is not supported; the importer accepts the documented 4.x JSON shape`,
+      `Spine version "${version}" is not supported; JSON candidates are 4.0, 4.1, and 4.2 release versions. Feature support is reported separately; binary support is not implied.`,
       { version },
     );
     return false;

@@ -57,12 +57,10 @@ describe('buildAppMenuTemplate', () => {
     const { template, dispatch } = build(false);
     const file = submenuOf(template, 'File');
     const labels = file.map((i) => i.label);
-    expect(labels).toEqual(
-      expect.arrayContaining(['New', 'Open...', 'Save...', 'Import Sprites...']),
-    );
+    expect(labels).toEqual(expect.arrayContaining(['New', 'Open...', 'Save', 'Import Sprites...']));
 
     file
-      .find((i) => i.label === 'Save...')
+      .find((i) => i.label === 'Save')
       ?.click?.(undefined as never, undefined, undefined as never);
     expect(dispatch).toHaveBeenCalledWith('file:save');
   });
@@ -102,7 +100,7 @@ describe('buildAppMenuTemplate', () => {
   it('shows accelerators for discoverability but does NOT register them (renderer owns the shortcut)', () => {
     const { template } = build(false);
     const file = submenuOf(template, 'File');
-    const save = file.find((i) => i.label === 'Save...');
+    const save = file.find((i) => i.label === 'Save');
     expect(save?.accelerator).toBe('Ctrl+S');
     // registerAccelerator:false means the menu does not steal the shortcut from the renderer keybindings.
     expect(save?.registerAccelerator).toBe(false);

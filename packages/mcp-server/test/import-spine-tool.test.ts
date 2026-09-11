@@ -122,13 +122,13 @@ describe('import.spineProject tool', () => {
     expect(d.sessions.get(documentId)).toBeDefined();
   });
 
-  it('imports a Spine .skel binary project through the same clean-room pipeline', async () => {
+  it('rejects unverified binary exports with an actionable error and opens no session', async () => {
     const d = deps(seededFiles({}, { '/rig.skel': minimalSkel() }));
-    const result = asRecord(await importTool.handler(d, { path: '/rig.skel' }));
-
-    expect(result['format']).toBe('skel');
-    expect(result['summary']).toMatchObject({ bones: 1, slots: 0 });
-    expect(result['documentId']).toBeTypeOf('string');
+    await expect(importTool.handler(d, { path: '/rig.skel' })).rejects.toMatchObject({
+      code: 'SPINE_IMPORT_FAILED',
+      detail: { errors: [expect.objectContaining({ code: 'SPINE_BINARY_UNVERIFIED' })] },
+    });
+    expect(d.sessions.size).toBe(0);
   });
 
   it('rejects a missing file with FILE_READ_ERROR', async () => {

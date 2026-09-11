@@ -544,7 +544,7 @@ function skinToFormat(skin: SkinEntity, slotIdToName: ReadonlyMap<string, string
   };
 }
 
-export function exportDocument(model: DocumentReadModel): SkeletonDocument {
+export function projectSkeleton(model: DocumentReadModel): SkeletonDocument {
   const orderedBones = model.bones(); // in boneOrder
   const boneIdToName = new Map<string, string>();
   for (const bone of orderedBones) boneIdToName.set(bone.id, bone.name);
@@ -692,8 +692,11 @@ export function exportDocument(model: DocumentReadModel): SkeletonDocument {
     // per exactOptionalPropertyTypes (absent means the identity defaults: no global weather, unit master mix).
     ...(physics !== undefined ? { physics } : {}),
   };
-  const withHash: SkeletonDocument = { ...draft, hash: computeContentHash(draft) };
+  return { ...draft, hash: computeContentHash(draft) };
+}
 
+export function exportDocument(model: DocumentReadModel): SkeletonDocument {
+  const withHash = projectSkeleton(model);
   const report = validateDocument(withHash, { verifyHash: true });
   if (!report.ok || report.document === null) {
     throw new ExportValidationError(report);

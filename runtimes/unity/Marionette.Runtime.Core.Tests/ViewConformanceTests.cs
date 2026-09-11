@@ -42,6 +42,8 @@ namespace Marionette.Runtime.Core.Tests
             {
                 FixtureSample sample = fixture.Samples[s];
                 scene.Sample(spec, sample, s);
+                // This assertion covers pre-clip skinning. NativeClippingTests checks rendered clipping.
+                if (rigId == "rig-clipping") scene.Pose.SlotAttachment[scene.SlotIndex("clipper")] = null;
                 SkeletonDrawList items = scene.GatherDrawItems(spec.Animation, sample.Time);
 
                 foreach (MeshVertices expected in sample.Meshes)

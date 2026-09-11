@@ -4,25 +4,12 @@ import {
   CommandNotAppliedError,
   CommandTargetMissingError,
 } from '../command/errors';
-import type { AnimationEntity } from '../model/doc-state';
 import type { AnimationId } from '../model/ids';
+import { lastAnimationKeyTime } from './animation-timelines';
 import { findAnimationSnapshot, type CommandSpec } from './spec';
 
 // The largest keyframe/frame time across every timeline of an animation. The new duration may not drop
 // below this, or keyframes would fall outside [0, duration] (the format's ANIM_TIME_RANGE / ANIM_DURATION).
-function lastKeyframeTime(animation: AnimationEntity): number {
-  let max = 0;
-  for (const set of animation.bones.values()) {
-    for (const channel of [set.rotate, set.translate, set.scale, set.shear]) {
-      for (const kf of channel) if (kf.time > max) max = kf.time;
-    }
-  }
-  for (const set of animation.slots.values()) {
-    for (const kf of set.color) if (kf.time > max) max = kf.time;
-    for (const frame of set.attachment) if (frame.time > max) max = frame.time;
-  }
-  return max;
-}
 
 // Set an animation's duration (command-history catalog SetAnimationDuration, `anim.duration`). Window
 // coalescing merges same-animation duration nudges within the time window, mirroring MoveBone. The
@@ -44,8 +31,13 @@ export class SetAnimationDurationCommand implements Command {
     if (this.before === undefined) {
       const animation = ctx.mutate.getAnimation(this.animId);
       if (!animation) throw new CommandTargetMissingError(this.kind, this.animId);
-      const lastTime = lastKeyframeTime(animation);
-      if (this.after < lastTime) {
+      const lastTime = lastAnimationKeyTime(animation);
+      if (
+        !Number.isFinite(this.after) ||
+        this.after < 0 ||
+        this.after < lastTime ||
+        (lastTime >= 0 && this.after === 0)
+      ) {
         throw new AnimationDurationError(this.animId, this.after, lastTime);
       }
       this.before = animation.duration;

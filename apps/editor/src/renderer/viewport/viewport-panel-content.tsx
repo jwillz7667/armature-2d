@@ -1,3 +1,4 @@
+import { publishDisplayedWorlds } from './scene-solve';
 import { Application, type Ticker } from 'pixi.js';
 import { useEffect, useMemo, useRef, type CSSProperties, type ReactElement } from 'react';
 import { SkeletonView } from '@marionette/runtime-web';
@@ -251,6 +252,7 @@ export function ViewportPanelContent(): ReactElement {
       // animation, or playhead) or the revision changed; null forces the first render after a (re)export.
       let lastTarget: RenderTarget | null = null;
       let lastRevision = -1;
+      let lastDocumentId: string | null = null;
 
       const tick = (ticker: Ticker): void => {
         const model = documentHost.current().model;
@@ -269,7 +271,13 @@ export function ViewportPanelContent(): ReactElement {
           onionDirty = true; // rebind ghost textures too
         }
 
-        const revisionChanged = model.revision !== lastRevision;
+        const identityChanged = documentHost.identity() !== lastDocumentId;
+        if (identityChanged) {
+          cachedDoc = null;
+          lastTarget = null;
+          lastDocumentId = documentHost.identity();
+        }
+        const revisionChanged = identityChanged || model.revision !== lastRevision;
         if (revisionChanged) {
           lastRevision = model.revision;
           if (model.bones().length === 0) {
@@ -368,6 +376,11 @@ export function ViewportPanelContent(): ReactElement {
             // change detector so this re-validates only on a real change, not every frame.
             view.sync(cachedDoc);
           }
+          publishDisplayedWorlds(model, view.readBoneWorlds());
+          gizmoDirty = true;
+          meshOverlayDirty = true;
+          pathOverlayDirty = true;
+          weightOverlayDirty = true;
           lastTarget = target;
         }
 

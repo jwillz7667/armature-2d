@@ -602,52 +602,95 @@ export default tseslint.config(
       ],
     },
     rules: {
-      'boundaries/element-types': [
+      'boundaries/dependencies': [
         'error',
         {
           default: 'disallow',
-          rules: [
-            { from: ['format'], allow: ['format'] },
+          policies: [
+            {
+              from: { element: { type: 'format' } },
+              allow: [{ to: { element: { type: 'format' } } }],
+            },
             // math-bridge owns the outcome boundary; it may import the format contract (so SpinResult
             // cells are typed as SymbolId) and nothing else in-repo (CD-1 direction: format never
             // imports math-bridge). The external engine client used by real/** is not an in-repo element.
-            { from: ['math-bridge'], allow: ['math-bridge', 'format'] },
+            {
+              from: { element: { type: 'math-bridge' } },
+              allow: [
+                { to: { element: { type: 'math-bridge' } } },
+                { to: { element: { type: 'format' } } },
+              ],
+            },
             // runtime-core imports format types; the runtime-core/slot sequencer ALSO imports the
             // math-bridge SpinResult VALUE TYPES (phase-4 WP-4.7, LAW 1: presentation is a pure function
             // OF the outcome, it never reads the engine client). boundaries is coarse (it cannot see the
             // /slot sub-path or the import-type distinction), so it allows math-bridge at the package
             // level; the fine-grained ban (slot-only, never math-bridge/real, never in effects) is
             // enforced by the no-restricted-imports blocks below.
-            { from: ['runtime-core'], allow: ['runtime-core', 'format', 'math-bridge'] },
-            { from: ['runtime-web'], allow: ['runtime-web', 'runtime-core', 'format'] },
+            {
+              from: { element: { type: 'runtime-core' } },
+              allow: [
+                { to: { element: { type: 'runtime-core' } } },
+                { to: { element: { type: 'format' } } },
+                { to: { element: { type: 'math-bridge' } } },
+              ],
+            },
+            {
+              from: { element: { type: 'runtime-web' } },
+              allow: [
+                { to: { element: { type: 'runtime-web' } } },
+                { to: { element: { type: 'runtime-core' } } },
+                { to: { element: { type: 'format' } } },
+              ],
+            },
             // atlas-pack is a leaf over the format contract (AtlasRef types): the deterministic pipeline
             // packs region coordinates into an AtlasRef and imports nothing else in-repo (ADR-0007).
-            { from: ['atlas-pack'], allow: ['atlas-pack', 'format'] },
+            {
+              from: { element: { type: 'atlas-pack' } },
+              allow: [
+                { to: { element: { type: 'atlas-pack' } } },
+                { to: { element: { type: 'format' } } },
+              ],
+            },
             // render-preview is the headless CPU rasterizer (ADR-0006): it consumes the format contract
             // (validate + types) and the pure solve core (runtime-core), never runtime-web or any UI.
-            { from: ['render-preview'], allow: ['render-preview', 'format', 'runtime-core'] },
+            {
+              from: { element: { type: 'render-preview' } },
+              allow: [
+                { to: { element: { type: 'render-preview' } } },
+                { to: { element: { type: 'format' } } },
+                { to: { element: { type: 'runtime-core' } } },
+              ],
+            },
             // document-core is the renderer-agnostic command/history spine (ADR-0001). It consumes
             // only format (validate/hash/types) and, where a transform command needs it, runtime-core.
-            { from: ['document-core'], allow: ['document-core', 'format', 'runtime-core'] },
+            {
+              from: { element: { type: 'document-core' } },
+              allow: [
+                { to: { element: { type: 'document-core' } } },
+                { to: { element: { type: 'format' } } },
+                { to: { element: { type: 'runtime-core' } } },
+              ],
+            },
             // mcp-server exposes document-core commands as MCP tools (WP-M.1). It drives the same
             // commands the GUI does and reads runtime-core solves; never the renderer/UI packages. It also
             // consumes render-preview (the headless CPU rasterizer, ADR-0006) for the render_frame tool: the
             // rasterizer is renderer-free (no PixiJS), so it does not breach the no-renderer boundary.
             {
-              from: ['mcp-server'],
+              from: { element: { type: 'mcp-server' } },
               allow: [
-                'mcp-server',
-                'document-core',
-                'format',
-                'runtime-core',
-                'render-preview',
+                { to: { element: { type: 'mcp-server' } } },
+                { to: { element: { type: 'document-core' } } },
+                { to: { element: { type: 'format' } } },
+                { to: { element: { type: 'runtime-core' } } },
+                { to: { element: { type: 'render-preview' } } },
                 // atlas-pack (ADR-0007): the atlas.pack tool runs the shared deterministic pipeline
                 // headlessly through a FileStore-backed AtlasFileStore adapter. The pipeline is
                 // renderer-free (no PixiJS), so it does not breach the no-renderer boundary.
-                'atlas-pack',
+                { to: { element: { type: 'atlas-pack' } } },
                 // import-spine (PP-A5): the import.spineProject tool converts a user-owned Spine export
                 // into a validated format document. The importer is a leaf over format (import only).
-                'import-spine',
+                { to: { element: { type: 'import-spine' } } },
               ],
             },
             // conformance is the cross-runtime behavioral-truth suite (conformance-and-ci.md A.1). It
@@ -657,42 +700,61 @@ export default tseslint.config(
             // committed (SpinResult, SlotScene) pairs must validate via the math-bridge contract. The fixtures
             // stay a pure function of (spin, scene, sample-spec, core); never the renderer/UI packages.
             {
-              from: ['conformance'],
-              allow: ['conformance', 'format', 'runtime-core', 'math-bridge'],
+              from: { element: { type: 'conformance' } },
+              allow: [
+                { to: { element: { type: 'conformance' } } },
+                { to: { element: { type: 'format' } } },
+                { to: { element: { type: 'runtime-core' } } },
+                { to: { element: { type: 'math-bridge' } } },
+              ],
             },
             // import-spine (PP-A5) is a leaf over the format contract: it PRODUCES a validated format
             // document from a user-owned Spine export and imports nothing else in-repo (LAW 4 exception).
-            { from: ['import-spine'], allow: ['import-spine', 'format'] },
+            {
+              from: { element: { type: 'import-spine' } },
+              allow: [
+                { to: { element: { type: 'import-spine' } } },
+                { to: { element: { type: 'format' } } },
+              ],
+            },
             // editor-main hosts the headless MCP server (WP-M.1), which drives document-core commands
             // and reads runtime-core solves; it stays off the renderer/UI packages.
             {
-              from: ['editor-main'],
+              from: { element: { type: 'editor-main' } },
               allow: [
-                'editor-main',
-                'editor-shared',
-                'mcp-server',
-                'document-core',
-                'format',
-                'runtime-core',
+                { to: { element: { type: 'editor-main' } } },
+                { to: { element: { type: 'editor-shared' } } },
+                { to: { element: { type: 'mcp-server' } } },
+                { to: { element: { type: 'document-core' } } },
+                { to: { element: { type: 'format' } } },
+                { to: { element: { type: 'runtime-core' } } },
                 // atlas-pack (ADR-0007): the main-process atlas import handler runs the shared pipeline;
                 // rembg (editor-only) stays in editor-main and reuses the package's AtlasError.
-                'atlas-pack',
-                // import-spine (PP-A5): the main-process Import Spine Project handler converts a
-                // user-owned Spine export to a validated format document off the renderer document path.
-                'import-spine',
+                { to: { element: { type: 'atlas-pack' } } },
+                // Import conversion runs off the renderer document path.
+                { to: { element: { type: 'import-spine' } } },
               ],
             },
-            { from: ['editor-preload'], allow: ['editor-preload', 'editor-shared'] },
-            { from: ['editor-shared'], allow: ['editor-shared'] },
             {
-              from: ['editor-renderer'],
+              from: { element: { type: 'editor-preload' } },
               allow: [
-                'editor-renderer',
-                'editor-shared',
-                'runtime-web',
-                'runtime-core',
-                'document-core',
-                'format',
+                { to: { element: { type: 'editor-preload' } } },
+                { to: { element: { type: 'editor-shared' } } },
+              ],
+            },
+            {
+              from: { element: { type: 'editor-shared' } },
+              allow: [{ to: { element: { type: 'editor-shared' } } }],
+            },
+            {
+              from: { element: { type: 'editor-renderer' } },
+              allow: [
+                { to: { element: { type: 'editor-renderer' } } },
+                { to: { element: { type: 'editor-shared' } } },
+                { to: { element: { type: 'runtime-web' } } },
+                { to: { element: { type: 'runtime-core' } } },
+                { to: { element: { type: 'document-core' } } },
+                { to: { element: { type: 'format' } } },
               ],
             },
           ],

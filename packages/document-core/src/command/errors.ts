@@ -80,7 +80,7 @@ export class AnimationDurationError extends Error {
   ) {
     super(
       `cannot set animation "${animationId}" duration to ${requestedDuration}; ` +
-        `it is below the last keyframe time ${lastKeyframeTime}`,
+        `it must be finite and at least the last keyframe time ${lastKeyframeTime}`,
     );
   }
 }
@@ -336,6 +336,7 @@ export class DeformError extends Error {
 // The author-time equivalent of the format validator's EFFECT_* / BUNDLE_* codes; the dangling-region case
 // for SetEffectsAtlas is surfaced through EffectsAtlasDanglingRegionError below (it carries the full report).
 export type EffectEditErrorReason =
+  | 'bundleName'
   | 'notFound'
   | 'simulationDt'
   | 'lifeCurveMinStops'

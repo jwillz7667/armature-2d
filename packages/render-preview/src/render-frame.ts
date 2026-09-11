@@ -3,7 +3,7 @@ import { buildPose } from '@marionette/runtime-core';
 import { AtlasIndex, type AtlasPixelSource } from './atlas';
 import { gatherClipRegionsFromPose } from './clipping';
 import { TRANSPARENT, type Color } from './color';
-import { gatherDrawItemsFromPose, solvePoseForFrame } from './draw-items';
+import { gatherDrawItemsFromPose, solvePoseAtTime } from './draw-items';
 import { encodePng } from './png';
 import { Framebuffer } from './raster';
 import { makeClipScratch, rasterizeClippedWorldItem } from './raster-clip';
@@ -17,6 +17,7 @@ export interface RenderFrameOptions {
   // The document to render, validated internally via packages/format before any solve (validate-before-
   // solve boundary): invalid input throws a typed FormatError and never reaches runtime-core.
   readonly document: unknown;
+  readonly activeSkin?: string;
   // The animation id to sample; omit for the setup pose.
   readonly animation?: string;
   // The time (seconds) to sample the animation at; clamped to [0, duration]. Ignored without `animation`.
@@ -47,9 +48,15 @@ export function renderFrame(options: RenderFrameOptions): RenderFrameResult {
   // Solve the pose ONCE, then gather both the draw items and the active clip regions against it (ADR-0012):
   // clipping reads the same solved world pass and draw order the items were gathered from, so the two agree.
   const pose = buildPose(document);
-  const deform = solvePoseForFrame(document, pose, options.animation, options.time);
-  const items = gatherDrawItemsFromPose(document, atlas, pose, deform);
-  const clipPlan = gatherClipRegionsFromPose(document, pose);
+  const deform = solvePoseAtTime(
+    document,
+    pose,
+    options.animation,
+    options.time,
+    options.activeSkin,
+  );
+  const items = gatherDrawItemsFromPose(document, atlas, pose, deform, options.activeSkin);
+  const clipPlan = gatherClipRegionsFromPose(document, pose, options.activeSkin);
 
   const bounds = new WorldBounds();
   for (const item of items) {

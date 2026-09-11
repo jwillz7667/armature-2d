@@ -1,11 +1,11 @@
 import {
-  renderSequence,
-  type AtlasPagePixels,
+  renderRgbaSequence,
   type AtlasPixelSource,
   type RenderSequenceOptions,
-} from '@marionette/render-preview';
+} from '@marionette/render-preview/browser';
 import { Muxer as Mp4Muxer, ArrayBufferTarget as Mp4Target } from 'mp4-muxer';
 import { Muxer as WebMMuxer, ArrayBufferTarget as WebMTarget } from 'webm-muxer';
+import { decodeAtlasPixels } from './atlas-pixels';
 import { computeVideoTiming, suggestedBitrate, videoCodecFor } from './video-timing';
 import type {
   VideoEncodeRequest,
@@ -33,6 +33,7 @@ interface WorkerScope {
 const ctx = globalThis as unknown as WorkerScope;
 
 let canceled = false;
+let busy = false;
 
 ctx.addEventListener('message', (event) => {
   const request = event.data;
@@ -40,35 +41,15 @@ ctx.addEventListener('message', (event) => {
     canceled = true;
     return;
   }
-  void encode(request);
-});
-
-// Decode a page PNG to straight-alpha RGBA using the worker's native codec (createImageBitmap +
-// OffscreenCanvas), so the worker never imports the Node-only atlas-pack file store. A page that fails to
-// decode is skipped (the region falls back to render-preview's white placeholder, parity with the
-// main-process media core, which decodes via atlas-pack in Node instead).
-async function toAtlasPixelSource(pages: VideoEncodeRequest['pages']): Promise<AtlasPixelSource> {
-  const map = new Map<string, AtlasPagePixels>();
-  for (const page of pages) {
-    try {
-      const bitmap = await createImageBitmap(new Blob([page.data]));
-      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-      const context = canvas.getContext('2d');
-      if (context === null) continue;
-      context.drawImage(bitmap, 0, 0);
-      const image = context.getImageData(0, 0, bitmap.width, bitmap.height);
-      map.set(page.file, {
-        width: bitmap.width,
-        height: bitmap.height,
-        rgba: new Uint8Array(image.data.buffer.slice(0)),
-      });
-      bitmap.close();
-    } catch {
-      // Skip an undecodable page.
-    }
+  if (busy) {
+    ctx.postMessage({ type: 'error', message: 'A video export is already running' });
+    return;
   }
-  return { pages: map };
-}
+  busy = true;
+  void encode(request).finally(() => {
+    busy = false;
+  });
+});
 
 function sequenceOptions(
   request: VideoEncodeRequest,
@@ -76,6 +57,7 @@ function sequenceOptions(
 ): RenderSequenceOptions {
   return {
     document: request.document,
+    ...(request.activeSkin !== undefined ? { activeSkin: request.activeSkin } : {}),
     atlas,
     viewport: { width: request.width, height: request.height, fit: 'content' },
     // Video has no alpha channel here: composite onto the opaque background.
@@ -89,9 +71,11 @@ function sequenceOptions(
 
 async function encode(request: VideoEncodeRequest): Promise<void> {
   canceled = false;
+  let encoder: VideoEncoder | null = null;
+  let failure: Error | null = null;
   try {
-    const atlas = await toAtlasPixelSource(request.pages);
-    const sequence = renderSequence(sequenceOptions(request, atlas));
+    const atlas = await decodeAtlasPixels(request.pages);
+    const sequence = renderRgbaSequence(sequenceOptions(request, atlas));
     const frameCount = sequence.frameCount;
     const timing = computeVideoTiming({ fps: request.fps, frameCount });
     const codec = videoCodecFor(request.container);
@@ -102,24 +86,42 @@ async function encode(request: VideoEncodeRequest): Promise<void> {
 
     const { addChunk, finalize } = makeMuxer(request, codec.webmMuxer);
 
-    const encoder = new VideoEncoder({
-      output: (chunk, meta) => addChunk(chunk, meta),
-      error: (error) => ctx.postMessage({ type: 'error', message: error.message }),
-    });
-    encoder.configure({
+    const config: VideoEncoderConfig = {
       codec: codec.webCodecs,
       width: request.width,
       height: request.height,
       bitrate,
       framerate: request.fps,
+    };
+    if (typeof VideoEncoder === 'undefined')
+      throw new Error('Video encoding is unavailable on this system');
+    const support = await VideoEncoder.isConfigSupported(config);
+    if (!support.supported)
+      throw new Error(
+        `This system does not support ${request.container.toUpperCase()} at the selected settings`,
+      );
+    let encodedBytes = 0;
+    encoder = new VideoEncoder({
+      output: (chunk, meta) => {
+        encodedBytes += chunk.byteLength;
+        if (encodedBytes > 512 * 1024 * 1024) {
+          failure = new Error('Video exceeds the 512 MiB export limit');
+          return;
+        }
+        addChunk(chunk, meta);
+      },
+      error: (error) => {
+        failure = error;
+      },
     });
+    encoder.configure(config);
 
     // A keyframe at the start and roughly once per second keeps seeking usable without bloating the file.
     const keyEvery = Math.max(1, request.fps);
     let index = 0;
     for (const frame of sequence.frames()) {
+      if (failure) throw failure;
       if (canceled) {
-        encoder.close();
         ctx.postMessage({ type: 'canceled' });
         return;
       }
@@ -131,14 +133,20 @@ async function encode(request: VideoEncodeRequest): Promise<void> {
         timestamp: timestamp.timestampMicros,
         duration: timestamp.durationMicros,
       });
-      encoder.encode(videoFrame, { keyFrame: index % keyEvery === 0 });
-      videoFrame.close();
+      try {
+        encoder.encode(videoFrame, { keyFrame: index % keyEvery === 0 });
+      } finally {
+        videoFrame.close();
+      }
+      // Bound the codec queue and yield to output/error/cancel tasks on every frame.
+      if (encoder.encodeQueueSize >= 4) await encoder.flush();
+      else await new Promise<void>((resolve) => setTimeout(resolve, 0));
       index += 1;
       ctx.postMessage({ type: 'progress', completed: index, total: frameCount });
     }
 
     await encoder.flush();
-    encoder.close();
+    if (failure) throw failure;
     const data = finalize();
     ctx.postMessage({ type: 'done', data, frameCount }, [data]);
   } catch (error) {
@@ -146,6 +154,8 @@ async function encode(request: VideoEncodeRequest): Promise<void> {
       type: 'error',
       message: error instanceof Error ? error.message : 'video encode failed',
     });
+  } finally {
+    if (encoder !== null && encoder.state !== 'closed') encoder.close();
   }
 }
 

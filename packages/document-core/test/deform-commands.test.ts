@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DeformError,
+  SetDeformCurveCommand,
   assertInvariants,
   loadDocument,
   type AnimationEntity,
@@ -194,5 +195,48 @@ describe('WP-2.9 deform timeline commands', () => {
     doc.history.undo();
     expect(doc.model.snapshot()).toEqual(before); // every cleared track restored deep-equal
     assertInvariants(doc.model);
+  });
+});
+
+describe('deform curve editing', () => {
+  it('keeps key identity and offsets, restores the exact channel through undo and redo', () => {
+    const { env } = makeTestEnv();
+    const doc = loadDocument(seeds.rigged, env);
+    const before = doc.model.snapshot();
+    const { anim, skinKey, slotId, attachmentName, frames } = panelTrack(doc);
+    const key = frames[0]!;
+    doc.history.execute(
+      new SetDeformCurveCommand(anim.id, skinKey, slotId, attachmentName, key.id, 'stepped'),
+    );
+    expect(panelTrack(doc).frames[0]).toEqual({ ...key, curve: 'stepped' });
+    const after = doc.model.snapshot();
+    doc.history.undo();
+    expect(doc.model.snapshot()).toEqual(before);
+    doc.history.redo();
+    expect(doc.model.snapshot()).toEqual(after);
+  });
+
+  it('rejects a missing key before changing the document or history', () => {
+    const { env } = makeTestEnv();
+    const doc = loadDocument(seeds.rigged, env);
+    const before = doc.model.snapshot();
+    const { anim, skinKey, slotId, attachmentName, frames } = panelTrack(doc);
+    doc.history.execute(new ClearAttachmentDeformCommand(slotId, attachmentName));
+    const cleared = doc.model.snapshot();
+    expect(() =>
+      doc.history.execute(
+        new SetDeformCurveCommand(
+          anim.id,
+          skinKey,
+          slotId,
+          attachmentName,
+          frames[0]!.id,
+          'stepped',
+        ),
+      ),
+    ).toThrow();
+    expect(doc.model.snapshot()).toEqual(cleared);
+    doc.history.undo();
+    expect(doc.model.snapshot()).toEqual(before);
   });
 });

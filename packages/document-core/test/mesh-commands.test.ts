@@ -4,6 +4,7 @@ import {
   AutoGridFillMeshCommand,
   AutoPerimeterTraceMeshCommand,
   DeleteMeshVertexCommand,
+  DocumentInvariantError,
   GenerateMeshFromRegionCommand,
   MeshTopologyLockedError,
   MoveMeshVertexCommand,
@@ -232,20 +233,57 @@ describe('topology-lock policy (TASK-2.1.8)', () => {
     expect(doc.history.canUndo).toBe(false); // and pushed no undo entry
   });
 
-  it('exempts MOVE and SetMeshEdges on a weighted mesh (no topology lock)', () => {
+  it('allows edge metadata but rejects flat moves on a weighted influence stream', () => {
     const { env } = makeTestEnv();
     const doc = loadDocument(weightedMeshDoc, env);
     const { slotId, name } = weightedMeshTarget(doc);
 
-    // MOVE and edge edits do not change vertex count/order, so the lock never fires (weighted bind-pose
-    // recompute on MOVE is WP-2.3; here we only assert the lock is not the gate).
     expect(() =>
       doc.history.execute(new SetMeshEdgesCommand(slotId, name, [0, 1, 1, 2])),
     ).not.toThrow();
-    expect(() =>
-      doc.history.execute(new MoveMeshVertexCommand(slotId, name, 0, 1, 1)),
-    ).not.toThrow();
+    const before = doc.model.snapshot();
+    const revision = doc.model.revision;
+    expect(() => doc.history.execute(new MoveMeshVertexCommand(slotId, name, 0, 1, 1))).toThrow(
+      MeshTopologyLockedError,
+    );
+    expect(doc.model.snapshot()).toEqual(before);
+    expect(doc.model.revision).toBe(revision);
+    doc.history.undo();
+    expect(doc.history.canUndo).toBe(false);
   });
+
+  it.each([-1, 0.5, 999, Number.NaN, Number.POSITIVE_INFINITY])(
+    'rejects invalid vertex index %s without changing state or history',
+    (index) => {
+      const doc = loadDocument(seeds.meshed, makeTestEnv().env);
+      const { slotId, name } = unweightedMeshTarget(doc);
+      const before = doc.model.snapshot();
+      expect(() =>
+        doc.history.execute(new MoveMeshVertexCommand(slotId, name, index, 1, 2)),
+      ).toThrow(DocumentInvariantError);
+      expect(doc.model.snapshot()).toEqual(before);
+      expect(doc.history.canUndo).toBe(false);
+    },
+  );
+
+  it.each([Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY])(
+    'rejects nonfinite coordinates %s before mutation',
+    (coordinate) => {
+      const doc = loadDocument(seeds.meshed, makeTestEnv().env);
+      const { slotId, name } = unweightedMeshTarget(doc);
+      const before = doc.model.snapshot();
+      for (const [x, y] of [
+        [coordinate, 0],
+        [0, coordinate],
+      ]) {
+        expect(() =>
+          doc.history.execute(new MoveMeshVertexCommand(slotId, name, 0, x!, y!)),
+        ).toThrow(DocumentInvariantError);
+      }
+      expect(doc.model.snapshot()).toEqual(before);
+      expect(doc.history.canUndo).toBe(false);
+    },
+  );
 
   it('is now LIVE end to end: UnbindMesh unlocks topology edits (TASK-2.1.8 round-trip)', () => {
     const { env } = makeTestEnv();

@@ -1,165 +1,304 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { basename } from 'node:path';
-import { validateDocument } from '@marionette/format';
-import type { AtlasPage } from '@marionette/format/types';
-import { BrowserWindow, dialog } from 'electron';
-import type { AtlasImportPage, FileOpenResponse, FileSaveResponse, IpcResult } from '../shared';
+import { constants } from 'node:fs';
+import { lstat, mkdir, open, readdir, realpath, unlink } from 'node:fs/promises';
+import { basename, join, resolve } from 'node:path';
+import { randomUUID } from 'node:crypto';
+import {
+  computeProjectContentHash,
+  decodeProjectAsset,
+  encodeProjectAsset,
+  isProjectDocument,
+  MAX_PROJECT_BYTES,
+  parseDocument,
+  parseProjectDocument,
+  type ProjectDocument,
+} from '@marionette/format';
+import { app, BrowserWindow, dialog } from 'electron';
+import type {
+  AtlasImportPage,
+  FileOpenResponse,
+  FileSaveOptions,
+  FileSaveResponse,
+  IpcResult,
+} from '../shared';
 import { confinePagePath, texturesDirFor } from './project-textures';
-
-// File IO lives in the main process only (the renderer is sandboxed, no Node). The renderer never
-// supplies a filesystem path: the path always comes from a main-process dialog (path-injection
-// defense). Documents are validated with @marionette/format at this boundary before any write or
-// after any read, so a malformed payload or a corrupt file fails loudly with a typed IPC error.
-// node:path keeps file names portable across macOS and Windows.
+import { atomicWriteFile } from './atomic-file';
+import { readBoundedFile } from './bounded-file';
+import { checkRecoveryStorage } from './recovery-storage';
 
 const FILE_FILTERS = [
-  { name: 'Armature 2D Skeleton', extensions: ['json'] },
+  { name: 'Armature 2D Project or Skeleton', extensions: ['json'] },
   { name: 'All Files', extensions: ['*'] },
 ];
-
-function handlerError(message: string): IpcResult<never> {
-  return { ok: false, error: { code: 'IPC_HANDLER_ERROR', message } };
+// Renderer session ids are opaque keys, never filesystem paths. Open and Save As are the only paths
+// that can add destinations to this table, and both get their paths from native dialogs.
+const destinations = new Map<string, string>();
+let saveQueue: Promise<unknown> = Promise.resolve();
+function queued<T>(operation: () => Promise<T>): Promise<T> {
+  const result = saveQueue.then(operation);
+  saveQueue = result.catch(() => undefined);
+  return result;
 }
 
-function validationMessage(prefix: string, codes: readonly string[]): string {
-  return `${prefix}: ${codes.join(', ')}`;
+function handlerError(error: unknown): IpcResult<never> {
+  return {
+    ok: false,
+    error: {
+      code: 'IPC_HANDLER_ERROR',
+      message: error instanceof Error ? error.message : String(error),
+    },
+  };
 }
 
-// Persist the atlas page PNGs into the project's sibling textures directory (PP-D5) so a later open can
-// restore the textures. Every destination is confined to the textures dir (confinePagePath), which is
-// derived from the main-controlled save path; an unsafe page name is skipped defensively. A write failure
-// surfaces (the JSON is already saved, but the caller reports the incomplete texture set) rather than
-// silently losing pixels.
-async function writeProjectPages(
-  projectPath: string,
+export function projectWithAssets(
+  document: unknown,
   pages: readonly AtlasImportPage[],
-): Promise<string | null> {
-  if (pages.length === 0) return null;
-  const texturesDir = texturesDirFor(projectPath);
-  try {
-    await mkdir(texturesDir, { recursive: true });
-  } catch {
-    return `could not create textures directory ${texturesDir}`;
-  }
+): ProjectDocument {
+  const project = parseProjectDocument(document);
+  const assets = new Map(project.assets.map((asset) => [`${asset.scope}:${asset.file}`, asset]));
   for (const page of pages) {
-    const dest = confinePagePath(texturesDir, page.file);
-    if (dest === null) continue;
-    try {
-      await writeFile(dest, page.data);
-    } catch {
-      return `could not write texture page ${page.file}`;
-    }
+    const asset = encodeProjectAsset(page.scope ?? 'skeleton', page.file, page.data);
+    assets.set(`${asset.scope}:${asset.file}`, asset);
   }
-  return null;
+  const draft = { ...project, assets: [...assets.values()] };
+  return parseProjectDocument(
+    { ...draft, hash: computeProjectContentHash(draft) },
+    { requireAssets: true },
+  );
 }
 
-// Read back the atlas page PNGs for an opening project from its sibling textures directory (PP-D5). Each
-// page listed in the document's atlas is confined to the textures dir; a missing or unreadable page is
-// skipped (a partial or absent set is fine, the viewport shows the placeholder for what is missing).
-async function readProjectPages(
-  projectPath: string,
-  atlasPages: readonly AtlasPage[],
-): Promise<AtlasImportPage[]> {
-  const texturesDir = texturesDirFor(projectPath);
-  const pages: AtlasImportPage[] = [];
-  for (const page of atlasPages) {
-    const src = confinePagePath(texturesDir, page.file);
-    if (src === null) continue;
-    try {
-      pages.push({ file: page.file, data: new Uint8Array(await readFile(src)) });
-    } catch {
-      // Missing or unreadable page: skip; the renderer keeps the placeholder for that page.
-    }
+async function writeProject(
+  path: string,
+  project: ProjectDocument,
+  beforeWrite?: (serializedBytes: number) => Promise<void>,
+): Promise<void> {
+  const serialized = `${JSON.stringify(project)}\n`;
+  const serializedBytes = Buffer.byteLength(serialized);
+  if (serializedBytes > MAX_PROJECT_BYTES) throw new Error('Project exceeds 512 MiB');
+  await beforeWrite?.(serializedBytes);
+  // Keep the last successful document as a recoverable sibling before committing the new one.
+  let previous: Uint8Array | undefined;
+  try {
+    previous = await readBoundedFile(path, MAX_PROJECT_BYTES);
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
   }
-  return pages;
+  if (previous !== undefined) await atomicWriteFile(`${path}.bak`, previous);
+  await atomicWriteFile(path, serialized);
 }
 
 export async function saveDocumentToFile(
   document: unknown,
   pages: readonly AtlasImportPage[],
+  options?: FileSaveOptions,
 ): Promise<IpcResult<FileSaveResponse>> {
-  // Deep-validate before touching disk (do not write an invalid document). verifyHash true: an
-  // exported document always carries the format's content hash, so a tampered payload is rejected.
-  const report = validateDocument(document, { verifyHash: true });
-  if (!report.ok || report.document === null) {
-    return handlerError(
-      validationMessage(
-        'document failed validation',
-        report.errors.map((e) => e.code),
-      ),
-    );
-  }
-
-  const saveOptions = {
-    title: 'Save Skeleton',
-    filters: FILE_FILTERS,
-    defaultPath: `${report.document.name}.json`,
+  const save = async (): Promise<IpcResult<FileSaveResponse>> => {
+    try {
+      const project = parseProjectDocument(document);
+      // Validate all required asset bytes BEFORE the user is told where the project will be saved.
+      const packed = projectWithAssets(project, pages);
+      let path = options?.saveAs ? undefined : options && destinations.get(options.documentId);
+      if (!path) {
+        const focused = BrowserWindow.getFocusedWindow();
+        const saveOptions = {
+          title: 'Save Project',
+          filters: FILE_FILTERS,
+          defaultPath: `${project.name}.armature.json`,
+        };
+        const result = focused
+          ? await dialog.showSaveDialog(focused, saveOptions)
+          : await dialog.showSaveDialog(saveOptions);
+        if (result.canceled || !result.filePath) return { ok: true, data: { status: 'canceled' } };
+        path = result.filePath;
+      }
+      await writeProject(path, packed);
+      if (options) destinations.set(options.documentId, path);
+      return { ok: true, data: { status: 'saved', path } };
+    } catch (error) {
+      return handlerError(error);
+    }
   };
-  // electron's showSaveDialog overloads accept either a parent window or none; a focused window may
-  // not exist, so dispatch to the matching overload rather than passing BrowserWindow | undefined.
-  const focused = BrowserWindow.getFocusedWindow();
-  const result = focused
-    ? await dialog.showSaveDialog(focused, saveOptions)
-    : await dialog.showSaveDialog(saveOptions);
-  if (result.canceled || result.filePath === undefined) {
-    return { ok: true, data: { status: 'canceled' } };
-  }
+  return queued(save);
+}
 
-  try {
-    await writeFile(result.filePath, `${JSON.stringify(report.document, null, 2)}\n`, 'utf8');
-  } catch {
-    return handlerError(`could not write file ${result.filePath}`);
+async function readLegacyPages(
+  path: string,
+  files: readonly string[],
+): Promise<{ pages: AtlasImportPage[]; warnings: string[] }> {
+  const pages: AtlasImportPage[] = [];
+  const warnings: string[] = [];
+  const root = texturesDirFor(path);
+  for (const name of files) {
+    try {
+      const filePath = confinePagePath(root, name);
+      if (!filePath) throw new Error('unsafe texture name');
+      const info = await lstat(root);
+      if (info.isSymbolicLink() || !info.isDirectory())
+        throw new Error('linked texture directory is not allowed');
+      const directory = await open(
+        root,
+        constants.O_RDONLY | constants.O_DIRECTORY | constants.O_NOFOLLOW,
+      );
+      try {
+        // Linux anchors the read to the opened directory. Other hosts verify the resolved parent.
+        const source =
+          process.platform === 'linux' ? `/proc/self/fd/${directory.fd}/${name}` : filePath;
+        if (process.platform !== 'linux' && (await realpath(root)) !== resolve(root))
+          throw new Error('linked texture directory is not allowed');
+        pages.push({ file: name, data: await readBoundedFile(source, MAX_PROJECT_BYTES) });
+      } finally {
+        await directory.close();
+      }
+    } catch (error) {
+      warnings.push(
+        `Texture ${name} could not be restored: ${error instanceof Error ? error.message : 'read failed'}`,
+      );
+    }
   }
+  return { pages, warnings };
+}
 
-  const pageError = await writeProjectPages(result.filePath, pages);
-  if (pageError !== null) {
-    return handlerError(`saved ${result.filePath} but ${pageError}`);
+export async function readProjectFile(
+  path: string,
+): Promise<Extract<FileOpenResponse, { status: 'opened' }>> {
+  const bytes = await readBoundedFile(path, MAX_PROJECT_BYTES);
+  const input: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+  if (isProjectDocument(input)) {
+    const project = parseProjectDocument(input, { requireAssets: true });
+    const pages = project.assets.map((asset) => ({
+      scope: asset.scope,
+      file: asset.file,
+      data: new Uint8Array(decodeProjectAsset(asset)),
+    }));
+    // Pixels cross IPC once as binary. Keep the renderer's document projection small; its own load
+    // path verifies the rehashed envelope with assets supplied separately to the texture stores.
+    const draft = { ...project, assets: [] };
+    return {
+      status: 'opened',
+      name: basename(path),
+      path,
+      document: { ...draft, hash: computeProjectContentHash(draft) },
+      pages,
+      warnings: [],
+    };
   }
-  return { ok: true, data: { status: 'saved', path: result.filePath } };
+  const document = parseDocument(input, { verifyHash: true });
+  const restored = await readLegacyPages(
+    path,
+    document.atlas.pages.map((page) => page.file),
+  );
+  return { status: 'opened', name: basename(path), path, document, ...restored };
 }
 
 export async function openDocumentFromFile(): Promise<IpcResult<FileOpenResponse>> {
-  const openOptions = {
-    title: 'Open Skeleton',
-    properties: ['openFile' as const],
-    filters: FILE_FILTERS,
-  };
-  const focused = BrowserWindow.getFocusedWindow();
-  const result = focused
-    ? await dialog.showOpenDialog(focused, openOptions)
-    : await dialog.showOpenDialog(openOptions);
-  const path = result.filePaths[0];
-  if (result.canceled || path === undefined) {
-    return { ok: true, data: { status: 'canceled' } };
-  }
-
-  let raw: string;
   try {
-    raw = await readFile(path, 'utf8');
-  } catch {
-    return handlerError(`could not read file ${path}`);
+    const focused = BrowserWindow.getFocusedWindow();
+    const options = {
+      title: 'Open Project',
+      properties: ['openFile' as const],
+      filters: FILE_FILTERS,
+    };
+    const result = focused
+      ? await dialog.showOpenDialog(focused, options)
+      : await dialog.showOpenDialog(options);
+    const path = result.filePaths[0];
+    if (result.canceled || !path) return { ok: true, data: { status: 'canceled' } };
+    const data = await readProjectFile(path);
+    const documentId = randomUUID();
+    // A legacy skeleton always gets a new project destination on its first Save.
+    if (isProjectDocument(data.document)) destinations.set(documentId, path);
+    return { ok: true, data: { ...data, documentId } };
+  } catch (error) {
+    return handlerError(error);
   }
+}
 
-  let parsed: unknown;
+const recoveryPath = (documentId: string): string =>
+  join(app.getPath('userData'), 'recovery', `${documentId}.armature.json`);
+
+export async function saveRecovery(
+  document: unknown,
+  pages: readonly AtlasImportPage[],
+  options: FileSaveOptions,
+): Promise<IpcResult<FileSaveResponse>> {
+  return queued(async () => {
+    try {
+      const path = recoveryPath(options.documentId);
+      const directory = join(app.getPath('userData'), 'recovery');
+      await mkdir(directory, { recursive: true });
+      await writeProject(path, projectWithAssets(document, pages), (bytes) =>
+        checkRecoveryStorage(directory, basename(path), bytes),
+      );
+      return { ok: true, data: { status: 'saved', path } };
+    } catch (error) {
+      return handlerError(error);
+    }
+  });
+}
+
+export async function discardRecovery(
+  documentId: string,
+): Promise<IpcResult<{ readonly status: 'discarded' }>> {
+  return queued(async () => {
+    try {
+      for (const path of [recoveryPath(documentId), `${recoveryPath(documentId)}.bak`]) {
+        await unlink(path).catch((error: unknown) => {
+          if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+        });
+      }
+      return { ok: true, data: { status: 'discarded' } };
+    } catch (error) {
+      return handlerError(error);
+    }
+  });
+}
+
+let startupRecoveryOffered = false;
+export async function openRecovery(startup = false): Promise<IpcResult<FileOpenResponse>> {
+  if (startup) {
+    if (startupRecoveryOffered) return { ok: true, data: { status: 'canceled' } };
+    startupRecoveryOffered = true;
+  }
   try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return handlerError(`file ${basename(path)} is not valid JSON`);
+    const directory = join(app.getPath('userData'), 'recovery');
+    await mkdir(directory, { recursive: true });
+    const files = await readdir(directory, { withFileTypes: true });
+    if (!files.some((file) => file.isFile() && /\.armature\.json(?:\.bak)?$/.test(file.name)))
+      return { ok: true, data: { status: 'canceled' } };
+    const focused = BrowserWindow.getFocusedWindow();
+    if (startup) {
+      const prompt = {
+        type: 'question' as const,
+        title: 'Recover Unsaved Work',
+        message: 'A recovery copy is available.',
+        detail:
+          'Choose a project to recover, or continue working and use File > Recover Unsaved Project later. Your recovery copies will be kept.',
+        buttons: ['Choose Recovery Copy', 'Later'],
+        defaultId: 0,
+        cancelId: 1,
+        noLink: true,
+      };
+      const choice = focused
+        ? await dialog.showMessageBox(focused, prompt)
+        : await dialog.showMessageBox(prompt);
+      if (choice.response !== 0) return { ok: true, data: { status: 'canceled' } };
+    }
+    const options = {
+      title: 'Recover Unsaved Project',
+      defaultPath: directory,
+      properties: ['openFile' as const],
+      filters: [
+        { name: 'Recovery Project or Backup', extensions: ['json', 'bak'] },
+        ...FILE_FILTERS,
+      ],
+    };
+    const result = focused
+      ? await dialog.showOpenDialog(focused, options)
+      : await dialog.showOpenDialog(options);
+    const path = result.filePaths[0];
+    if (result.canceled || !path) return { ok: true, data: { status: 'canceled' } };
+    // Recovered content gets a fresh id and a Save As destination, protecting the recovery copy.
+    return { ok: true, data: { ...(await readProjectFile(path)), documentId: randomUUID() } };
+  } catch (error) {
+    return handlerError(error);
   }
-
-  const report = validateDocument(parsed, { verifyHash: true });
-  if (!report.ok || report.document === null) {
-    return handlerError(
-      validationMessage(
-        'document failed validation',
-        report.errors.map((e) => e.code),
-      ),
-    );
-  }
-
-  const pages = await readProjectPages(path, report.document.atlas.pages);
-  return {
-    ok: true,
-    data: { status: 'opened', name: basename(path), document: report.document, pages },
-  };
 }

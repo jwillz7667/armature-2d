@@ -1,5 +1,9 @@
 import type { Command, CommandContext } from '../command/command';
-import { CommandNotAppliedError } from '../command/errors';
+import {
+  CommandNotAppliedError,
+  DocumentInvariantError,
+  MeshTopologyLockedError,
+} from '../command/errors';
 import { meshGeometryOf, type MeshGeometry } from '../model/doc-state';
 import type { SlotId } from '../model/ids';
 import { findAttachmentSnapshot, type CommandSpec } from './spec';
@@ -9,9 +13,8 @@ import { requireMesh } from './mesh-support';
 // runs inside an interaction group (beginInteraction/endInteraction); each pointer-move is one command,
 // and consecutive moves of the SAME (slot, attachment, vertexIndex) coalesce into one undo step keeping
 // the gesture-start geometry as the single before memento. MOVE never re-triangulates: triangle indices
-// stay stable, only the vertex position changes, so it is exempt from the topology lock and allowed on
-// any mesh. For an UNWEIGHTED mesh it sets the flat vertices[2i], vertices[2i+1]; weighted bind-pose
-// recompute is WP-2.3 (out of scope; WP-2.1 authors only unweighted meshes).
+// stay stable, only the unweighted vertex position changes. Weighted geometry uses an influence stream,
+// so changing it through flat position indices is rejected at the shared command boundary.
 export class MoveMeshVertexCommand implements Command {
   readonly kind = 'mesh.moveVertex';
   readonly label = 'Move Mesh Vertex';
@@ -28,6 +31,20 @@ export class MoveMeshVertexCommand implements Command {
 
   do(ctx: CommandContext): void {
     const mesh = requireMesh(ctx, this.kind, this.slotId, this.name);
+    if (mesh.bones !== undefined) {
+      throw new MeshTopologyLockedError(this.slotId, this.name, 'weighted');
+    }
+    if (
+      !Number.isInteger(this.vertexIndex) ||
+      this.vertexIndex < 0 ||
+      this.vertexIndex >= mesh.vertices.length / 2 ||
+      !Number.isFinite(this.x) ||
+      !Number.isFinite(this.y)
+    ) {
+      throw new DocumentInvariantError(
+        'mesh vertex index must exist and coordinates must be finite',
+      );
+    }
     if (this.before === undefined || this.after === undefined) {
       this.before = meshGeometryOf(mesh);
       const vertices = this.before.vertices.slice();
@@ -74,8 +91,10 @@ export const moveMeshVertexSpec: CommandSpec = {
   representativeSeedId: 'meshed',
   fixture: (model) => {
     for (const slot of model.slots()) {
-      const att = model.attachments(slot.id).find((a) => a.kind === 'mesh');
-      if (att && att.kind === 'mesh' && att.vertices.length >= 2) {
+      const att = model
+        .attachments(slot.id)
+        .find((a) => a.kind === 'mesh' && a.bones === undefined);
+      if (att && att.kind === 'mesh' && att.bones === undefined && att.vertices.length >= 2) {
         return { command: new MoveMeshVertexCommand(slot.id, att.name, 0, 5, 7) };
       }
     }

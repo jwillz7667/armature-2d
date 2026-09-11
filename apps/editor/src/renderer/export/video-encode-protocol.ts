@@ -15,6 +15,7 @@ export interface VideoEncodeRequest {
   readonly pages: readonly AtlasImportPage[];
   readonly container: ExportVideoContainer;
   readonly animation: string | null;
+  readonly activeSkin?: string;
   readonly fps: number;
   readonly width: number;
   readonly height: number;
