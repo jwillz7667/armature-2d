@@ -18,7 +18,7 @@ presentation boundaries. Work proceeds in verified subsystem changes.
 | F19 | Slot controls, bindings, feature graph, and composed scenario preview | Implemented; command/workflow/timing tests pass; desktop acceptance pending |
 | F16 | Explicit import profiles, sibling atlas transaction, loss reports, worker budgets | Implemented safeguards and JSON asset workflow; real-export binary profile/corpus and desktop fidelity acceptance pending |
 | F29 | Deform crossfades, additive layers, masks, linked-skin resolution | Implemented in TS state playback; native AnimationState API not present |
-| F14 | Native pixels | Pending |
+| F14 | Native pixels | Clipping implemented in C#/Godot and native conformance passes; Unity tint/alpha upload implemented; GPU acceptance and Godot color/blend parity pending |
 | F24 | Exact-commit format/release gates, required jobs, complete native triggers | Implemented; regression and packaged MCP checks pass |
 | F28 | Built MCP startup and worker acceptance | Executable smoke tests implemented; installed Electron and native GPU acceptance pending |
 | F22 | Supported dependencies and advisory gates | Updated; verification recorded in dependency maintenance notes |
@@ -160,3 +160,21 @@ Local September 11 checks used the available Node 24.19.0 runtime. The downloade
 24.20.0 binary could not run in this container. CI now regenerates every fixture
 on the pinned toolchain and rejects byte drift as a required job; local tolerance
 tests are not substituted for that gate. Full build/type checks pass (22 tasks).
+
+## Native rendering checkpoint and export cancellation (September 11)
+
+- PR #42 implements native clipping with atlas UV interpolation and current draw-order end
+  boundaries. Godot tests include concave intersections, fully clipped output, and reused buffers.
+  Both CI and native conformance pass for commit b66c2c3e0e897e9be9b934a92027185abc383bd9.
+- Unity forwards dark tint and explicit atlas alpha policy, configures separate RGB/alpha blend
+  factors, recalculates mesh bounds, supports larger index buffers, and releases owned resources.
+  The Unity-specific uploader/shader is not compiled by the headless C# suite. Engine pixel
+  verification remains required. Godot dark tint/PMA/screen parity is still pending.
+- Media cancellation drains active writes and awaits worker termination before cleanup. Cancellation
+  after a native dialog returns is checked before starting work. Single-file cancellation remains
+  effective through staging; once atomic commit begins, cancellation correctly reports false.
+- Project reads allocate only the checked size and reject growth/truncation, closing the gap between
+  checking file size and an unbounded `readFile()` call. Existing project assets still round-trip.
+- Focused regression: 22 tests pass across worker lifecycle, native-dialog cancellation, file commit,
+  bounded reads, portable project assets, and media encoding. These are automated host-seam checks;
+  actual installed Electron dialog and GPU acceptance are not claimed.

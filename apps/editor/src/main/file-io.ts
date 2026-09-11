@@ -22,6 +22,7 @@ import type {
 } from '../shared';
 import { confinePagePath, texturesDirFor } from './project-textures';
 import { atomicWriteFile } from './atomic-file';
+import { readBoundedFile } from './bounded-file';
 
 const FILE_FILTERS = [
   { name: 'Armature 2D Project or Skeleton', extensions: ['json'] },
@@ -47,18 +48,6 @@ function handlerError(error: unknown): IpcResult<never> {
   };
 }
 
-async function readBoundedFile(path: string): Promise<Uint8Array<ArrayBuffer>> {
-  const file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW);
-  try {
-    const stat = await file.stat();
-    if (!stat.isFile() || stat.size > MAX_PROJECT_BYTES)
-      throw new Error('Project file is not a regular file or exceeds 512 MiB');
-    return new Uint8Array(await file.readFile());
-  } finally {
-    await file.close();
-  }
-}
-
 export function projectWithAssets(
   document: unknown,
   pages: readonly AtlasImportPage[],
@@ -82,7 +71,7 @@ async function writeProject(path: string, project: ProjectDocument): Promise<voi
   // Keep the last successful document as a recoverable sibling before committing the new one.
   let previous: Uint8Array | undefined;
   try {
-    previous = await readBoundedFile(path);
+    previous = await readBoundedFile(path, MAX_PROJECT_BYTES);
   } catch (error) {
     if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
   }
@@ -148,7 +137,7 @@ async function readLegacyPages(
           process.platform === 'linux' ? `/proc/self/fd/${directory.fd}/${name}` : filePath;
         if (process.platform !== 'linux' && (await realpath(root)) !== resolve(root))
           throw new Error('linked texture directory is not allowed');
-        pages.push({ file: name, data: await readBoundedFile(source) });
+        pages.push({ file: name, data: await readBoundedFile(source, MAX_PROJECT_BYTES) });
       } finally {
         await directory.close();
       }
@@ -164,7 +153,7 @@ async function readLegacyPages(
 export async function readProjectFile(
   path: string,
 ): Promise<Extract<FileOpenResponse, { status: 'opened' }>> {
-  const bytes = await readBoundedFile(path);
+  const bytes = await readBoundedFile(path, MAX_PROJECT_BYTES);
   const input: unknown = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
   if (isProjectDocument(input)) {
     const project = parseProjectDocument(input, { requireAssets: true });
