@@ -1,6 +1,14 @@
 import type { Ticker } from 'pixi.js';
-import { EffectSystem, type EffectAnchor } from '@marionette/runtime-core';
+import type { EffectSystem } from '@marionette/runtime-core';
+import {
+  createEffectPreviewSimulation,
+  DEFAULT_EFFECT_PREVIEW_SEED,
+  type EffectPreviewSimulation,
+  type EffectPreviewMotion,
+  type EffectPreviewTarget,
+} from './preview-simulation';
 import { ParticleLayerView } from '@marionette/runtime-web';
+import { effectsTextureStore } from '../../editor-state/atlas-texture-store';
 import { documentHost, exportEffects } from '../../document';
 import { createPreviewStage, type PreviewStage } from '../preview/preview-stage';
 import { fitBounds } from '../preview/preview-fit';
@@ -37,12 +45,10 @@ import {
 const PREVIEW_WORLD_HALF = 260;
 const FIT_PADDING = 16;
 // A fixed deterministic trigger seed: a deterministic effect replays identically, an ambient one ignores it.
-const PREVIEW_SEED = 0x9e37_79b1;
 // Clamp a stalled frame so a long GC pause cannot explode the particle sim in one step.
 const MAX_FRAME_DT = 1 / 20;
 // Throttle stats pushes to the panel so a per-frame count change does not thrash React.
 const STATS_INTERVAL_MS = 250;
-const ORIGIN_ANCHOR: EffectAnchor = { space: 'world', x: 0, y: 0, rotation: 0 };
 
 export interface EffectPreviewStats {
   readonly liveInstances: number;
@@ -61,6 +67,9 @@ export interface EffectPreviewCallbacks {
 export interface EffectPreviewHandle {
   // Set which effect (by name) the preview plays; null clears it. Rebuilds the system on a real change.
   setEffectName: (name: string | null) => void;
+  setBundleName: (name: string | null) => void;
+  setSeed: (seed: number) => void;
+  setMotion: (motion: EffectPreviewMotion) => void;
   // Re-export the effects library and rebuild if its content changed (called on document revision changes).
   resyncFromDocument: () => void;
   play: () => void;
@@ -81,9 +90,29 @@ export function mountEffectPreview(
 
   let transport = makePreviewTransport();
   let effectName: string | null = null;
+  let bundleName: string | null = null;
+  let seed = DEFAULT_EFFECT_PREVIEW_SEED;
+  let motion: EffectPreviewMotion = 'still';
+  let simulation: EffectPreviewSimulation | null = null;
+  let loopable = false;
+  const target = (): EffectPreviewTarget | null =>
+    bundleName !== null
+      ? { kind: 'bundle', name: bundleName }
+      : effectName !== null
+        ? { kind: 'effect', name: effectName }
+        : null;
+  const targetKey = () =>
+    bundleName !== null
+      ? `bundle:${bundleName}`
+      : effectName !== null
+        ? `effect:${effectName}`
+        : null;
 
   let system: EffectSystem | null = null;
   let particleView: ParticleLayerView | null = null;
+  const detachTextures = effectsTextureStore.subscribe(() =>
+    particleView?.setTextureResolver(effectsTextureStore.getResolver()),
+  );
   // The content hash of the effects library the current system was built from; skips a rebuild when an
   // unrelated (skeleton) edit bumps the document revision but the effects library is byte-identical.
   let builtHash: string | null = null;
@@ -102,7 +131,8 @@ export function mountEffectPreview(
     if (stage === null) return;
     teardownSystem();
 
-    if (effectName === null) {
+    const selection = target();
+    if (selection === null) {
       builtHash = null;
       builtName = null;
       callbacks.onNotice(null);
@@ -121,23 +151,25 @@ export function mountEffectPreview(
       return;
     }
 
-    if (doc.effects[effectName] === undefined) {
-      builtHash = null;
-      builtName = null;
-      callbacks.onNotice('Select an effect to preview.');
+    try {
+      simulation = createEffectPreviewSimulation(doc, selection, seed, motion);
+    } catch (error) {
+      callbacks.onNotice(error instanceof Error ? error.message : 'Preview unavailable');
       return;
     }
-
-    const built = new EffectSystem(doc);
-    const view = new ParticleLayerView(null);
+    const built = simulation.system;
+    const view = new ParticleLayerView(effectsTextureStore.getResolver());
     stage.content.addChild(view.root);
     view.setViewport(PREVIEW_WORLD_HALF * 2, PREVIEW_WORLD_HALF * 2);
-    built.trigger({ effect: effectName, anchor: ORIGIN_ANCHOR, seed: PREVIEW_SEED, startTime: 0 });
+    loopable =
+      selection.kind === 'effect'
+        ? (doc.effects[selection.name]?.layers.length ?? 0) > 0
+        : (doc.bundles[selection.name]?.items.length ?? 0) > 0;
 
     system = built;
     particleView = view;
     builtHash = doc.hash;
-    builtName = effectName;
+    builtName = targetKey();
     transport = restartPreview(transport);
     callbacks.onNotice(null);
     notifyTransport();
@@ -150,13 +182,11 @@ export function mountEffectPreview(
       particleView = null;
     }
     system = null;
+    simulation = null;
   };
 
-  // Re-trigger the current effect without re-exporting: used to loop a finished one-shot and on restart.
-  const retrigger = (): void => {
-    if (system === null || effectName === null) return;
-    system.trigger({ effect: effectName, anchor: ORIGIN_ANCHOR, seed: PREVIEW_SEED, startTime: 0 });
-  };
+  // Rebuild from rest on repeat/restart so previous particles and random-stream positions are discarded.
+  const retrigger = (): void => rebuild();
 
   const tick = (ticker: Ticker): void => {
     if (stage === null || stage.isHidden()) return;
@@ -184,10 +214,10 @@ export function mountEffectPreview(
 
     if (system !== null && particleView !== null && transport.isPlaying) {
       const dt = Math.min(MAX_FRAME_DT, ticker.deltaMS / 1000);
-      system.step(dt);
+      simulation?.step(dt);
       particleView.update(system.readState());
       // Loop a finished one-shot so the preview keeps showing motion instead of freezing on an empty frame.
-      if (system.liveInstanceCount() === 0) retrigger();
+      const repeat = loopable && system.liveInstanceCount() === 0;
       transport = advancePreview(transport, ticker.deltaMS);
 
       statsAccumMs += ticker.deltaMS;
@@ -198,6 +228,7 @@ export function mountEffectPreview(
           liveParticles: system.liveParticleTotal(),
         });
       }
+      if (repeat) retrigger();
     }
   };
 
@@ -210,12 +241,33 @@ export function mountEffectPreview(
     stage = created;
     rebuild();
     stage.app.ticker.add(tick);
-  })();
+  })().catch((error: unknown) =>
+    callbacks.onNotice(error instanceof Error ? error.message : 'Preview initialization failed'),
+  );
 
   return {
     setEffectName(name: string | null): void {
-      if (name === effectName) return;
+      if (name === effectName && bundleName === null) return;
       effectName = name;
+      bundleName = null;
+      rebuild();
+    },
+    setBundleName(name: string | null): void {
+      if (name === bundleName && effectName === null) return;
+      bundleName = name;
+      effectName = null;
+      rebuild();
+    },
+    setSeed(value: number): void {
+      if (value === seed) return;
+      if (!Number.isInteger(value) || value < 0 || value > 0xffffffff)
+        throw new Error('Seed must be an unsigned 32-bit integer.');
+      seed = value;
+      rebuild();
+    },
+    setMotion(value: EffectPreviewMotion): void {
+      if (value === motion) return;
+      motion = value;
       rebuild();
     },
     resyncFromDocument(): void {
@@ -231,7 +283,7 @@ export function mountEffectPreview(
         rebuild();
         return;
       }
-      if (doc.hash === builtHash && effectName === builtName) return;
+      if (doc.hash === builtHash && targetKey() === builtName) return;
       rebuild();
     },
     play(): void {
@@ -261,6 +313,7 @@ export function mountEffectPreview(
     },
     destroy(): void {
       disposed = true;
+      detachTextures();
       teardownSystem();
       if (stage !== null) {
         stage.app.ticker.remove(tick);

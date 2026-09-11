@@ -15,7 +15,18 @@ export class CompositeCommand implements Command {
   ) {}
 
   do(ctx: CommandContext): void {
-    for (const child of this.children) child.do(ctx);
+    let applied = 0;
+    try {
+      for (const child of this.children) {
+        child.do(ctx);
+        applied += 1;
+      }
+    } catch (error) {
+      // Individual commands validate before mutation. Restore every completed child if a later
+      // validation fails, so a failed compound action never leaves an untracked partial document.
+      for (let i = applied - 1; i >= 0; --i) this.children[i]!.undo(ctx);
+      throw error;
+    }
   }
 
   undo(ctx: CommandContext): void {

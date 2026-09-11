@@ -9,6 +9,7 @@ import {
   buildPose,
   makeAnimationState,
   sampleMeshVertices,
+  crossfadeTo,
   setAnimation,
   skinMeshInto,
   updateAnimationState,
@@ -19,8 +20,7 @@ import { bone, makeDocument } from './rig';
 // SkeletonView.syncState (ADR-0005 runtime-web mirror): solve a multi-track AnimationState through the
 // same render-from-pose path the single-animation player uses. These tests prove (1) a single-track state
 // renders IDENTICALLY to syncAnimated (the blended step 2 at one full-weight track is the sampler), (2) a
-// second track actually reaches the rendered pose, and (3) the documented v1 mesh-DEFORM scoping: deform
-// is taken from the track-0 current entry only, so an empty track 0 renders meshes as pure skin.
+// second track reaches the rendered pose, and (3) mesh deformation reaches sparse tracks and crossfades.
 
 function repoRoot(): string {
   let dir = dirname(fileURLToPath(import.meta.url));
@@ -124,12 +124,11 @@ describe('SkeletonView.syncState (ADR-0005)', () => {
     expect(armLayered.rotation).not.toBeCloseTo(armBase.rotation, 3);
   });
 
-  it('scopes mesh deform to track 0: an empty track 0 renders meshes as pure skin (v1 scope)', () => {
+  it('renders deformation from a higher track with an empty base track', () => {
     const document = loadLimbRig();
     const t = 0.35;
 
-    // Put the deforming 'wave' on track 1 only; track 0 is empty, so per the documented v1 scope the mesh
-    // renders as the PURE SKIN of the state-solved pose (no deform), never track 1's deform.
+    // A sparse track must still contribute deformation on top of its solved bone pose.
     const view = new SkeletonView();
     const state = makeAnimationState(document);
     setAnimation(state, 1, 'wave', false);
@@ -144,12 +143,32 @@ describe('SkeletonView.syncState (ADR-0005)', () => {
     const boneIndex = pose.slotBoneIndices[slotIndex]!;
     const pureSkin = new Float32Array(rendered.vertexCount * 2);
     skinMeshInto(meshAttachmentOf(document), pose, boneIndex, pureSkin);
-    expect(rendered.vertices).toEqual(Array.from(pureSkin));
+    expect(rendered.vertices).not.toEqual(Array.from(pureSkin));
 
-    // And prove the scope EXCLUDED deform: sampling wave's deform on top would differ.
+    // The same full-weight clip must match the independent single-clip sampler.
     const withDeform = new Float32Array(rendered.vertexCount * 2);
     sampleMeshVertices(document, 'wave', t, pose, 'default', 'limb', 'limb', withDeform);
-    expect(Array.from(withDeform)).not.toEqual(rendered.vertices);
+    expect(Array.from(withDeform)).toEqual(rendered.vertices);
+  });
+
+  it('preserves outgoing deformation at the start of a crossfade to an empty clip', () => {
+    const original = loadLimbRig();
+    const document = {
+      ...original,
+      animations: {
+        ...original.animations,
+        empty: { duration: 1, bones: {}, slots: {}, ik: {}, transform: {}, deform: {} },
+      },
+    };
+    const state = makeAnimationState(document);
+    setAnimation(state, 0, 'wave', false);
+    updateAnimationState(state, 0.35);
+    const view = new SkeletonView();
+    view.syncState(document, state);
+    const before = view.describe().meshes;
+    crossfadeTo(state, 0, 'empty', false, 1);
+    view.syncState(document, state);
+    expect(view.describe().meshes).toEqual(before);
   });
 
   it('forwards the active skin so a skin-scoped constraint toggles under multi-track playback', () => {

@@ -136,6 +136,13 @@ export function decodeSkel(bytes: Uint8Array): unknown {
   const events = readEvents(reader, ctx);
   const animations = readAnimations(reader, ctx);
 
+  if (!reader.atEnd)
+    throw new SpineBinaryError(
+      'SPINE_BINARY_INVALID',
+      '',
+      'unexpected trailing bytes after the documented binary layout',
+      { offset: reader.position },
+    );
   return { skeleton, bones, slots, ik, transform, path, skins, events, animations };
 }
 
@@ -839,27 +846,22 @@ function readTransformTimelines(reader: SkelReader, ctx: DecodeContext, base: st
   return out;
 }
 
-// Path constraint animations: the binary keeps a SEPARATE position, spacing, and mix timeline per
-// constraint; the name-based intermediate keeps ONE flat frame list per constraint (each frame carrying
-// whichever channels are keyed at that time). The three timelines are merged by time and re-sorted, so a
-// JSON author's single per-constraint frame list and the binary's split timelines converge. When two
-// sub-timelines share a time, the later one's curve wins (a rare, documented lossy edge).
+// Preserve independent source channels until the shared converter can check curve compatibility.
 function readPathTimelines(reader: SkelReader, ctx: DecodeContext, base: string): JsonRecord {
   const count = reader.count(base, 'path timeline entry count');
   const out: JsonRecord = {};
   for (let i = 0; i < count; i += 1) {
     const index = reader.count(base, 'path constraint index');
     const name = ctx.pathNames[index];
-    if (name === undefined) {
+    if (name === undefined)
       throw new SpineBinaryError(
         'SPINE_BINARY_INVALID',
         base,
         `path timeline index ${index} is out of range`,
         { index },
       );
-    }
     const timelineCount = reader.count(base, 'path timeline count');
-    const byTime = new Map<number, JsonRecord>();
+    const timelines: JsonRecord = {};
     for (let t = 0; t < timelineCount; t += 1) {
       const type = enumName(
         PATH_TIMELINE_TYPES,
@@ -867,25 +869,19 @@ function readPathTimelines(reader: SkelReader, ctx: DecodeContext, base: string)
         base,
         'path timeline type',
       );
+      if (timelines[type] !== undefined)
+        throw new SpineBinaryError('SPINE_BINARY_INVALID', base, 'duplicate path timeline type');
       const frameCount = reader.count(base, 'frame count');
-      for (let f = 0; f < frameCount; f += 1) {
-        const frameBase = `${base}/${name}/${type}/${f}`;
-        const time = reader.float(frameBase, 'time');
-        const frame = byTime.get(time) ?? { time };
-        // The position and spacing timelines carry one value; the mix timeline carries rotate AND
-        // translate mix (two floats), matching our format's independent path mix channels.
-        if (type === 'position') frame['position'] = reader.float(frameBase, 'position');
-        else if (type === 'spacing') frame['spacing'] = reader.float(frameBase, 'spacing');
-        else {
-          frame['rotateMix'] = reader.float(frameBase, 'rotate mix');
-          frame['translateMix'] = reader.float(frameBase, 'translate mix');
-        }
-        const curve = f < frameCount - 1 ? readCurve(reader, frameBase) : {};
-        Object.assign(frame, curve);
-        byTime.set(time, frame);
-      }
+      timelines[type] = readCurvedFrames(reader, `${base}/${name}/${type}`, frameCount, (path) =>
+        type === 'mix'
+          ? {
+              rotateMix: reader.float(path, 'rotate mix'),
+              translateMix: reader.float(path, 'translate mix'),
+            }
+          : { [type]: reader.float(path, type) },
+      );
     }
-    out[name] = [...byTime.values()].sort((a, b) => (a['time'] as number) - (b['time'] as number));
+    out[name] = timelines;
   }
   return out;
 }
@@ -958,13 +954,15 @@ function readDrawOrderTimeline(reader: SkelReader, ctx: DecodeContext, base: str
   const frameCount = reader.count(base, 'draw order frame count');
   const placeholder: unknown[] = [];
   for (let f = 0; f < frameCount; f += 1) {
-    reader.float(base, 'time');
+    const time = reader.float(base, 'time');
+    const offsets: Array<{ slot: string; offset: number }> = [];
     const changeCount = reader.count(base, 'draw order change count');
     for (let c = 0; c < changeCount; c += 1) {
-      slotName(ctx, reader.count(base, 'draw order slot index'), base);
-      reader.count(base, 'draw order amount');
+      const slot = slotName(ctx, reader.count(base, 'draw order slot index'), base);
+      const offset = reader.varint(base, true, 'draw order amount') | 0;
+      offsets.push({ slot, offset });
     }
-    placeholder.push({});
+    placeholder.push({ time, offsets });
   }
   return placeholder;
 }

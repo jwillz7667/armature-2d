@@ -1,4 +1,5 @@
 import { unzipSync } from 'fflate';
+import { inspectPng } from '@marionette/format';
 import { decodePng } from './atlas';
 import {
   joinLayerName,
@@ -19,8 +20,27 @@ import {
 export function parseOra(bytes: Uint8Array, name: string): LayeredDocument {
   let files: Record<string, Uint8Array>;
   try {
-    files = unzipSync(bytes);
+    let expanded = 0;
+    let entries = 0;
+    files = unzipSync(bytes, {
+      filter: (file) => {
+        expanded += file.originalSize;
+        entries += 1;
+        if (
+          entries > 4096 ||
+          expanded > 256 * 1024 * 1024 ||
+          file.originalSize > 64 * 1024 * 1024
+        ) {
+          throw new LayeredParseError(
+            'ORA_RESOURCE_LIMIT',
+            'ORA archive exceeds 4096 entries, 64 MiB per entry, or 256 MiB expanded',
+          );
+        }
+        return file.name === 'stack.xml' || file.name.toLowerCase().endsWith('.png');
+      },
+    });
   } catch (cause) {
+    if (cause instanceof LayeredParseError) throw cause;
     throw new LayeredParseError('ORA_NOT_A_ZIP', 'the ORA file is not a readable zip archive', {
       cause,
     });
@@ -31,6 +51,8 @@ export function parseOra(bytes: Uint8Array, name: string): LayeredDocument {
     throw new LayeredParseError('ORA_NO_STACK', 'the ORA archive has no stack.xml');
   }
 
+  if (stackBytes.byteLength > 4 * 1024 * 1024)
+    throw new LayeredParseError('ORA_RESOURCE_LIMIT', 'stack.xml exceeds 4 MiB');
   const root = parseXml(new TextDecoder().decode(stackBytes));
   if (root === null || root.tag !== 'image') {
     throw new LayeredParseError('ORA_BAD_STACK', 'stack.xml has no <image> root element');
@@ -42,7 +64,7 @@ export function parseOra(bytes: Uint8Array, name: string): LayeredDocument {
   const diagnostics: LayeredDiagnostic[] = [];
   const layers: RasterLayer[] = [];
   if (stack !== undefined) {
-    collect(stack, '', files, layers, diagnostics);
+    collect(stack, '', files, layers, diagnostics, { pixels: 0, layers: 0 });
   }
 
   if (layers.length === 0) {
@@ -64,14 +86,15 @@ function collect(
   files: Record<string, Uint8Array>,
   out: RasterLayer[],
   diagnostics: LayeredDiagnostic[],
+  budget: { pixels: number; layers: number },
 ): void {
   for (const child of stack.children) {
     if (child.tag === 'stack') {
-      collect(child, joinLayerName(prefix, child.attrs['name']), files, out, diagnostics);
+      collect(child, joinLayerName(prefix, child.attrs['name']), files, out, diagnostics, budget);
       continue;
     }
     if (child.tag !== 'layer') continue;
-    const layer = toRasterLayer(child, prefix, files, diagnostics);
+    const layer = toRasterLayer(child, prefix, files, diagnostics, budget);
     if (layer !== null) out.push(layer);
   }
 }
@@ -81,6 +104,7 @@ function toRasterLayer(
   prefix: string,
   files: Record<string, Uint8Array>,
   diagnostics: LayeredDiagnostic[],
+  budget: { pixels: number; layers: number },
 ): RasterLayer | null {
   const src = element.attrs['src'];
   const name = joinLayerName(
@@ -95,6 +119,25 @@ function toRasterLayer(
       why: `layer src "${src ?? '(none)'}" is not present in the archive; skipped`,
     });
     return null;
+  }
+  let size: { width: number; height: number };
+  try {
+    size = inspectPng(bytes);
+  } catch {
+    diagnostics.push({
+      feature: 'ora-missing-src',
+      layer: name,
+      why: 'Layer PNG is invalid or exceeds image limits; skipped',
+    });
+    return null;
+  }
+  budget.pixels += size.width * size.height;
+  budget.layers += 1;
+  if (budget.pixels > 64 * 1024 * 1024 || budget.layers > 4096) {
+    throw new LayeredParseError(
+      'ORA_RESOURCE_LIMIT',
+      'ORA exceeds 4096 layers or 64 million decoded pixels',
+    );
   }
   let decoded: { width: number; height: number; rgba: Uint8Array };
   try {
@@ -163,7 +206,10 @@ function parseXml(text: string): XmlElement | null {
     i = at < 0 ? text.length : at + marker.length;
   };
 
+  let nodes = 0;
   while (i < text.length) {
+    if (++nodes > 16384 || stack.length > 128)
+      throw new LayeredParseError('ORA_RESOURCE_LIMIT', 'ORA XML exceeds node or nesting limits');
     const lt = text.indexOf('<', i);
     if (lt < 0) break;
     i = lt + 1;

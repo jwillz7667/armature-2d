@@ -20,6 +20,16 @@ const DT = 1 / 60;
 const WORLD: EffectAnchor = { space: 'world', x: 100, y: 50, rotation: 0 };
 
 describe('EffectSystem: trigger + anchor', () => {
+  it('does not render a scheduled sprite before its start time', () => {
+    const doc = effectsDocument({ fx: effectConfig({ layers: [spriteAnimatorLayer()] }) });
+    const system = new EffectSystem(doc);
+    system.trigger({ effect: 'fx', anchor: WORLD, seed: 1, startTime: 2 });
+    expect(system.readState().instances).toHaveLength(0);
+    system.step(1.9);
+    expect(system.readState().instances).toHaveLength(0);
+    system.step(0.1);
+    expect(system.readState().instances[0]!.sprites).toHaveLength(1);
+  });
   it('trigger spawns an instance at the anchor and step advances it', () => {
     const doc = effectsDocument({
       fx: effectConfig({

@@ -1,4 +1,9 @@
 import {
+  SetWinSequencerCommand,
+  SetFeatureFlowGraphCommand,
+  SetSceneRefsCommand,
+} from '@marionette/document-core';
+import {
   AddBoneToMeshBindingCommand,
   AddMeshVertexCommand,
   AddPathCurveCommand,
@@ -101,6 +106,7 @@ import {
   SetBoneTransformModeCommand,
   SetCurveCommand,
   SetDeformKeyframeCommand,
+  SetDeformCurveCommand,
   SetIkBendPositiveCommand,
   SetIkDepthParamsCommand,
   SetIkKeyframeCommand,
@@ -129,6 +135,8 @@ import {
   RemoveLayerCommand,
   ReorderLayersCommand,
   SetLayerFieldCommand,
+  SetEmitterTrailCommand,
+  CompositeCommand,
   SetLayerBlendModeCommand,
   AddLifeStopCommand,
   RemoveLifeStopCommand,
@@ -253,14 +261,7 @@ import {
   type AtlasFileStore,
   type PackConfig,
 } from '@marionette/atlas-pack';
-import {
-  MAT2X3_STRIDE,
-  buildPose,
-  computeWorldTransforms,
-  resetToSetupPose,
-  EffectNotFoundError,
-  BundleNotFoundError,
-} from '@marionette/runtime-core';
+import { MAT2X3_STRIDE, EffectNotFoundError, BundleNotFoundError } from '@marionette/runtime-core';
 import {
   RenderPreviewError,
   renderFrame,
@@ -272,6 +273,7 @@ import {
 import { PNG } from 'pngjs';
 import { z } from 'zod';
 import { McpToolError } from './errors';
+import { sampleQueryPose, sampleQueryMesh } from './solved-query';
 import type { FileStore } from './files';
 import type { Session, SessionRegistry } from './session';
 
@@ -938,6 +940,9 @@ function animationView(animation: AnimationEntity): Record<string, unknown> {
         time: kf.time,
         mix: kf.mix,
         bendPositive: kf.bendPositive,
+        softness: kf.softness,
+        stretch: kf.stretch,
+        compress: kf.compress,
         curve: kf.curve,
       })),
     })),
@@ -988,6 +993,21 @@ function animationView(animation: AnimationEntity): Record<string, unknown> {
         curve: kf.curve,
       })),
     })),
+    deform: [...animation.deform.entries()].flatMap(([skin, slots]) =>
+      [...slots.entries()].flatMap(([slotId, attachments]) =>
+        [...attachments.entries()].map(([name, frames]) => ({
+          skin,
+          slotId,
+          name,
+          keyframes: frames.map((key) => ({
+            id: key.id,
+            time: key.time,
+            offsets: [...key.offsets],
+            curve: key.curve,
+          })),
+        })),
+      ),
+    ),
     events: animation.events.map((key) => ({
       id: key.id,
       time: key.time,
@@ -1693,6 +1713,27 @@ const tumbleChoreographySchema = z
   })
   .strict();
 
+const winSequenceConfigSchema = z
+  .object({
+    sequences: z.record(z.object({ steps: z.array(winSequenceStepSchema) }).strict()),
+    thresholds: escalationThresholdsSchema,
+    defaultSequence: z.string().min(1),
+  })
+  .strict();
+const featureFlowGraphSchema = z
+  .object({
+    states: z.record(featureFlowNodeSchema),
+    transitions: z.array(featureFlowTransitionSchema),
+    entry: z.string().min(1),
+  })
+  .strict();
+const sceneRefEntrySchema = z
+  .object({ name: z.string().min(1), hash: z.string().regex(/^[0-9a-f]{64}$/) })
+  .strict();
+const sceneRefsSchema = z
+  .object({ skeletons: z.array(sceneRefEntrySchema), vfxPresets: z.array(sceneRefEntrySchema) })
+  .strict();
+
 const effectsTools: readonly ToolDefinition[] = [
   // ----- effects: library + effect meta (each drives the WP-3.7 command on the shared History, LAW 2) -----
   defineTool(
@@ -1771,9 +1812,10 @@ const effectsTools: readonly ToolDefinition[] = [
       title: 'Set effect meta',
       description:
         'Set an effect duration (null = endless), deterministic flag, and/or simulationDt (must be > 0). ' +
-        'Only the provided fields change.',
+        'Only the provided fields change, including optional default blendMode.',
       input: z
         .object({
+          blendMode: blendModeSchema.optional(),
           documentId,
           effectId,
           duration: z.number().finite().nullable().optional(),
@@ -1786,6 +1828,7 @@ const effectsTools: readonly ToolDefinition[] = [
       const session = deps.sessions.get(input.documentId);
       requireEffect(session, input.effectId);
       const patch: EffectMetaPatch = {
+        ...(input.blendMode !== undefined ? { blendMode: input.blendMode } : {}),
         ...(input.duration !== undefined ? { duration: input.duration } : {}),
         ...(input.deterministic !== undefined ? { deterministic: input.deterministic } : {}),
         ...(input.simulationDt !== undefined ? { simulationDt: input.simulationDt } : {}),
@@ -1910,14 +1953,55 @@ const effectsTools: readonly ToolDefinition[] = [
         );
       }
       const body: EffectLayerBody = input.body;
+      const edit = new SetLayerFieldCommand(
+        asEffectId(input.effectId),
+        asEffectLayerId(input.layerId),
+        input.field,
+        body,
+      );
+      const changedTrail =
+        body.type === 'emitter' &&
+        layer.body.type === 'emitter' &&
+        (body.trail === null) !== (layer.body.trail === null);
+      const command =
+        changedTrail && body.type === 'emitter'
+          ? new CompositeCommand('Set Emitter Layer', [
+              edit,
+              new SetEmitterTrailCommand(
+                asEffectId(input.effectId),
+                asEffectLayerId(input.layerId),
+                body.trail,
+              ),
+            ])
+          : edit;
+      return { revision: executeEffectEdit(session, command) };
+    },
+  ),
+  defineTool(
+    {
+      name: 'effect.layer.setTrail',
+      title: 'Set emitter particle trail',
+      description:
+        'Enable, edit, or disable an emitter particle trail and its width/alpha curves atomically. Existing stop identities are preserved; null disables the trail.',
+      input: z
+        .object({
+          documentId,
+          effectId,
+          layerId: effectLayerId,
+          trail: emitterTrailBodySchema.nullable(),
+        })
+        .strict(),
+    },
+    (deps, input) => {
+      const session = deps.sessions.get(input.documentId);
+      requireLayer(session, input.effectId, input.layerId);
       return {
         revision: executeEffectEdit(
           session,
-          new SetLayerFieldCommand(
+          new SetEmitterTrailCommand(
             asEffectId(input.effectId),
             asEffectLayerId(input.layerId),
-            input.field,
-            body,
+            input.trail,
           ),
         ),
       };
@@ -2306,6 +2390,51 @@ const effectsTools: readonly ToolDefinition[] = [
 
 const slotSceneTools: readonly ToolDefinition[] = [
   // ----- slot composer: grid (each drives the WP-4.5+ command on the shared History, LAW 2) -----
+  defineTool(
+    {
+      name: 'slot.winseq.setConfig',
+      title: 'Set complete win sequencer',
+      description:
+        'Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.',
+      input: z.object({ documentId, config: winSequenceConfigSchema }).strict(),
+    },
+    (deps, input) => ({
+      revision: executeSlotEdit(
+        deps.sessions.get(input.documentId),
+        new SetWinSequencerCommand(input.config),
+      ),
+    }),
+  ),
+  defineTool(
+    {
+      name: 'slot.flow.setGraph',
+      title: 'Set complete feature flow',
+      description:
+        'Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.',
+      input: z.object({ documentId, graph: featureFlowGraphSchema }).strict(),
+    },
+    (deps, input) => ({
+      revision: executeSlotEdit(
+        deps.sessions.get(input.documentId),
+        new SetFeatureFlowGraphCommand(input.graph),
+      ),
+    }),
+  ),
+  defineTool(
+    {
+      name: 'slot.scene.setRefs',
+      title: 'Set scene artifact references',
+      description:
+        'Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.',
+      input: z.object({ documentId, refs: sceneRefsSchema }).strict(),
+    },
+    (deps, input) => ({
+      revision: executeSlotEdit(
+        deps.sessions.get(input.documentId),
+        new SetSceneRefsCommand(input.refs),
+      ),
+    }),
+  ),
   defineTool(
     {
       name: 'slot.grid.set',
@@ -3396,8 +3525,11 @@ export const TOOLS: readonly ToolDefinition[] = [
       name: 'import.spineProject',
       title: 'Import Spine project',
       description:
-        'Import a user-owned exported Spine project (a .json or a .skel binary) through the clean-room ' +
-        'importer, open it as a new editable document, and return a summary plus any lossy-conversion ' +
+        'Import a user-owned Spine JSON export through the clean-room importer. Real .skel binary ' +
+        'exports are gated until verified; export JSON from Spine instead. This tool imports data ' +
+        'with placeholder atlas geometry and returns an explicit loss report; the editor import ' +
+        'flow additionally loads sibling atlas/images. Open the result as a new editable document ' +
+        'and return a summary plus any lossy-conversion ' +
         'warnings. Import only: this never writes or exports any Spine format (LAW 4 / PP-A5).',
       input: z.object({ path: z.string().min(1), name: z.string().min(1).optional() }).strict(),
     },
@@ -4918,7 +5050,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       description:
         'Insert or update an IK keyframe at a time on a constraint IK channel (mix + bendPositive). ' +
         'Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` ' +
-        '(default linear).',
+        '(default linear). `replaceCurve` explicitly replaces existing easing. IK depth fields preserve omitted values.',
       input: z
         .object({
           documentId,
@@ -4928,6 +5060,10 @@ export const TOOLS: readonly ToolDefinition[] = [
           mix: ikMixSchema,
           bendPositive: z.boolean(),
           curve: curveSchema.optional(),
+          replaceCurve: curveSchema.optional(),
+          softness: z.number().finite().nonnegative().optional(),
+          stretch: z.boolean().optional(),
+          compress: z.boolean().optional(),
         })
         .strict(),
     },
@@ -4936,22 +5072,20 @@ export const TOOLS: readonly ToolDefinition[] = [
       requireAnimation(session, input.animationId);
       requireIkConstraint(session, input.ikConstraintId);
       session.document.history.execute(
-        input.curve === undefined
-          ? new SetIkKeyframeCommand(
-              asAnimationId(input.animationId),
-              asIkConstraintId(input.ikConstraintId),
-              input.time,
-              input.mix,
-              input.bendPositive,
-            )
-          : new SetIkKeyframeCommand(
-              asAnimationId(input.animationId),
-              asIkConstraintId(input.ikConstraintId),
-              input.time,
-              input.mix,
-              input.bendPositive,
-              input.curve,
-            ),
+        new SetIkKeyframeCommand(
+          asAnimationId(input.animationId),
+          asIkConstraintId(input.ikConstraintId),
+          input.time,
+          input.mix,
+          input.bendPositive,
+          input.curve ?? 'linear',
+          {
+            ...(input.replaceCurve !== undefined ? { replaceCurve: input.replaceCurve } : {}),
+            ...(input.softness !== undefined ? { softness: input.softness } : {}),
+            ...(input.stretch !== undefined ? { stretch: input.stretch } : {}),
+            ...(input.compress !== undefined ? { compress: input.compress } : {}),
+          },
+        ),
       );
       return { revision: session.document.model.revision };
     },
@@ -5186,7 +5320,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       description:
         'Insert or update a transform keyframe at a time on a constraint channel. `mix` carries the six ' +
         'per-channel factors; an omitted channel keeps its base value at solve time. Updating an existing ' +
-        'time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).',
+        'time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing.',
       input: z
         .object({
           documentId,
@@ -5195,6 +5329,7 @@ export const TOOLS: readonly ToolDefinition[] = [
           time: z.number().finite().nonnegative(),
           mix: transformKeyframeMixSchema,
           curve: curveSchema.optional(),
+          replaceCurve: curveSchema.optional(),
         })
         .strict(),
     },
@@ -5212,20 +5347,14 @@ export const TOOLS: readonly ToolDefinition[] = [
         mixShearY: input.mix.mixShearY,
       };
       session.document.history.execute(
-        input.curve === undefined
-          ? new SetTransformKeyframeCommand(
-              asAnimationId(input.animationId),
-              asTransformConstraintId(input.transformConstraintId),
-              input.time,
-              mix,
-            )
-          : new SetTransformKeyframeCommand(
-              asAnimationId(input.animationId),
-              asTransformConstraintId(input.transformConstraintId),
-              input.time,
-              mix,
-              input.curve,
-            ),
+        new SetTransformKeyframeCommand(
+          asAnimationId(input.animationId),
+          asTransformConstraintId(input.transformConstraintId),
+          input.time,
+          mix,
+          input.curve ?? 'linear',
+          { ...(input.replaceCurve !== undefined ? { replaceCurve: input.replaceCurve } : {}) },
+        ),
       );
       return { revision: session.document.model.revision };
     },
@@ -5482,7 +5611,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       description:
         'Insert or update a path-constraint keyframe at a time. Each channel (position/spacing/mixRotate/' +
         'mixX/mixY) is optional; an omitted channel keeps its base value at solve time. Updating an existing ' +
-        'time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).',
+        'time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing.',
       input: z
         .object({
           documentId,
@@ -5495,6 +5624,7 @@ export const TOOLS: readonly ToolDefinition[] = [
           mixX: pathMixSchema.optional(),
           mixY: pathMixSchema.optional(),
           curve: curveSchema.optional(),
+          replaceCurve: curveSchema.optional(),
         })
         .strict(),
     },
@@ -5510,20 +5640,14 @@ export const TOOLS: readonly ToolDefinition[] = [
         mixY: input.mixY,
       };
       session.document.history.execute(
-        input.curve === undefined
-          ? new SetPathKeyframeCommand(
-              asAnimationId(input.animationId),
-              asPathConstraintId(input.pathConstraintId),
-              input.time,
-              channels,
-            )
-          : new SetPathKeyframeCommand(
-              asAnimationId(input.animationId),
-              asPathConstraintId(input.pathConstraintId),
-              input.time,
-              channels,
-              input.curve,
-            ),
+        new SetPathKeyframeCommand(
+          asAnimationId(input.animationId),
+          asPathConstraintId(input.pathConstraintId),
+          input.time,
+          channels,
+          input.curve ?? 'linear',
+          { ...(input.replaceCurve !== undefined ? { replaceCurve: input.replaceCurve } : {}) },
+        ),
       );
       return { revision: session.document.model.revision };
     },
@@ -6179,6 +6303,52 @@ export const TOOLS: readonly ToolDefinition[] = [
   ),
   defineTool(
     {
+      name: 'deform.setCurve',
+      title: 'Set deform keyframe curve',
+      description:
+        'Set the outgoing interpolation curve (linear / stepped / bezier) of an EXISTING deform ' +
+        'keyframe by id, keeping its time and offsets. The in-place complement to deform.setKeyframe ' +
+        '(whose update path keeps the old curve); kf.curve covers only bone/slot channels. `skin` is ' +
+        '"default" or a named SkinId.',
+      input: z
+        .object({
+          documentId,
+          animationId,
+          skin: deformSkinKey,
+          slotId,
+          name: attachmentName,
+          keyframeId,
+          curve: curveSchema,
+        })
+        .strict(),
+    },
+    (deps, input) => {
+      const session = deps.sessions.get(input.documentId);
+      requireAnimation(session, input.animationId);
+      const skinKey = resolveDeformSkinKey(session, input.skin);
+      requireSlot(session, input.slotId);
+      try {
+        session.document.history.execute(
+          new SetDeformCurveCommand(
+            asAnimationId(input.animationId),
+            skinKey,
+            asSlotId(input.slotId),
+            input.name,
+            asKeyframeId(input.keyframeId),
+            input.curve,
+          ),
+        );
+      } catch (error) {
+        if (error instanceof CommandTargetMissingError) {
+          throw new McpToolError('KEYFRAME_NOT_FOUND', error.message);
+        }
+        throw error;
+      }
+      return { revision: session.document.model.revision };
+    },
+  ),
+  defineTool(
+    {
       name: 'deform.deleteKeyframe',
       title: 'Delete deform keyframe',
       description:
@@ -6339,21 +6509,69 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'document.getWorldTransforms',
-      title: 'Get world transforms',
-      description: 'Solve the setup pose and return each bone world matrix [a, b, c, d, tx, ty].',
-      input: z.object({ documentId }).strict(),
+      title: 'Get solved world transforms',
+      description:
+        'Read bone matrices from setup or a fully constrained animated pose. Physics is replayed from rest at 60 Hz; times clamp to the clip duration. Returns revision and resolved context.',
+      input: z
+        .object({
+          documentId,
+          animationId: animationId.optional(),
+          time: z.number().finite().nonnegative().max(1800).default(0),
+          skin: deformSkinKey.default('default'),
+        })
+        .strict(),
     },
     (deps, input) => {
-      const model = deps.sessions.get(input.documentId).document.model;
+      const session = deps.sessions.get(input.documentId);
+      const model = session.document.model;
       const exported = exportOrThrow(model);
-      const pose = buildPose(exported);
-      resetToSetupPose(pose);
-      computeWorldTransforms(pose);
+      const animation =
+        input.animationId === undefined
+          ? undefined
+          : requireAnimation(session, input.animationId).name;
+      const skin = input.skin === 'default' ? 'default' : requireSkin(session, input.skin).name;
+      const { pose, context } = sampleQueryPose(exported, animation, input.time, skin);
       const transforms = pose.boneNames.map((name, index) => {
         const base = index * MAT2X3_STRIDE;
         return { name, world: Array.from(pose.world.subarray(base, base + MAT2X3_STRIDE)) };
       });
-      return { transforms };
+      return { revision: model.revision, hash: exported.hash, context, transforms };
+    },
+  ),
+  defineTool(
+    {
+      name: 'mesh.sample',
+      title: 'Sample solved mesh vertices',
+      description:
+        'Return final world-space vertices, triangles, and bounds after constraints, skinning, and deform. Supports weighted and linked meshes and named-skin default fallback. Physics replays at 60 Hz.',
+      input: z
+        .object({
+          documentId,
+          slotId,
+          name: attachmentName,
+          animationId: animationId.optional(),
+          time: z.number().finite().nonnegative().max(1800).default(0),
+          skin: deformSkinKey.default('default'),
+        })
+        .strict(),
+    },
+    (deps, input) => {
+      const session = deps.sessions.get(input.documentId);
+      const model = session.document.model;
+      const exported = exportOrThrow(model);
+      const animation =
+        input.animationId === undefined
+          ? undefined
+          : requireAnimation(session, input.animationId).name;
+      const skin = input.skin === 'default' ? 'default' : requireSkin(session, input.skin).name;
+      const slot = requireSlot(session, input.slotId);
+      const solved = sampleQueryPose(exported, animation, input.time, skin);
+      return {
+        revision: model.revision,
+        hash: exported.hash,
+        context: solved.context,
+        ...sampleQueryMesh(exported, solved, slot.name, input.name),
+      };
     },
   ),
   defineTool(

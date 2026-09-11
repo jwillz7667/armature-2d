@@ -1,3 +1,4 @@
+import { inspectPng } from '@marionette/format';
 import { decodePng } from '@marionette/atlas-pack';
 import {
   encodeApng,
@@ -52,18 +53,19 @@ export interface RunMediaExportParams {
   readonly control?: MediaExportControl;
 }
 
-// Decode the atlas page PNG bytes into the render-preview pixel source. A page that fails to decode is
-// skipped (the region renders as the white placeholder, matching runtime-web's unresolved-texture path),
-// so a partially-corrupt atlas still previews rather than failing the whole export.
+// Supplied artwork must decode within the budget before any output is written.
 function toAtlasPixelSource(pages: readonly AtlasImportPage[]): AtlasPixelSource {
   const map = new Map<string, AtlasPagePixels>();
+  let pixels = 0;
+  let bytes = 0;
   for (const page of pages) {
-    try {
-      const decoded = decodePng(page.data);
-      map.set(page.file, { width: decoded.width, height: decoded.height, rgba: decoded.rgba });
-    } catch {
-      // Skip an undecodable page; the region falls back to the placeholder sampler.
-    }
+    if (map.has(page.file)) throw new Error(`Duplicate atlas page ${page.file}`);
+    const dimensions = inspectPng(page.data);
+    pixels += dimensions.width * dimensions.height;
+    bytes += page.data.byteLength;
+    if (pixels > 64 * 1024 * 1024 || bytes > 512 * 1024 * 1024)
+      throw new Error('Export textures exceed their resource budget');
+    map.set(page.file, decodePng(page.data));
   }
   return { pages: map };
 }
