@@ -27,6 +27,7 @@ import {
   exportProjectDocument,
   DocumentHost,
   MoveBoneCommand,
+  attachProjectRecovery,
 } from '.';
 
 // Behavior the fake preload bridge should exhibit for one test. Defaults: save succeeds, open cancels.
@@ -34,6 +35,7 @@ interface Behavior {
   save?: (document: unknown) => IpcResult<FileSaveResponse> | Promise<IpcResult<FileSaveResponse>>;
   open?: () => IpcResult<FileOpenResponse>;
   confirm?: 'save' | 'discard' | 'cancel';
+  recover?: MarionetteApi['openRecovery'];
 }
 
 // Install a fake window.marionette. file-actions reads the bridge at call time (never at import), so
@@ -44,7 +46,7 @@ function installApi(behavior: Behavior): { savedDocument: () => unknown } {
     confirmUnsaved: async () => ({ ok: true, data: behavior.confirm ?? 'discard' }),
     closeApproved: async () => ({ ok: true, data: { status: 'closed' } }),
     saveRecovery: async () => ({ ok: true, data: { status: 'saved', path: '/recovery.json' } }),
-    openRecovery: async () => ({ ok: true, data: { status: 'canceled' } }),
+    openRecovery: behavior.recover ?? (async () => ({ ok: true, data: { status: 'canceled' } })),
     discardRecovery: async () => ({ ok: true, data: { status: 'discarded' } }),
     getVersion: async (): Promise<IpcResult<GetVersionResponse>> => ({
       ok: true,
@@ -309,4 +311,21 @@ describe('project identity and unsaved work', () => {
     expect(listener).toHaveBeenCalledOnce();
     unsubscribe();
   });
+});
+
+it('requests a startup recovery offer and detaches its recovery timer', async () => {
+  const recover = vi.fn(
+    async (): Promise<IpcResult<FileOpenResponse>> => ({ ok: true, data: { status: 'canceled' } }),
+  );
+  installApi({ recover });
+  window.addEventListener = vi.fn();
+  window.removeEventListener = vi.fn();
+  const detach = attachProjectRecovery();
+  try {
+    await Promise.resolve();
+    expect(recover).toHaveBeenCalledWith({ startup: true });
+  } finally {
+    detach();
+  }
+  expect(window.removeEventListener).toHaveBeenCalledWith('beforeunload', expect.any(Function));
 });

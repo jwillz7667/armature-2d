@@ -151,7 +151,7 @@ serialized, and is never undoable. Selecting a bone is not a command; moving one
 ## Determinism strategy
 
 - **Skeleton**: pure float solve, fixtures generated from `runtime-core` on a pinned Node
-  (22.13.1) and compared byte-exact for drift, tolerance-based across runtimes.
+  (24.20.0) and compared byte-exact for drift, tolerance-based across runtimes.
 - **Effects**: Mulberry32 PRNG with a normative per-particle draw order, integer step clocks,
   seeds derived by `hash32` chains from `spinSeed` (FNV-1a-32 of the spin id), SoA pools sized
   once. Integer primitives are golden-vectored for cross-language reproduction.

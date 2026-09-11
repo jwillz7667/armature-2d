@@ -20,6 +20,7 @@ import {
   resetPhysics,
   resolveRenderMesh,
   sampleMeshVertices,
+  sampleMeshVerticesWithState,
   sampleSkeleton,
   sampleSlotSequenceFrame,
   setActiveSkin,
@@ -365,11 +366,8 @@ export class SkeletonView {
   // syncAnimated does. The pose is built once per document and reused, so a steady-state frame allocates
   // only the region products.
   //
-  // Mesh DEFORM scoping (v1): ADR-0005 does not define cross-track deform blending, so deform under
-  // AnimationState is sampled from the TRACK-0 current entry's animation and trackTime ONLY (the base
-  // layer), on top of the state-solved skin. A crossfade on track 0 uses its incoming (current) entry.
-  // When track 0 is empty, meshes render as the pure skin of the state-solved pose (no deform). This is a
-  // deliberate, documented scope, NOT invented cross-track deform math.
+  // Mesh offsets blend across tracks and crossfade entries after skinning (ADR-0016). Track 0 remains
+  // the sequence-attachment clock; deformation uses every unmasked track, including a sparse base.
   //
   // SKIN-SCOPED CONSTRAINTS under AnimationState: the ACTIVE skin is forwarded to applyAnimationState, so a
   // skin-scoped constraint (ADR-0009 section 5) toggles with the active skin here EXACTLY as on the
@@ -382,9 +380,9 @@ export class SkeletonView {
     applyAnimationState(state, scene.pose, scene.skinState.activeSkin, frameDt);
     const track0 = getTrackEntry(state, 0);
     if (track0 === null) {
-      this.renderFromPose(scene, null, 0);
+      this.renderFromPose(scene, null, 0, state);
     } else {
-      this.renderFromPose(scene, track0.animationId, track0.trackTime);
+      this.renderFromPose(scene, track0.animationId, track0.trackTime, state);
     }
   }
 
@@ -707,7 +705,12 @@ export class SkeletonView {
   // null means setup pose (skin only; deform is zero at setup). The only per-frame allocation is the
   // region product matrix from runtime-core's multiply (the affine library exposes no in-place product
   // to this layer); the pose, records, display objects, and mesh position buffers are all reused.
-  private renderFromPose(scene: CachedScene, animationId: string | null, t: number): void {
+  private renderFromPose(
+    scene: CachedScene,
+    animationId: string | null,
+    t: number,
+    state?: AnimationState,
+  ): void {
     const world = scene.pose.world;
 
     for (const record of scene.boneRecords) {
@@ -741,7 +744,16 @@ export class SkeletonView {
       }
 
       if (meshEntry !== undefined && resolved !== null) {
-        this.renderMesh(scene, record, meshEntry, resolved.name, resolved.skinName, animationId, t);
+        this.renderMesh(
+          scene,
+          record,
+          meshEntry,
+          resolved.name,
+          resolved.skinName,
+          animationId,
+          t,
+          state,
+        );
         continue;
       }
 
@@ -944,8 +956,18 @@ export class SkeletonView {
     skinName: string,
     animationId: string | null,
     t: number,
+    state?: AnimationState,
   ): void {
-    if (animationId === null) {
+    if (state !== undefined) {
+      sampleMeshVerticesWithState(
+        state,
+        scene.pose,
+        skinName,
+        record.slot,
+        activeName,
+        entry.positions,
+      );
+    } else if (animationId === null) {
       // Setup pose: skin the SOURCE geometry (the resolved parent mesh for a linked mesh, PP-C8).
       skinMeshInto(entry.sourceMesh, scene.pose, record.boneIndex, entry.positions);
     } else {

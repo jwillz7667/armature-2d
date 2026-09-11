@@ -3525,8 +3525,11 @@ export const TOOLS: readonly ToolDefinition[] = [
       name: 'import.spineProject',
       title: 'Import Spine project',
       description:
-        'Import a user-owned exported Spine project (a .json or a .skel binary) through the clean-room ' +
-        'importer, open it as a new editable document, and return a summary plus any lossy-conversion ' +
+        'Import a user-owned Spine JSON export through the clean-room importer. Real .skel binary ' +
+        'exports are gated until verified; export JSON from Spine instead. This tool imports data ' +
+        'with placeholder atlas geometry and returns an explicit loss report; the editor import ' +
+        'flow additionally loads sibling atlas/images. Open the result as a new editable document ' +
+        'and return a summary plus any lossy-conversion ' +
         'warnings. Import only: this never writes or exports any Spine format (LAW 4 / PP-A5).',
       input: z.object({ path: z.string().min(1), name: z.string().min(1).optional() }).strict(),
     },

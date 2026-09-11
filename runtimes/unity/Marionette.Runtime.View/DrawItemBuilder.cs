@@ -16,6 +16,7 @@ namespace Marionette.Runtime.View
         private readonly List<DrawItem> _pool = new List<DrawItem>();
 
         // Reusable float scratch for a single mesh's world vertices (2 lanes per vertex), grown on demand.
+        internal readonly DrawClipping Clips = new DrawClipping();
         internal float[] VertexScratch = Array.Empty<float>();
 
         public int Count { get; private set; }
@@ -25,6 +26,7 @@ namespace Marionette.Runtime.View
         internal void Reset()
         {
             Count = 0;
+            Clips.Reset();
         }
 
         // Return the next pooled item to fill, growing the pool by one when exhausted. The returned item's
@@ -126,7 +128,16 @@ namespace Marionette.Runtime.View
                 }
 
                 Slot slot = document.Slots[slotIndex];
-                RenderAttachment? attachment = skin.Find(slot.Name, activeName);
+                RenderSkin ownerSkin = skin;
+                RenderAttachment? attachment = ownerSkin.Find(slot.Name, activeName);
+                if (attachment == null) {
+                    RenderSkin? fallback = renderModel.FindSkin("default");
+                    if (fallback != null) { ownerSkin = fallback; attachment = fallback.Find(slot.Name, activeName); }
+                }
+                if (attachment?.Clipping != null) {
+                    outList.Clips.Add(pose, position, slotIndex, attachment.Clipping);
+                    continue;
+                }
                 if (attachment == null || attachment.Kind == RenderAttachmentKind.NonDrawing)
                 {
                     continue;
@@ -137,8 +148,8 @@ namespace Marionette.Runtime.View
                     renderModel,
                     atlas,
                     pose,
-                    skin,
-                    skinName,
+                    ownerSkin,
+                    ownerSkin.Name,
                     animationId,
                     sampleTime,
                     position,
@@ -149,6 +160,7 @@ namespace Marionette.Runtime.View
                     attachment,
                     outList);
             }
+            outList.Clips.Apply(outList);
         }
 
         private static void EmitDrawable(

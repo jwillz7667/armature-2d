@@ -89,6 +89,11 @@ describe('packNamedLayers', () => {
     const names = atlas.pages.flatMap((page) => page.regions.map((region) => region.name));
     expect(new Set(names)).toEqual(new Set(['a', 'b']));
     expect(pages.length).toBe(atlas.pages.length);
+    expect(atlas.pages[0]?.width).toBe(64);
+    expect(atlas.pages[0]?.height).toBe(64);
+    const repeated = packNamedLayers(named);
+    expect(repeated.atlas).toEqual(atlas);
+    expect(Buffer.compare(repeated.pages[0]!.data, pages[0]!.data)).toBe(0);
     expect(pages[0]?.data.length).toBeGreaterThan(0);
   });
 });

@@ -5,6 +5,7 @@ import { defineConfig } from 'vitest/config';
 // WITHOUT a renderer, so no WebGL or DOM context is required and the Node environment is sufficient.
 export default defineConfig({
   test: {
+    maxWorkers: 2,
     environment: 'node',
     include: ['test/**/*.test.ts'],
   },

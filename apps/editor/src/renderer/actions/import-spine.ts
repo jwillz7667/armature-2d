@@ -47,7 +47,7 @@ export async function importSpineProjectFromDialog(): Promise<SpineProjectImport
       return { kind: 'failed', errors: data.errors, warnings: data.warnings };
     }
     const outcome = await installOpenedProject(
-      { status: 'opened', name: data.name, document: data.document, pages: [] },
+      { status: 'opened', name: data.name, document: data.document, pages: data.pages ?? [] },
       original,
       true,
     );

@@ -298,8 +298,8 @@ describe('emitter solve: lifecycle', () => {
   });
 });
 
-describe('emitter solve: zero heap allocation in stepOnce (allocation probe)', () => {
-  it('allocates no heap across many steps after warmup', () => {
+describe('emitter solve: bounded retained heap after steady-state steps', () => {
+  it('retains no significant heap across many steps after warmup', () => {
     const runGc = (globalThis as { gc?: () => void }).gc;
     if (typeof runGc !== 'function') {
       throw new Error('the emitter allocation probe requires the worker to run with --expose-gc');
@@ -325,7 +325,8 @@ describe('emitter solve: zero heap allocation in stepOnce (allocation probe)', (
     for (let i = 0; i < 100_000; i += 1) stepEmitterOnce(inst);
     runGc();
     const growth = memoryUsage().heapUsed - before;
-    // 100k steps that each allocated even one small object would add megabytes. Allow GC/measure noise.
+    // GC before both readings measures retained growth, not transient allocation. Allow measure noise.
     expect(growth).toBeLessThan(512 * 1024);
-  });
+    // 100k simulation steps plus explicit GC need more than the default 5s on shared CI.
+  }, 30_000);
 });

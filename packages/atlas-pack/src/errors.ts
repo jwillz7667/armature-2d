@@ -10,6 +10,8 @@
 export type AtlasErrorCode =
   // Configuration the caller controls is invalid (page size, padding, concurrency, page count).
   | 'ATLAS_INVALID_CONFIG'
+  | 'ATLAS_RESOURCE_LIMIT'
+  | 'ATLAS_SOURCE_CHANGED'
   // A trimmed sprite is larger than a single page; it can never be packed.
   | 'ATLAS_SPRITE_TOO_LARGE'
   // Two sprites resolve to the same region name; the AtlasRef would be ambiguous.

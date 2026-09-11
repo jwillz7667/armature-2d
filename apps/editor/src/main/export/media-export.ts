@@ -20,7 +20,7 @@ import { atomicWriteFile } from '../atomic-file';
 // cancel registry (export:cancel aborts the in-flight AbortController). One export per job id; only one is
 // realistically in flight at a time, but the registry is keyed so a stale cancel never aborts a new job.
 
-const inFlight = new Map<string, AbortController>();
+const inFlight = new Map<string, { controller: AbortController; committing: boolean }>();
 
 function handlerError(message: string): IpcResult<never> {
   return { ok: false, error: { code: 'IPC_HANDLER_ERROR', message } };
@@ -97,7 +97,11 @@ export async function exportMediaToFile(
       'An export is already running. Finish or cancel it before starting another.',
     );
   const controller = new AbortController();
-  inFlight.set(jobId, controller);
+  const job = { controller, committing: false };
+  inFlight.set(jobId, job);
+  const checkCanceled = (): void => {
+    if (controller.signal.aborted) throw new MediaExportAbortedError();
+  };
 
   const onProgress = (completed: number, total: number): void => {
     if (!sender.isDestroyed()) {
@@ -108,6 +112,7 @@ export async function exportMediaToFile(
   try {
     if (options.medium === 'gif' || options.medium === 'apng') {
       const filePath = await pickSingleFilePath(options.medium, options);
+      checkCanceled();
       if (filePath === null) return { ok: true, data: { status: 'canceled' } };
 
       // The single-image encoders never call the sink; a defensive sink makes a stray call fail loudly.
@@ -124,7 +129,11 @@ export async function exportMediaToFile(
       });
       if (result.kind !== 'single') return handlerError('expected a single-image export result');
       if (controller.signal.aborted) throw new MediaExportAbortedError();
-      await atomicWriteFile(filePath, result.bytes);
+      await atomicWriteFile(filePath, result.bytes, async (from, to) => {
+        checkCanceled();
+        job.committing = true;
+        await rename(from, to);
+      });
       return {
         ok: true,
         data: { status: 'saved', paths: [filePath], frameCount: result.frameCount },
@@ -132,6 +141,7 @@ export async function exportMediaToFile(
     }
 
     const outputDir = await pickOutputDirectory();
+    checkCanceled();
     if (outputDir === null) return { ok: true, data: { status: 'canceled' } };
     await mkdir(outputDir, { recursive: true });
 
@@ -160,6 +170,7 @@ export async function exportMediaToFile(
       }
       if (controller.signal.aborted) throw new MediaExportAbortedError();
       const destination = join(outputDir, `armature-frames-${randomUUID()}`);
+      job.committing = true;
       await rename(staging, destination);
       return {
         ok: true,
@@ -184,8 +195,8 @@ export async function exportMediaToFile(
 
 // Abort the in-flight export with this id, if any. Returns whether a job was actually aborted.
 export function cancelMediaExport(jobId: string): IpcResult<ExportCancelResponse> {
-  const controller = inFlight.get(jobId);
-  if (controller === undefined) return { ok: true, data: { canceled: false } };
-  controller.abort();
+  const job = inFlight.get(jobId);
+  if (job === undefined || job.committing) return { ok: true, data: { canceled: false } };
+  job.controller.abort();
   return { ok: true, data: { canceled: true } };
 }

@@ -15,7 +15,7 @@ export function isRecord(value: unknown): value is JsonRecord {
 // Append a segment to a JSON-Pointer-style path. The root path is the empty string, so the first
 // segment yields "/segment" and nesting yields "/a/b/2".
 export function ptr(base: string, segment: string | number): string {
-  return `${base}/${segment}`;
+  return `${base}/${String(segment).replaceAll('~', '~0').replaceAll('/', '~1')}`;
 }
 
 // Coerce a value to a record, recording SPINE_SCHEMA and returning undefined when it is not one.

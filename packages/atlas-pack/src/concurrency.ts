@@ -18,20 +18,30 @@ export async function mapWithConcurrency<T, R>(
 
   const results = new Array<R>(items.length);
   let cursor = 0;
+  let failed = false;
+  let firstError: unknown;
 
   const runWorker = async (): Promise<void> => {
-    while (cursor < items.length) {
+    while (!failed && cursor < items.length) {
       // Read-then-advance is atomic in single-threaded JS (no await between the two statements), so
       // two workers never claim the same index.
       const index = cursor;
       cursor += 1;
       const item = items[index];
       if (item === undefined) continue; // unreachable for dense inputs; satisfies noUncheckedIndexedAccess
-      results[index] = await worker(item, index);
+      try {
+        results[index] = await worker(item, index);
+      } catch (error) {
+        if (!failed) {
+          failed = true;
+          firstError = error;
+        }
+      }
     }
   };
 
   const poolSize = Math.min(limit, items.length);
   await Promise.all(Array.from({ length: poolSize }, () => runWorker()));
+  if (failed) throw firstError;
   return results;
 }

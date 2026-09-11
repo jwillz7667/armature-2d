@@ -94,8 +94,7 @@ export interface SingleAnimationSequenceOptions extends SequenceBaseOptions {
 // Source B: an AnimationState track setup (crossfades, layering, queued animations). The factory is called
 // once per iteration pass with the parsed, validated document and returns a fresh state; the pipeline
 // advances it by 1/fps per frame (updateAnimationState) and solves it (applyAnimationState). Mesh deform is
-// scoped to the track-0 entry, matching runtime-web's SkeletonView.syncState (ADR-0005 defines no
-// cross-track deform blend), so the preview and the shipped renderer sample the same deform.
+// blended across tracks using ADR-0016, matching runtime-web SkeletonView.syncState.
 export interface AnimationStateSequenceOptions extends SequenceBaseOptions {
   readonly animationState: (document: SkeletonDocument) => AnimationState;
   readonly animation?: undefined;
@@ -258,8 +257,12 @@ class RenderedRgbaSequenceImpl implements RenderedRgbaSequence {
         const track0 = getTrackEntry(state!, 0);
         deform =
           track0 === null
-            ? { animationId: null, sampleTime: 0 }
-            : { animationId: track0.animationId, sampleTime: track0.trackTime };
+            ? { animationId: null, sampleTime: 0, animationState: state! }
+            : {
+                animationId: track0.animationId,
+                sampleTime: track0.trackTime,
+                animationState: state!,
+              };
       }
       // Physics and animation state are warmed from frame zero, including ranged exports. Bounds and
       // pixel passes each build a fresh pose/state and follow this same deterministic progression.

@@ -14,7 +14,7 @@ const api: MarionetteApi = {
   closeApproved: () => ipcRenderer.invoke(IpcChannel.fileCloseApproved),
   saveRecovery: (document, pages, options) =>
     ipcRenderer.invoke(IpcChannel.fileRecoverySave, { document, pages, options }),
-  openRecovery: () => ipcRenderer.invoke(IpcChannel.fileRecoveryOpen),
+  openRecovery: (options) => ipcRenderer.invoke(IpcChannel.fileRecoveryOpen, options),
   discardRecovery: (documentId) =>
     ipcRenderer.invoke(IpcChannel.fileRecoveryDiscard, { documentId }),
   openDocument: () => ipcRenderer.invoke(IpcChannel.fileOpen, undefined),
