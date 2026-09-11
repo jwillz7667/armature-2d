@@ -5,7 +5,7 @@ Known failure modes and their fixes, ordered by how often they bite.
 ## Install / toolchain
 
 **`pnpm install` behaves differently than CI or refuses the lockfile.**
-Check `pnpm --version` is 11.8.0 (`corepack enable` makes the `packageManager` pin authoritative)
+Check `pnpm --version` is 11.19.0 (`corepack enable` makes the `packageManager` pin authoritative)
 and Node is >= 22.13.0. pnpm 11 denies dependency build scripts by default; this repo sanctions
 only `electron` and `esbuild` in `pnpm-workspace.yaml`. If a new dependency needs a postinstall
 step, that is a deliberate allowlist change, not something to work around locally.
@@ -17,7 +17,7 @@ The `electron` postinstall (binary download) may have been skipped. Run
 ## Tests and CI
 
 **The conformance drift gate fails but I did not touch the solve.**
-Two causes. If you are not on Node 22.13.1, the byte-exact regeneration differs; use the pin
+Two causes. If you are not on Node 24.20.0, the byte-exact regeneration differs; use the pin
 (`nvm use "$(cat .node-version)"`). If you are on the pin, you actually changed solve behavior
 somewhere upstream (format defaults, curve tables, ordering); find it, do not regenerate to make
 it pass.

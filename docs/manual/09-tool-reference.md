@@ -2,7 +2,7 @@
 
 Generated from the live registry. Run `pnpm --filter @marionette/mcp-server reference` to update.
 
-204 tools. All inputs are validated before execution. Document mutations use command history.
+208 tools. All inputs are validated before execution. Document mutations use command history.
 The machine-readable companion is `mcp-tools.json`. The artist UI exposes its own documented subset.
 
 ## anim.create
@@ -549,13 +549,21 @@ Inputs: `documentId`, `effectId`, `layerId`, `field`, `body`.
 
 Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 67.
 
+## effect.layer.setTrail
+
+Enable, edit, or disable an emitter particle trail and its width/alpha curves atomically. Existing stop identities are preserved; null disables the trail.
+
+Inputs: `documentId`, `effectId`, `layerId`, `trail`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 68.
+
 ## effect.lifeStop.add
 
 Insert an interior stop (t in (0,1)) into a layer life curve, keeping t strictly ascending. `value` is a scalar or an {r,g,b} matching the curve field.
 
 Inputs: `documentId`, `effectId`, `layerId`, `field`, `t`, `value`, `curve`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 68.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 69.
 
 ## effect.lifeStop.move
 
@@ -563,7 +571,7 @@ Move a stop to a new t, keeping strict-ascending order and the t=0 / t=1 anchor 
 
 Inputs: `documentId`, `effectId`, `layerId`, `stopId`, `t`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 69.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 70.
 
 ## effect.lifeStop.remove
 
@@ -571,7 +579,7 @@ Remove an interior stop from a layer life curve. The t=0 / t=1 anchors and the t
 
 Inputs: `documentId`, `effectId`, `layerId`, `stopId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 70.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 71.
 
 ## effect.lifeStop.setCurve
 
@@ -579,7 +587,7 @@ Set a stop outgoing easing (linear / stepped / a cubic bezier).
 
 Inputs: `documentId`, `effectId`, `layerId`, `stopId`, `curve`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 71.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 72.
 
 ## effect.lifeStop.setValue
 
@@ -587,7 +595,7 @@ Set a stop value (a scalar or an {r,g,b} matching the curve field shape).
 
 Inputs: `documentId`, `effectId`, `layerId`, `stopId`, `value`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 72.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 73.
 
 ## effect.list
 
@@ -595,7 +603,7 @@ List the effects (id, name, meta, layer count) in library order.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 73.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 74.
 
 ## effect.rename
 
@@ -603,7 +611,7 @@ Rename an effect (identity is the id, so bundle-item references are unaffected).
 
 Inputs: `documentId`, `effectId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 74.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 75.
 
 ## effect.setAtlas
 
@@ -611,15 +619,15 @@ Replace the VFX atlas. Rejects (EFFECTS_ATLAS_DANGLING_REGION) any swap that dro
 
 Inputs: `documentId`, `atlas`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 75.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 76.
 
 ## effect.setMeta
 
-Set an effect duration (null = endless), deterministic flag, and/or simulationDt (must be > 0). Only the provided fields change.
+Set an effect duration (null = endless), deterministic flag, and/or simulationDt (must be > 0). Only the provided fields change, including optional default blendMode.
 
-Inputs: `documentId`, `effectId`, `duration`, `deterministic`, `simulationDt`.
+Inputs: `blendMode`, `documentId`, `effectId`, `duration`, `deterministic`, `simulationDt`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 76.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 77.
 
 ## event.define
 
@@ -627,7 +635,7 @@ Create a document-level event definition (its int/float/string payload defaults 
 
 Inputs: `documentId`, `name`, `int`, `float`, `string`, `audio`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 77.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 78.
 
 ## event.delete
 
@@ -635,7 +643,7 @@ Delete an event definition and cascade-remove every animation event key that fir
 
 Inputs: `documentId`, `eventId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 78.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 79.
 
 ## event.get
 
@@ -643,7 +651,7 @@ Get one document-level event definition by id.
 
 Inputs: `documentId`, `eventId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 79.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 80.
 
 ## event.key.delete
 
@@ -651,7 +659,7 @@ Delete an event-timeline key (by id) from an animation. A missing key is a typed
 
 Inputs: `documentId`, `animationId`, `keyframeId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 80.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 81.
 
 ## event.key.move
 
@@ -659,7 +667,7 @@ Move an event-timeline key (by id) to a new time, keeping the timeline non-decre
 
 Inputs: `documentId`, `animationId`, `keyframeId`, `time`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 81.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 82.
 
 ## event.key.set
 
@@ -667,7 +675,7 @@ Insert or update an event-timeline key that fires an event definition at a time,
 
 Inputs: `documentId`, `animationId`, `eventId`, `time`, `int`, `float`, `string`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 82.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 83.
 
 ## event.list
 
@@ -675,7 +683,7 @@ List the document-level event definitions (id, name, payload defaults, audio hin
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 83.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 84.
 
 ## event.rename
 
@@ -683,7 +691,7 @@ Rename an event definition (identity is the id, so an animation event key never 
 
 Inputs: `documentId`, `eventId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 84.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 85.
 
 ## event.setAudio
 
@@ -691,7 +699,7 @@ Set (or, when audio is absent, clear) an event definition audio hint. `volume` m
 
 Inputs: `documentId`, `eventId`, `audio`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 85.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 86.
 
 ## event.setDefaults
 
@@ -699,7 +707,7 @@ Replace an event definition int/float/string payload defaults wholesale (an abse
 
 Inputs: `documentId`, `eventId`, `int`, `float`, `string`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 86.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 87.
 
 ## history.beginInteraction
 
@@ -707,7 +715,7 @@ Start a coalescing interaction; subsequent edits collapse into one undo step.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 87.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 88.
 
 ## history.endInteraction
 
@@ -715,7 +723,7 @@ Commit the interaction as a single undo step with the given label.
 
 Inputs: `documentId`, `label`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 88.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 89.
 
 ## history.getState
 
@@ -723,7 +731,7 @@ Report whether undo/redo are available and their labels.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 89.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 90.
 
 ## history.redo
 
@@ -731,7 +739,7 @@ Redo the last undone change.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 90.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 91.
 
 ## history.undo
 
@@ -739,7 +747,7 @@ Undo the last committed change.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 91.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 92.
 
 ## ik.createConstraint
 
@@ -747,7 +755,7 @@ Create an IK constraint over a 1 or 2 bone chain reaching toward a target bone, 
 
 Inputs: `documentId`, `name`, `boneIds`, `targetId`, `mix`, `bendPositive`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 92.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 93.
 
 ## ik.deleteConstraint
 
@@ -755,7 +763,7 @@ Delete an IK constraint, cascading every animation IK timeline keyed to it (one 
 
 Inputs: `documentId`, `ikConstraintId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 93.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 94.
 
 ## ik.deleteKeyframe
 
@@ -763,7 +771,7 @@ Delete an IK keyframe (by id) from a constraint IK channel.
 
 Inputs: `documentId`, `animationId`, `ikConstraintId`, `keyframeId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 94.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 95.
 
 ## ik.get
 
@@ -771,7 +779,7 @@ Get one IK constraint by id.
 
 Inputs: `documentId`, `ikConstraintId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 95.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 96.
 
 ## ik.list
 
@@ -779,7 +787,7 @@ List the IK constraints in solve order.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 96.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 97.
 
 ## ik.moveKeyframe
 
@@ -787,7 +795,7 @@ Move an IK keyframe (by id) to a new time on a constraint IK channel (IK times a
 
 Inputs: `documentId`, `animationId`, `ikConstraintId`, `keyframeId`, `time`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 97.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 98.
 
 ## ik.setBendPositive
 
@@ -795,7 +803,7 @@ Set an IK constraint bend-direction flag (true bends positive, false negative).
 
 Inputs: `documentId`, `ikConstraintId`, `bendPositive`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 98.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 99.
 
 ## ik.setDepth
 
@@ -803,15 +811,15 @@ Patch a Stage F2 IK depth field: `softness` (non-negative world-unit ease-in dis
 
 Inputs: `documentId`, `ikConstraintId`, `softness`, `stretch`, `compress`, `uniform`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 99.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 100.
 
 ## ik.setKeyframe
 
-Insert or update an IK keyframe at a time on a constraint IK channel (mix + bendPositive). Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).
+Insert or update an IK keyframe at a time on a constraint IK channel (mix + bendPositive). Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing. IK depth fields preserve omitted values.
 
-Inputs: `documentId`, `animationId`, `ikConstraintId`, `time`, `mix`, `bendPositive`, `curve`.
+Inputs: `documentId`, `animationId`, `ikConstraintId`, `time`, `mix`, `bendPositive`, `curve`, `replaceCurve`, `softness`, `stretch`, `compress`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 100.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 101.
 
 ## ik.setMix
 
@@ -819,15 +827,15 @@ Set an IK constraint mix blend (0..1) toward the solved pose (absolute target).
 
 Inputs: `documentId`, `ikConstraintId`, `mix`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 101.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 102.
 
 ## import.spineProject
 
-Import a user-owned exported Spine project (a .json or a .skel binary) through the clean-room importer, open it as a new editable document, and return a summary plus any lossy-conversion warnings. Import only: this never writes or exports any Spine format (LAW 4 / PP-A5).
+Import a user-owned Spine JSON export through the clean-room importer. Real .skel binary exports are gated until verified; export JSON from Spine instead. This tool imports data with placeholder atlas geometry and returns an explicit loss report; the editor import flow additionally loads sibling atlas/images. Open the result as a new editable document and return a summary plus any lossy-conversion warnings. Import only: this never writes or exports any Spine format (LAW 4 / PP-A5).
 
 Inputs: `path`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 102.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 103.
 
 ## kf.attachment.delete
 
@@ -835,7 +843,7 @@ Delete the slot attachment-swap frame at exactly `time` from the stepped attachm
 
 Inputs: `documentId`, `animationId`, `slotId`, `time`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 103.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 104.
 
 ## kf.attachment.move
 
@@ -843,7 +851,7 @@ Move a slot attachment-swap frame (by id) to a new time on the stepped attachmen
 
 Inputs: `documentId`, `animationId`, `slotId`, `keyframeId`, `time`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 104.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 105.
 
 ## kf.attachment.set
 
@@ -851,7 +859,7 @@ Insert or replace a slot attachment-swap frame at a time on the stepped attachme
 
 Inputs: `documentId`, `animationId`, `slotId`, `time`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 105.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 106.
 
 ## kf.curve
 
@@ -859,7 +867,7 @@ Set a keyframe outgoing interpolation curve (linear / stepped / bezier).
 
 Inputs: `documentId`, `animationId`, `channel`, `boneId`, `slotId`, `keyframeId`, `curve`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 106.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 107.
 
 ## kf.delete
 
@@ -867,7 +875,7 @@ Delete a keyframe (by id) from its channel.
 
 Inputs: `documentId`, `animationId`, `channel`, `boneId`, `slotId`, `keyframeId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 107.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 108.
 
 ## kf.move
 
@@ -875,7 +883,7 @@ Move a keyframe (by id) to a new time on its channel. Rejects landing on an occu
 
 Inputs: `documentId`, `animationId`, `channel`, `boneId`, `slotId`, `keyframeId`, `time`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 108.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 109.
 
 ## kf.paste
 
@@ -883,7 +891,7 @@ Insert several keyframes at absolute times in one undo step. Each item names its
 
 Inputs: `documentId`, `animationId`, `items`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 109.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 110.
 
 ## kf.set
 
@@ -891,7 +899,7 @@ Insert or update a keyframe at a time on a channel. `channel` is rotate/translat
 
 Inputs: `documentId`, `animationId`, `channel`, `boneId`, `slotId`, `time`, `value`, `curve`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 110.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 111.
 
 ## mesh.addBoneBinding
 
@@ -899,7 +907,7 @@ Add one bone influence to an already-weighted mesh, seeded by proximity and re-n
 
 Inputs: `documentId`, `slotId`, `name`, `boneId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 111.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 112.
 
 ## mesh.addVertex
 
@@ -907,7 +915,7 @@ Add an interior vertex to a mesh. The editor re-triangulates and passes the reco
 
 Inputs: `documentId`, `slotId`, `name`, `uvs`, `triangles`, `vertices`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 112.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 113.
 
 ## mesh.autoGridFill
 
@@ -915,7 +923,7 @@ Replace a mesh with an editor-computed regular interior grid (uvs/triangles/hull
 
 Inputs: `documentId`, `slotId`, `name`, `uvs`, `triangles`, `hullLength`, `vertices`, `edges`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 113.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 114.
 
 ## mesh.autoPerimeterTrace
 
@@ -923,7 +931,7 @@ Replace a mesh with an editor-computed silhouette-traced hull plus interior fill
 
 Inputs: `documentId`, `slotId`, `name`, `uvs`, `triangles`, `hullLength`, `vertices`, `edges`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 114.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 115.
 
 ## mesh.autoWeight
 
@@ -931,7 +939,7 @@ Re-seed a weighted mesh by inverse distance to each bound bone segment (capped t
 
 Inputs: `documentId`, `slotId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 115.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 116.
 
 ## mesh.bindToBones
 
@@ -939,7 +947,7 @@ Convert an UNWEIGHTED mesh to the weighted encoding by binding it to a set of bo
 
 Inputs: `documentId`, `slotId`, `name`, `boneIds`, `weightMode`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 116.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 117.
 
 ## mesh.deleteVertex
 
@@ -947,7 +955,7 @@ Delete a mesh vertex. The editor re-triangulates and passes the recomputed uvs/t
 
 Inputs: `documentId`, `slotId`, `name`, `uvs`, `triangles`, `vertices`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 117.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 118.
 
 ## mesh.generateFromRegion
 
@@ -955,7 +963,7 @@ Replace a region attachment with a mesh under the same name. The editor computes
 
 Inputs: `documentId`, `slotId`, `name`, `uvs`, `triangles`, `hullLength`, `width`, `height`, `color`, `edges`, `vertices`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 118.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 119.
 
 ## mesh.moveVertex
 
@@ -963,7 +971,7 @@ Move one mesh vertex to (x, y). Never re-triangulates (indices stable); always a
 
 Inputs: `documentId`, `slotId`, `name`, `vertexIndex`, `x`, `y`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 119.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 120.
 
 ## mesh.normalizeWeights
 
@@ -971,7 +979,7 @@ Re-normalize every vertex of a weighted mesh to sum 1 and cap to 4 influences (i
 
 Inputs: `documentId`, `slotId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 120.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 121.
 
 ## mesh.paintWeight
 
@@ -979,7 +987,7 @@ Apply a weight-paint stroke to one active bone across a set of dabs (per-vertex 
 
 Inputs: `documentId`, `slotId`, `name`, `activeBoneId`, `dabs`, `mode`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 121.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 122.
 
 ## mesh.removeBoneBinding
 
@@ -987,7 +995,7 @@ Drop one bone influence from a weighted mesh and re-normalize (a vertex left wit
 
 Inputs: `documentId`, `slotId`, `name`, `boneId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 122.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 123.
 
 ## mesh.sample
 
@@ -995,7 +1003,7 @@ Return final world-space vertices, triangles, and bounds after constraints, skin
 
 Inputs: `documentId`, `slotId`, `name`, `animationId`, `time`, `skin`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 123.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 124.
 
 ## mesh.setEdges
 
@@ -1003,7 +1011,7 @@ Set or replace a mesh edges (wireframe) array, as vertex-index pairs. Does not c
 
 Inputs: `documentId`, `slotId`, `name`, `edges`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 124.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 125.
 
 ## mesh.unbind
 
@@ -1011,7 +1019,7 @@ Clear all weights, returning a mesh to the unweighted flat encoding (re-derived 
 
 Inputs: `documentId`, `slotId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 125.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 126.
 
 ## path.addCurve
 
@@ -1019,7 +1027,7 @@ Append one cubic curve (three control points) to the end of a path spline; the a
 
 Inputs: `documentId`, `slotId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 126.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 127.
 
 ## path.createConstraint
 
@@ -1027,7 +1035,7 @@ Create a path constraint that distributes a set of bones along the path attachme
 
 Inputs: `documentId`, `name`, `targetSlotId`, `boneIds`, `params`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 127.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 128.
 
 ## path.deleteConstraint
 
@@ -1035,7 +1043,7 @@ Delete a path constraint, cascading every animation path timeline keyed to it (o
 
 Inputs: `documentId`, `pathConstraintId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 128.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 129.
 
 ## path.deleteControlPoint
 
@@ -1043,7 +1051,7 @@ Delete one ANCHOR control point (pointIndex must be a multiple of 3), collapsing
 
 Inputs: `documentId`, `slotId`, `name`, `pointIndex`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 129.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 130.
 
 ## path.deleteKeyframe
 
@@ -1051,7 +1059,7 @@ Delete a path keyframe (by id) from a constraint path channel.
 
 Inputs: `documentId`, `animationId`, `pathConstraintId`, `keyframeId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 130.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 131.
 
 ## path.get
 
@@ -1059,7 +1067,7 @@ Read a path attachment: its openness, parametrization flag, flat control-point s
 
 Inputs: `documentId`, `slotId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 131.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 132.
 
 ## path.getConstraint
 
@@ -1067,7 +1075,7 @@ Get one path constraint by id.
 
 Inputs: `documentId`, `pathConstraintId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 132.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 133.
 
 ## path.listConstraints
 
@@ -1075,7 +1083,7 @@ List the path constraints in solve order.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 133.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 134.
 
 ## path.moveControlPoint
 
@@ -1083,7 +1091,7 @@ Move one path control point (anchor or handle). The arc-length table is recomput
 
 Inputs: `documentId`, `slotId`, `name`, `pointIndex`, `x`, `y`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 134.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 135.
 
 ## path.moveKeyframe
 
@@ -1091,7 +1099,7 @@ Move a path keyframe (by id) to a new time (path times are strictly ascending). 
 
 Inputs: `documentId`, `animationId`, `pathConstraintId`, `keyframeId`, `time`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 135.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 136.
 
 ## path.removeCurve
 
@@ -1099,7 +1107,7 @@ Drop the last cubic curve from a path spline (a path keeps at least one curve). 
 
 Inputs: `documentId`, `slotId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 136.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 137.
 
 ## path.setClosed
 
@@ -1107,7 +1115,7 @@ Set a path spline open or closed. Closing drops the trailing anchor; opening app
 
 Inputs: `documentId`, `slotId`, `name`, `closed`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 137.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 138.
 
 ## path.setConstantSpeed
 
@@ -1115,15 +1123,15 @@ Set a path spline arc-length (constant-speed) vs naive-t parametrization. A pure
 
 Inputs: `documentId`, `slotId`, `name`, `constantSpeed`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 138.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 139.
 
 ## path.setKeyframe
 
-Insert or update a path-constraint keyframe at a time. Each channel (position/spacing/mixRotate/mixX/mixY) is optional; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).
+Insert or update a path-constraint keyframe at a time. Each channel (position/spacing/mixRotate/mixX/mixY) is optional; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing.
 
-Inputs: `documentId`, `animationId`, `pathConstraintId`, `time`, `position`, `spacing`, `mixRotate`, `mixX`, `mixY`, `curve`.
+Inputs: `documentId`, `animationId`, `pathConstraintId`, `time`, `position`, `spacing`, `mixRotate`, `mixX`, `mixY`, `curve`, `replaceCurve`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 139.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 140.
 
 ## path.setParams
 
@@ -1131,7 +1139,7 @@ Patch a path constraint parameter: the modes (positionMode/spacingMode/rotateMod
 
 Inputs: `documentId`, `pathConstraintId`, `positionMode`, `spacingMode`, `rotateMode`, `position`, `spacing`, `offsetRotation`, `mixRotate`, `mixX`, `mixY`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 140.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 141.
 
 ## physics.createConstraint
 
@@ -1139,7 +1147,7 @@ Create a physics constraint that simulates a subset of ONE bone's local channels
 
 Inputs: `documentId`, `name`, `boneId`, `channels`, `params`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 141.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 142.
 
 ## physics.deleteConstraint
 
@@ -1147,7 +1155,7 @@ Delete a physics constraint, cascading every animation physics timeline keyed to
 
 Inputs: `documentId`, `physicsConstraintId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 142.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 143.
 
 ## physics.deleteKeyframe
 
@@ -1155,7 +1163,7 @@ Delete a physics keyframe (by id) from a constraint physics channel.
 
 Inputs: `documentId`, `animationId`, `physicsConstraintId`, `keyframeId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 143.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 144.
 
 ## physics.getConstraint
 
@@ -1163,7 +1171,7 @@ Get one physics constraint by id.
 
 Inputs: `documentId`, `physicsConstraintId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 144.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 145.
 
 ## physics.getSettings
 
@@ -1171,7 +1179,7 @@ Get the OPTIONAL skeleton physics settings block (global gravity/wind/master mix
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 145.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 146.
 
 ## physics.listConstraints
 
@@ -1179,7 +1187,7 @@ List the physics constraints in solve order.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 146.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 147.
 
 ## physics.moveKeyframe
 
@@ -1187,7 +1195,7 @@ Move a physics keyframe (by id) to a new time (physics times are strictly ascend
 
 Inputs: `documentId`, `animationId`, `physicsConstraintId`, `keyframeId`, `time`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 147.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 148.
 
 ## physics.renameConstraint
 
@@ -1195,7 +1203,7 @@ Rename a physics constraint (identity is the id, so its timeline tracks are unaf
 
 Inputs: `documentId`, `physicsConstraintId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 148.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 149.
 
 ## physics.setChannels
 
@@ -1203,7 +1211,7 @@ Replace a physics constraint's simulated channel set (non-empty, duplicate-free 
 
 Inputs: `documentId`, `physicsConstraintId`, `channels`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 149.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 150.
 
 ## physics.setKeyframe
 
@@ -1211,7 +1219,7 @@ Insert or update a physics-constraint keyframe at a time. Each dynamic channel (
 
 Inputs: `documentId`, `animationId`, `physicsConstraintId`, `time`, `mix`, `inertia`, `strength`, `damping`, `wind`, `gravity`, `curve`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 150.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 151.
 
 ## physics.setParams
 
@@ -1219,7 +1227,7 @@ Patch a physics constraint scalar parameter: step (>0), inertia/damping/mix ([0,
 
 Inputs: `documentId`, `physicsConstraintId`, `step`, `inertia`, `strength`, `damping`, `mass`, `wind`, `gravity`, `mix`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 151.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 152.
 
 ## physics.setSettings
 
@@ -1227,7 +1235,7 @@ Set or CLEAR the global physics settings block. Pass { gravity, wind, mix } to s
 
 Inputs: `documentId`, `settings`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 152.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 153.
 
 ## physics.setTargetBone
 
@@ -1235,7 +1243,7 @@ Retarget a physics constraint to a different bone (the single driven/setpoint bo
 
 Inputs: `documentId`, `physicsConstraintId`, `boneId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 153.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 154.
 
 ## render_frame
 
@@ -1243,7 +1251,7 @@ Rasterize the current document to a PNG for headless authoring feedback (ADR-000
 
 Inputs: `documentId`, `animation`, `time`, `width`, `height`, `fit`, `background`, `effect`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 154.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 155.
 
 ## skin.create
 
@@ -1251,7 +1259,7 @@ Create a NAMED (non-default) skin and return its id. The implicit "default" skin
 
 Inputs: `documentId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 155.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 156.
 
 ## skin.delete
 
@@ -1259,7 +1267,7 @@ Delete a NAMED skin, cascading every animation deform timeline keyed to it (one 
 
 Inputs: `documentId`, `skinId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 156.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 157.
 
 ## skin.get
 
@@ -1267,7 +1275,7 @@ Get one NAMED skin (and its attachment addresses) by id.
 
 Inputs: `documentId`, `skinId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 157.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 158.
 
 ## skin.list
 
@@ -1275,7 +1283,7 @@ List the NAMED (non-default) skins in skin order, each with its attachment addre
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 158.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 159.
 
 ## skin.removeAttachment
 
@@ -1283,7 +1291,7 @@ Remove an attachment from a NAMED skin at a (slot, attachment-name) address. Rej
 
 Inputs: `documentId`, `skinId`, `slotId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 159.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 160.
 
 ## skin.rename
 
@@ -1291,7 +1299,7 @@ Rename a NAMED skin (identity is the id, so deform tracks are unaffected). Rejec
 
 Inputs: `documentId`, `skinId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 160.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 161.
 
 ## skin.scope.add
 
@@ -1299,7 +1307,7 @@ Add a bone or constraint NAME to a NAMED skin Stage F2 scoping list (the bones/c
 
 Inputs: `documentId`, `skinId`, `scope`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 161.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 162.
 
 ## skin.scope.remove
 
@@ -1307,7 +1315,7 @@ Remove a bone or constraint NAME from a NAMED skin scoping list (clearing the di
 
 Inputs: `documentId`, `skinId`, `scope`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 162.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 163.
 
 ## skin.setAttachment
 
@@ -1315,7 +1323,7 @@ Add or replace a region attachment on a NAMED skin at a (slot, attachment-name) 
 
 Inputs: `documentId`, `skinId`, `slotId`, `attachment`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 163.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 164.
 
 ## slot.activeAttachment
 
@@ -1323,7 +1331,7 @@ Set the slot setup-pose active attachment name (null clears it).
 
 Inputs: `documentId`, `slotId`, `attachment`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 164.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 165.
 
 ## slot.blend
 
@@ -1331,7 +1339,7 @@ Set a slot blend mode (the format BlendMode enum).
 
 Inputs: `documentId`, `slotId`, `blendMode`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 165.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 166.
 
 ## slot.color
 
@@ -1339,7 +1347,7 @@ Set a slot tint color (RGBA, each channel 0..1).
 
 Inputs: `documentId`, `slotId`, `color`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 166.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 167.
 
 ## slot.create
 
@@ -1347,7 +1355,7 @@ Create a slot riding a bone and return its id.
 
 Inputs: `documentId`, `boneId`, `name`, `color`, `darkColor`, `attachment`, `blendMode`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 167.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 168.
 
 ## slot.darkColor
 
@@ -1355,7 +1363,7 @@ Set or clear a slot setup DARK color (Stage F2 two-color tint, RGBA 0..1). A non
 
 Inputs: `documentId`, `slotId`, `color`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 168.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 169.
 
 ## slot.delete
 
@@ -1363,7 +1371,7 @@ Delete a slot and its attachments (one undo step).
 
 Inputs: `documentId`, `slotId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 169.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 170.
 
 ## slot.flow.addTransition
 
@@ -1371,7 +1379,7 @@ Append a transition (from + on match + to) to the feature-flow graph. The shape 
 
 Inputs: `documentId`, `transition`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 170.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 171.
 
 ## slot.flow.createState
 
@@ -1379,7 +1387,7 @@ Add a named feature-flow state (optional cinematic node). Rejects a duplicate or
 
 Inputs: `documentId`, `name`, `node`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 171.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 172.
 
 ## slot.flow.deleteState
 
@@ -1387,7 +1395,7 @@ Delete a named state and every transition incident to it (one undo step). The ma
 
 Inputs: `documentId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 172.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 173.
 
 ## slot.flow.get
 
@@ -1395,7 +1403,7 @@ Return the feature-flow graph (states, transitions, entry).
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 173.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 174.
 
 ## slot.flow.removeTransition
 
@@ -1403,7 +1411,7 @@ Remove one transition by its index in the graph transition list.
 
 Inputs: `documentId`, `index`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 174.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 175.
 
 ## slot.flow.renameState
 
@@ -1411,7 +1419,15 @@ Rename a state and rewrite every transition that references it. "base" cannot be
 
 Inputs: `documentId`, `from`, `to`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 175.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 176.
+
+## slot.flow.setGraph
+
+Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.
+
+Inputs: `documentId`, `graph`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 177.
 
 ## slot.get
 
@@ -1419,7 +1435,7 @@ Get one slot (and its attachment names) by id.
 
 Inputs: `documentId`, `slotId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 176.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 178.
 
 ## slot.grid.get
 
@@ -1427,7 +1443,7 @@ Return the current slot grid config.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 177.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 179.
 
 ## slot.grid.preset
 
@@ -1435,7 +1451,7 @@ Apply a canonical grid preset in one call: reelStrip5x3, scatterPay6x5, or clust
 
 Inputs: `documentId`, `preset`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 178.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 180.
 
 ## slot.grid.set
 
@@ -1443,7 +1459,7 @@ Set the slot grid config (topology + dimensions + gravity, optional anticipation
 
 Inputs: `documentId`, `grid`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 179.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 181.
 
 ## slot.list
 
@@ -1451,7 +1467,7 @@ List the slots in setup-pose draw order.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 180.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 182.
 
 ## slot.rename
 
@@ -1459,7 +1475,7 @@ Rename a slot (identity is the id, so references are unaffected).
 
 Inputs: `documentId`, `slotId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 181.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 183.
 
 ## slot.reorder
 
@@ -1467,7 +1483,7 @@ Move a slot to a new index in the setup-pose draw order.
 
 Inputs: `documentId`, `slotId`, `toIndex`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 182.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 184.
 
 ## slot.scene.get
 
@@ -1475,7 +1491,15 @@ Return the whole slot-scene snapshot (grid, symbol library, win sequencer, featu
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 183.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 185.
+
+## slot.scene.setRefs
+
+Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.
+
+Inputs: `documentId`, `refs`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 186.
 
 ## slot.symbol.get
 
@@ -1483,7 +1507,7 @@ Return the anim set mapped to one SymbolId, or null when the symbol is unmapped.
 
 Inputs: `documentId`, `symbolId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 184.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 187.
 
 ## slot.symbol.list
 
@@ -1491,7 +1515,7 @@ List the mapped symbols (SymbolId + anim set) in id order.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 185.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 188.
 
 ## slot.symbol.map
 
@@ -1499,7 +1523,7 @@ Map a SymbolId to a skeleton + idle/land/win(/anticipation) animation set, addin
 
 Inputs: `documentId`, `symbolId`, `animSet`, `skeletonAnimationNames`, `skeletonHash`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 186.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 189.
 
 ## slot.symbol.unmap
 
@@ -1507,7 +1531,7 @@ Remove a SymbolId mapping, pruning its skeletonRef when no remaining symbol refe
 
 Inputs: `documentId`, `symbolId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 187.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 190.
 
 ## slot.tumble.get
 
@@ -1515,7 +1539,7 @@ Return the tumble/cascade choreography.
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 188.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 191.
 
 ## slot.tumble.set
 
@@ -1523,7 +1547,7 @@ Set the tumble/cascade timing (explode/drop/refill/settle/step ms as non-negativ
 
 Inputs: `documentId`, `tumble`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 189.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 192.
 
 ## slot.winseq.create
 
@@ -1531,7 +1555,7 @@ Create a new, empty, named win sequence. Rejects a duplicate name (SLOT_EDIT).
 
 Inputs: `documentId`, `name`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 190.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 193.
 
 ## slot.winseq.get
 
@@ -1539,7 +1563,7 @@ Return the win-sequencer config (sequences, thresholds, default sequence).
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 191.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 194.
 
 ## slot.winseq.reorderSteps
 
@@ -1547,7 +1571,15 @@ Reorder a sequence steps by an explicit new-order array of current step indices 
 
 Inputs: `documentId`, `sequenceName`, `order`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 192.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 195.
+
+## slot.winseq.setConfig
+
+Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.
+
+Inputs: `documentId`, `config`.
+
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 196.
 
 ## slot.winseq.setStep
 
@@ -1555,7 +1587,7 @@ Set or append a step (atMs + target + action) at an index in a named sequence. A
 
 Inputs: `documentId`, `sequenceName`, `index`, `step`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 193.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 197.
 
 ## slot.winseq.setThresholds
 
@@ -1563,7 +1595,7 @@ Set the big/mega/epic win escalation thresholds (finite, non-negative). Coalesce
 
 Inputs: `documentId`, `thresholds`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 194.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 198.
 
 ## transform.createConstraint
 
@@ -1571,7 +1603,7 @@ Create a transform constraint that drives a set of bones from a target with per-
 
 Inputs: `documentId`, `name`, `boneIds`, `targetId`, `params`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 195.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 199.
 
 ## transform.deleteConstraint
 
@@ -1579,7 +1611,7 @@ Delete a transform constraint, cascading every animation transform timeline keye
 
 Inputs: `documentId`, `transformConstraintId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 196.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 200.
 
 ## transform.deleteKeyframe
 
@@ -1587,7 +1619,7 @@ Delete a transform keyframe (by id) from a constraint channel.
 
 Inputs: `documentId`, `animationId`, `transformConstraintId`, `keyframeId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 197.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 201.
 
 ## transform.get
 
@@ -1595,7 +1627,7 @@ Get one transform constraint by id.
 
 Inputs: `documentId`, `transformConstraintId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 198.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 202.
 
 ## transform.list
 
@@ -1603,7 +1635,7 @@ List the transform constraints in solve order (after all IK).
 
 Inputs: `documentId`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 199.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 203.
 
 ## transform.moveKeyframe
 
@@ -1611,15 +1643,15 @@ Move a transform keyframe (by id) to a new time on a constraint channel (times a
 
 Inputs: `documentId`, `animationId`, `transformConstraintId`, `keyframeId`, `time`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 200.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 204.
 
 ## transform.setKeyframe
 
-Insert or update a transform keyframe at a time on a constraint channel. `mix` carries the six per-channel factors; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).
+Insert or update a transform keyframe at a time on a constraint channel. `mix` carries the six per-channel factors; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing.
 
-Inputs: `documentId`, `animationId`, `transformConstraintId`, `time`, `mix`, `curve`.
+Inputs: `documentId`, `animationId`, `transformConstraintId`, `time`, `mix`, `curve`, `replaceCurve`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 201.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 205.
 
 ## transform.setParams
 
@@ -1627,7 +1659,7 @@ Patch a transform constraint mix/offset channels (only the named channels change
 
 Inputs: `documentId`, `transformConstraintId`, `patch`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 202.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 206.
 
 ## transform.setVariants
 
@@ -1635,4 +1667,4 @@ Patch a transform constraint Stage F2 variant flag: `local` (local-space read/wr
 
 Inputs: `documentId`, `transformConstraintId`, `local`, `relative`.
 
-Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 203.
+Exact types, bounds, required fields, and defaults: [mcp-tools.json](./mcp-tools.json), entry 207.

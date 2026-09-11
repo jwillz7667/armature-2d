@@ -1,4 +1,9 @@
 import {
+  SetWinSequencerCommand,
+  SetFeatureFlowGraphCommand,
+  SetSceneRefsCommand,
+} from '@marionette/document-core';
+import {
   AddBoneToMeshBindingCommand,
   AddMeshVertexCommand,
   AddPathCurveCommand,
@@ -130,6 +135,8 @@ import {
   RemoveLayerCommand,
   ReorderLayersCommand,
   SetLayerFieldCommand,
+  SetEmitterTrailCommand,
+  CompositeCommand,
   SetLayerBlendModeCommand,
   AddLifeStopCommand,
   RemoveLifeStopCommand,
@@ -1706,6 +1713,27 @@ const tumbleChoreographySchema = z
   })
   .strict();
 
+const winSequenceConfigSchema = z
+  .object({
+    sequences: z.record(z.object({ steps: z.array(winSequenceStepSchema) }).strict()),
+    thresholds: escalationThresholdsSchema,
+    defaultSequence: z.string().min(1),
+  })
+  .strict();
+const featureFlowGraphSchema = z
+  .object({
+    states: z.record(featureFlowNodeSchema),
+    transitions: z.array(featureFlowTransitionSchema),
+    entry: z.string().min(1),
+  })
+  .strict();
+const sceneRefEntrySchema = z
+  .object({ name: z.string().min(1), hash: z.string().regex(/^[0-9a-f]{64}$/) })
+  .strict();
+const sceneRefsSchema = z
+  .object({ skeletons: z.array(sceneRefEntrySchema), vfxPresets: z.array(sceneRefEntrySchema) })
+  .strict();
+
 const effectsTools: readonly ToolDefinition[] = [
   // ----- effects: library + effect meta (each drives the WP-3.7 command on the shared History, LAW 2) -----
   defineTool(
@@ -1784,9 +1812,10 @@ const effectsTools: readonly ToolDefinition[] = [
       title: 'Set effect meta',
       description:
         'Set an effect duration (null = endless), deterministic flag, and/or simulationDt (must be > 0). ' +
-        'Only the provided fields change.',
+        'Only the provided fields change, including optional default blendMode.',
       input: z
         .object({
+          blendMode: blendModeSchema.optional(),
           documentId,
           effectId,
           duration: z.number().finite().nullable().optional(),
@@ -1799,6 +1828,7 @@ const effectsTools: readonly ToolDefinition[] = [
       const session = deps.sessions.get(input.documentId);
       requireEffect(session, input.effectId);
       const patch: EffectMetaPatch = {
+        ...(input.blendMode !== undefined ? { blendMode: input.blendMode } : {}),
         ...(input.duration !== undefined ? { duration: input.duration } : {}),
         ...(input.deterministic !== undefined ? { deterministic: input.deterministic } : {}),
         ...(input.simulationDt !== undefined ? { simulationDt: input.simulationDt } : {}),
@@ -1923,14 +1953,55 @@ const effectsTools: readonly ToolDefinition[] = [
         );
       }
       const body: EffectLayerBody = input.body;
+      const edit = new SetLayerFieldCommand(
+        asEffectId(input.effectId),
+        asEffectLayerId(input.layerId),
+        input.field,
+        body,
+      );
+      const changedTrail =
+        body.type === 'emitter' &&
+        layer.body.type === 'emitter' &&
+        (body.trail === null) !== (layer.body.trail === null);
+      const command =
+        changedTrail && body.type === 'emitter'
+          ? new CompositeCommand('Set Emitter Layer', [
+              edit,
+              new SetEmitterTrailCommand(
+                asEffectId(input.effectId),
+                asEffectLayerId(input.layerId),
+                body.trail,
+              ),
+            ])
+          : edit;
+      return { revision: executeEffectEdit(session, command) };
+    },
+  ),
+  defineTool(
+    {
+      name: 'effect.layer.setTrail',
+      title: 'Set emitter particle trail',
+      description:
+        'Enable, edit, or disable an emitter particle trail and its width/alpha curves atomically. Existing stop identities are preserved; null disables the trail.',
+      input: z
+        .object({
+          documentId,
+          effectId,
+          layerId: effectLayerId,
+          trail: emitterTrailBodySchema.nullable(),
+        })
+        .strict(),
+    },
+    (deps, input) => {
+      const session = deps.sessions.get(input.documentId);
+      requireLayer(session, input.effectId, input.layerId);
       return {
         revision: executeEffectEdit(
           session,
-          new SetLayerFieldCommand(
+          new SetEmitterTrailCommand(
             asEffectId(input.effectId),
             asEffectLayerId(input.layerId),
-            input.field,
-            body,
+            input.trail,
           ),
         ),
       };
@@ -2319,6 +2390,51 @@ const effectsTools: readonly ToolDefinition[] = [
 
 const slotSceneTools: readonly ToolDefinition[] = [
   // ----- slot composer: grid (each drives the WP-4.5+ command on the shared History, LAW 2) -----
+  defineTool(
+    {
+      name: 'slot.winseq.setConfig',
+      title: 'Set complete win sequencer',
+      description:
+        'Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.',
+      input: z.object({ documentId, config: winSequenceConfigSchema }).strict(),
+    },
+    (deps, input) => ({
+      revision: executeSlotEdit(
+        deps.sessions.get(input.documentId),
+        new SetWinSequencerCommand(input.config),
+      ),
+    }),
+  ),
+  defineTool(
+    {
+      name: 'slot.flow.setGraph',
+      title: 'Set complete feature flow',
+      description:
+        'Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.',
+      input: z.object({ documentId, graph: featureFlowGraphSchema }).strict(),
+    },
+    (deps, input) => ({
+      revision: executeSlotEdit(
+        deps.sessions.get(input.documentId),
+        new SetFeatureFlowGraphCommand(input.graph),
+      ),
+    }),
+  ),
+  defineTool(
+    {
+      name: 'slot.scene.setRefs',
+      title: 'Set scene artifact references',
+      description:
+        'Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.',
+      input: z.object({ documentId, refs: sceneRefsSchema }).strict(),
+    },
+    (deps, input) => ({
+      revision: executeSlotEdit(
+        deps.sessions.get(input.documentId),
+        new SetSceneRefsCommand(input.refs),
+      ),
+    }),
+  ),
   defineTool(
     {
       name: 'slot.grid.set',
@@ -3409,8 +3525,11 @@ export const TOOLS: readonly ToolDefinition[] = [
       name: 'import.spineProject',
       title: 'Import Spine project',
       description:
-        'Import a user-owned exported Spine project (a .json or a .skel binary) through the clean-room ' +
-        'importer, open it as a new editable document, and return a summary plus any lossy-conversion ' +
+        'Import a user-owned Spine JSON export through the clean-room importer. Real .skel binary ' +
+        'exports are gated until verified; export JSON from Spine instead. This tool imports data ' +
+        'with placeholder atlas geometry and returns an explicit loss report; the editor import ' +
+        'flow additionally loads sibling atlas/images. Open the result as a new editable document ' +
+        'and return a summary plus any lossy-conversion ' +
         'warnings. Import only: this never writes or exports any Spine format (LAW 4 / PP-A5).',
       input: z.object({ path: z.string().min(1), name: z.string().min(1).optional() }).strict(),
     },
@@ -4931,7 +5050,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       description:
         'Insert or update an IK keyframe at a time on a constraint IK channel (mix + bendPositive). ' +
         'Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` ' +
-        '(default linear).',
+        '(default linear). `replaceCurve` explicitly replaces existing easing. IK depth fields preserve omitted values.',
       input: z
         .object({
           documentId,
@@ -4941,6 +5060,10 @@ export const TOOLS: readonly ToolDefinition[] = [
           mix: ikMixSchema,
           bendPositive: z.boolean(),
           curve: curveSchema.optional(),
+          replaceCurve: curveSchema.optional(),
+          softness: z.number().finite().nonnegative().optional(),
+          stretch: z.boolean().optional(),
+          compress: z.boolean().optional(),
         })
         .strict(),
     },
@@ -4949,22 +5072,20 @@ export const TOOLS: readonly ToolDefinition[] = [
       requireAnimation(session, input.animationId);
       requireIkConstraint(session, input.ikConstraintId);
       session.document.history.execute(
-        input.curve === undefined
-          ? new SetIkKeyframeCommand(
-              asAnimationId(input.animationId),
-              asIkConstraintId(input.ikConstraintId),
-              input.time,
-              input.mix,
-              input.bendPositive,
-            )
-          : new SetIkKeyframeCommand(
-              asAnimationId(input.animationId),
-              asIkConstraintId(input.ikConstraintId),
-              input.time,
-              input.mix,
-              input.bendPositive,
-              input.curve,
-            ),
+        new SetIkKeyframeCommand(
+          asAnimationId(input.animationId),
+          asIkConstraintId(input.ikConstraintId),
+          input.time,
+          input.mix,
+          input.bendPositive,
+          input.curve ?? 'linear',
+          {
+            ...(input.replaceCurve !== undefined ? { replaceCurve: input.replaceCurve } : {}),
+            ...(input.softness !== undefined ? { softness: input.softness } : {}),
+            ...(input.stretch !== undefined ? { stretch: input.stretch } : {}),
+            ...(input.compress !== undefined ? { compress: input.compress } : {}),
+          },
+        ),
       );
       return { revision: session.document.model.revision };
     },
@@ -5199,7 +5320,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       description:
         'Insert or update a transform keyframe at a time on a constraint channel. `mix` carries the six ' +
         'per-channel factors; an omitted channel keeps its base value at solve time. Updating an existing ' +
-        'time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).',
+        'time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing.',
       input: z
         .object({
           documentId,
@@ -5208,6 +5329,7 @@ export const TOOLS: readonly ToolDefinition[] = [
           time: z.number().finite().nonnegative(),
           mix: transformKeyframeMixSchema,
           curve: curveSchema.optional(),
+          replaceCurve: curveSchema.optional(),
         })
         .strict(),
     },
@@ -5225,20 +5347,14 @@ export const TOOLS: readonly ToolDefinition[] = [
         mixShearY: input.mix.mixShearY,
       };
       session.document.history.execute(
-        input.curve === undefined
-          ? new SetTransformKeyframeCommand(
-              asAnimationId(input.animationId),
-              asTransformConstraintId(input.transformConstraintId),
-              input.time,
-              mix,
-            )
-          : new SetTransformKeyframeCommand(
-              asAnimationId(input.animationId),
-              asTransformConstraintId(input.transformConstraintId),
-              input.time,
-              mix,
-              input.curve,
-            ),
+        new SetTransformKeyframeCommand(
+          asAnimationId(input.animationId),
+          asTransformConstraintId(input.transformConstraintId),
+          input.time,
+          mix,
+          input.curve ?? 'linear',
+          { ...(input.replaceCurve !== undefined ? { replaceCurve: input.replaceCurve } : {}) },
+        ),
       );
       return { revision: session.document.model.revision };
     },
@@ -5495,7 +5611,7 @@ export const TOOLS: readonly ToolDefinition[] = [
       description:
         'Insert or update a path-constraint keyframe at a time. Each channel (position/spacing/mixRotate/' +
         'mixX/mixY) is optional; an omitted channel keeps its base value at solve time. Updating an existing ' +
-        'time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).',
+        'time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing.',
       input: z
         .object({
           documentId,
@@ -5508,6 +5624,7 @@ export const TOOLS: readonly ToolDefinition[] = [
           mixX: pathMixSchema.optional(),
           mixY: pathMixSchema.optional(),
           curve: curveSchema.optional(),
+          replaceCurve: curveSchema.optional(),
         })
         .strict(),
     },
@@ -5523,20 +5640,14 @@ export const TOOLS: readonly ToolDefinition[] = [
         mixY: input.mixY,
       };
       session.document.history.execute(
-        input.curve === undefined
-          ? new SetPathKeyframeCommand(
-              asAnimationId(input.animationId),
-              asPathConstraintId(input.pathConstraintId),
-              input.time,
-              channels,
-            )
-          : new SetPathKeyframeCommand(
-              asAnimationId(input.animationId),
-              asPathConstraintId(input.pathConstraintId),
-              input.time,
-              channels,
-              input.curve,
-            ),
+        new SetPathKeyframeCommand(
+          asAnimationId(input.animationId),
+          asPathConstraintId(input.pathConstraintId),
+          input.time,
+          channels,
+          input.curve ?? 'linear',
+          { ...(input.replaceCurve !== undefined ? { replaceCurve: input.replaceCurve } : {}) },
+        ),
       );
       return { revision: session.document.model.revision };
     },

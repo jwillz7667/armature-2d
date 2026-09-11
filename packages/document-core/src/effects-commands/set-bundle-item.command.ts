@@ -64,7 +64,10 @@ export class SetBundleItemCommand implements Command {
       prev.bundleName === this.bundleName &&
       prev.itemId === this.itemId
     ) {
-      const merged = new SetBundleItemCommand(this.bundleName, this.itemId, this.patch);
+      const merged = new SetBundleItemCommand(this.bundleName, this.itemId, {
+        ...prev.patch,
+        ...this.patch,
+      });
       merged.before = prev.before;
       return merged;
     }

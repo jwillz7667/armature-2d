@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
   AddBundleItemCommand,
+  CreateBundleCommand,
+  ReorderLayersCommand,
+  ReorderBundleItemsCommand,
   AddLifeStopCommand,
   EffectEditError,
   EffectsAtlasDanglingRegionError,
@@ -12,6 +15,7 @@ import {
   SetEffectMetaCommand,
   SetEffectsAtlasCommand,
   SetLayerFieldCommand,
+  SetEmitterTrailCommand,
   SetLifeStopCurveCommand,
   SetLifeStopValueCommand,
   exportEffects,
@@ -359,5 +363,109 @@ describe('effects commands: import/export round-trip (section 8.1.1 identity)', 
     const exported = exportEffects(doc.effects);
     // The seed carries a recomputed hash; export recomputes it too, so the documents are deep-equal.
     expect(exported).toEqual(effectsSeeds.library);
+  });
+});
+
+describe('effects ordering and compound edits', () => {
+  it('rejects duplicate layer and bundle order entries before mutation', () => {
+    const doc = loadLibrary();
+    const effect = doc.effects.effects().find((e) => e.layerOrder.length >= 2)!;
+    const bundle = doc.effects.bundles().find((b) => b.itemOrder.length >= 2)!;
+    const before = doc.effects.snapshot();
+    const layers = [...effect.layerOrder];
+    layers[1] = layers[0]!;
+    const items = [...bundle.itemOrder];
+    items[1] = items[0]!;
+    expect(() => doc.history.execute(new ReorderLayersCommand(effect.id, layers))).toThrow(
+      EffectEditError,
+    );
+    expect(() => doc.history.execute(new ReorderBundleItemsCommand(bundle.name, items))).toThrow(
+      EffectEditError,
+    );
+    expect(doc.effects.snapshot()).toEqual(before);
+    expect(doc.history.canUndo).toBe(false);
+  });
+
+  it('retains all patched bundle fields on redo after coalescing', () => {
+    const doc = loadLibrary();
+    const bundle = doc.effects.bundles()[0]!;
+    const item = bundle.itemOrder[0]!;
+    const before = doc.effects.snapshot();
+    doc.history.beginInteraction();
+    doc.history.execute(new SetBundleItemCommand(bundle.name, item, { startOffset: 0.75 }));
+    doc.history.execute(new SetBundleItemCommand(bundle.name, item, { anchorRole: 'center' }));
+    doc.history.endInteraction('Edit Bundle Item');
+    const after = doc.effects.snapshot();
+    doc.history.undo();
+    expect(doc.effects.snapshot()).toEqual(before);
+    expect(doc.history.canUndo).toBe(false);
+    doc.history.redo();
+    expect(doc.effects.snapshot()).toEqual(after);
+  });
+});
+
+describe('emitter trail authoring', () => {
+  it('adds and removes trail curves together and restores stop identities through undo/redo', () => {
+    const doc = loadLibrary();
+    const { effectId, layerId } = emitterLayerId(doc);
+    const before = doc.effects.snapshot();
+    doc.history.execute(
+      new SetEmitterTrailCommand(effectId, layerId, {
+        region: 'coin',
+        maxSegments: 12,
+        segmentSpacing: 3,
+      }),
+    );
+    const enabled = doc.effects.snapshot();
+    const layer = doc.effects.getLayer(effectId, layerId)!;
+    expect(layer.curves.has('trailWidthOverLength')).toBe(true);
+    expect(layer.curves.has('trailAlphaOverLength')).toBe(true);
+    expect(() => exportEffects(doc.effects)).not.toThrow();
+    doc.history.execute(new SetEmitterTrailCommand(effectId, layerId, null));
+    expect(doc.effects.getLayer(effectId, layerId)!.curves.has('trailWidthOverLength')).toBe(false);
+    doc.history.undo();
+    expect(doc.effects.snapshot()).toEqual(enabled);
+    doc.history.undo();
+    expect(doc.effects.snapshot()).toEqual(before);
+    doc.history.redo();
+    expect(doc.effects.snapshot()).toEqual(enabled);
+  });
+
+  it('rejects an invalid trail specification without changing the document', () => {
+    const doc = loadLibrary();
+    const { effectId, layerId } = emitterLayerId(doc);
+    const before = doc.effects.snapshot();
+    expect(() =>
+      doc.history.execute(
+        new SetEmitterTrailCommand(effectId, layerId, {
+          region: 'coin',
+          maxSegments: 0,
+          segmentSpacing: 3,
+        }),
+      ),
+    ).toThrow(EffectEditError);
+    expect(doc.effects.snapshot()).toEqual(before);
+    expect(doc.history.canUndo).toBe(false);
+  });
+});
+
+describe('effect metadata and bundle identity', () => {
+  it('rejects duplicate bundle identity without replacing its items', () => {
+    const doc = loadLibrary();
+    const name = doc.effects.bundles()[0]!.name;
+    const before = doc.effects.snapshot();
+    expect(() => doc.history.execute(new CreateBundleCommand(name))).toThrow(EffectEditError);
+    expect(doc.effects.snapshot()).toEqual(before);
+    expect(doc.history.canUndo).toBe(false);
+  });
+  it('edits the effect default blend mode and restores it through undo', () => {
+    const doc = loadLibrary();
+    const effect = doc.effects.effects()[0]!;
+    const before = doc.effects.snapshot();
+    const blendMode = effect.blendMode === 'multiply' ? 'normal' : 'multiply';
+    doc.history.execute(new SetEffectMetaCommand(effect.id, { blendMode }));
+    expect(doc.effects.getEffect(effect.id)!.blendMode).toBe(blendMode);
+    doc.history.undo();
+    expect(doc.effects.snapshot()).toEqual(before);
   });
 });

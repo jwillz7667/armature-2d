@@ -55,3 +55,32 @@ describe('mapWithConcurrency', () => {
     });
   });
 });
+
+it('stops scheduling on failure and drains in-flight reads before rejecting', async () => {
+  let release: () => void = () => undefined;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started: number[] = [];
+  let drained = false;
+  const failure = new Error('read failed');
+  const result = mapWithConcurrency([0, 1, 2, 3], 2, async (value) => {
+    started.push(value);
+    if (value === 0) throw failure;
+    await pending;
+    drained = true;
+    return value;
+  });
+  let settled = false;
+  const observed = result.catch((error: unknown) => {
+    settled = true;
+    expect(error).toBe(failure);
+  });
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(settled).toBe(false);
+  release();
+  await observed;
+  expect(drained).toBe(true);
+  expect(started).toEqual([0, 1]);
+});

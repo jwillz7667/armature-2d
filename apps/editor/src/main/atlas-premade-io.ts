@@ -1,7 +1,8 @@
-import { readFile } from 'node:fs/promises';
-import { basename, dirname, extname } from 'node:path';
-import { decodePng, isAtlasError } from './atlas';
-import { confinePagePath } from './project-textures';
+import { basename, extname } from 'node:path';
+import { isAtlasError } from './atlas';
+import { inspectPng } from '@marionette/format';
+import { withImportFiles, type ImportFiles } from './import-files';
+import { buildSpineAtlas, parseSpineAtlas } from './spine-atlas';
 import {
   buildGridAtlas,
   buildSinglePageAtlas,
@@ -48,24 +49,20 @@ function fromResult(
 // inside that directory. Returns the decoded pixel size plus the raw bytes to ship to the renderer, or a
 // typed error message.
 async function readPageImage(
-  descriptorDir: string,
+  files: ImportFiles,
   pageFile: string,
 ): Promise<
   | { ok: true; width: number; height: number; data: Uint8Array<ArrayBuffer> }
   | { ok: false; message: string }
 > {
-  const full = confinePagePath(descriptorDir, pageFile);
-  if (full === null) {
-    return { ok: false, message: `page image name "${pageFile}" is not a plain file name` };
-  }
   let bytes: Uint8Array<ArrayBuffer>;
   try {
-    bytes = new Uint8Array(await readFile(full));
+    bytes = await files.read(pageFile, 256 * 1024 * 1024);
   } catch {
     return { ok: false, message: `could not read page image "${pageFile}" next to the descriptor` };
   }
   try {
-    const decoded = decodePng(bytes);
+    const decoded = inspectPng(bytes);
     return { ok: true, width: decoded.width, height: decoded.height, data: bytes };
   } catch (error) {
     if (isAtlasError(error)) {
@@ -81,9 +78,43 @@ async function readPageImage(
 export async function importPremadeAtlasFromDescriptor(
   descriptorPath: string,
 ): Promise<IpcResult<AtlasImportResponse>> {
+  try {
+    return await withImportFiles(descriptorPath, async (files) => {
+      if (extname(descriptorPath).toLowerCase() === '.atlas') {
+        const text = new TextDecoder('utf-8', { fatal: true }).decode(
+          await files.read(basename(descriptorPath), 4 * 1024 * 1024),
+        );
+        const parsed = parseSpineAtlas(text);
+        const images = new Map<string, Uint8Array>();
+        for (const page of parsed.pages)
+          images.set(page.file, await files.read(page.file, 256 * 1024 * 1024));
+        const packed = buildSpineAtlas(parsed, images);
+        return {
+          ok: true,
+          data: {
+            status: 'imported',
+            atlas: packed.atlas,
+            pages: packed.pages,
+            warnings: packed.warnings,
+          },
+        };
+      }
+      return importJsonDescriptor(descriptorPath, files);
+    });
+  } catch (error) {
+    return handlerError(error instanceof Error ? error.message : 'Atlas import failed');
+  }
+}
+
+async function importJsonDescriptor(
+  descriptorPath: string,
+  files: ImportFiles,
+): Promise<IpcResult<AtlasImportResponse>> {
   let text: string;
   try {
-    text = await readFile(descriptorPath, 'utf8');
+    text = new TextDecoder('utf-8', { fatal: true }).decode(
+      await files.read(basename(descriptorPath), 4 * 1024 * 1024),
+    );
   } catch {
     return handlerError(`could not read atlas descriptor ${descriptorPath}`);
   }
@@ -101,7 +132,6 @@ export async function importPremadeAtlasFromDescriptor(
     return handlerError(`atlas import failed (${parsed.error.code}): ${parsed.error.message}`);
   }
 
-  const descriptorDir = dirname(descriptorPath);
   const pageBytes: AtlasImportPage[] = [];
 
   if (parsed.parsed.kind === 'atlasRef') {
@@ -109,7 +139,7 @@ export async function importPremadeAtlasFromDescriptor(
     // against the true image bounds.
     const dimensions = new Map<string, PageDimensions>();
     for (const page of parsed.parsed.atlas.pages) {
-      const image = await readPageImage(descriptorDir, page.file);
+      const image = await readPageImage(files, page.file);
       if (!image.ok) {
         return handlerError(`atlas import failed (ATLAS_REGION_INVALID): ${image.message}`);
       }
@@ -122,7 +152,7 @@ export async function importPremadeAtlasFromDescriptor(
   // Generic region list over a single page image: default the page to the descriptor's sibling PNG.
   const descriptorStem = basename(descriptorPath, extname(descriptorPath));
   const pageFile = parsed.parsed.descriptor.image ?? `${descriptorStem}.png`;
-  const image = await readPageImage(descriptorDir, pageFile);
+  const image = await readPageImage(files, pageFile);
   if (!image.ok) {
     return handlerError(`atlas import failed (ATLAS_REGION_INVALID): ${image.message}`);
   }
@@ -143,14 +173,16 @@ export async function importGridAtlasFromImage(
   let width: number;
   let height: number;
   try {
-    const decoded = decodePng(image.data);
+    const decoded = inspectPng(image.data);
     width = decoded.width;
     height = decoded.height;
   } catch (error) {
     if (isAtlasError(error)) {
       return handlerError(`atlas import failed (${error.code}): ${image.name} is not a valid PNG`);
     }
-    return handlerError(`atlas import failed: ${image.name} could not be decoded`);
+    return handlerError(
+      `atlas import failed (ATLAS_DECODE_FAILED): ${image.name}: ${error instanceof Error ? error.message : 'could not be decoded'}`,
+    );
   }
 
   const pageFile = image.name;

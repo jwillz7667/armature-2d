@@ -1510,6 +1510,37 @@
     }
   },
   {
+    "name": "effect.layer.setTrail",
+    "title": "Set emitter particle trail",
+    "description": "Enable, edit, or disable an emitter particle trail and its width/alpha curves atomically. Existing stop identities are preserved; null disables the trail.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "effectId": { "type": "string", "minLength": 1 },
+        "layerId": { "type": "string", "minLength": 1 },
+        "trail": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "region": { "type": "string", "minLength": 1 },
+                "maxSegments": { "type": "integer", "minimum": 1 },
+                "segmentSpacing": { "type": "number", "exclusiveMinimum": 0 }
+              },
+              "required": ["region", "maxSegments", "segmentSpacing"],
+              "additionalProperties": false
+            },
+            { "type": "null" }
+          ]
+        }
+      },
+      "required": ["documentId", "effectId", "layerId", "trail"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
     "name": "effect.lifeStop.add",
     "title": "Add life-curve stop",
     "description": "Insert an interior stop (t in (0,1)) into a layer life curve, keeping t strictly ascending. `value` is a scalar or an {r,g,b} matching the curve field.",
@@ -1771,10 +1802,11 @@
   {
     "name": "effect.setMeta",
     "title": "Set effect meta",
-    "description": "Set an effect duration (null = endless), deterministic flag, and/or simulationDt (must be > 0). Only the provided fields change.",
+    "description": "Set an effect duration (null = endless), deterministic flag, and/or simulationDt (must be > 0). Only the provided fields change, including optional default blendMode.",
     "inputSchema": {
       "type": "object",
       "properties": {
+        "blendMode": { "type": "string", "enum": ["normal", "additive", "multiply", "screen"] },
         "documentId": { "type": "string", "minLength": 1 },
         "effectId": { "type": "string", "minLength": 1 },
         "duration": { "anyOf": [{ "type": "number" }, { "type": "null" }] },
@@ -2170,7 +2202,7 @@
   {
     "name": "ik.setKeyframe",
     "title": "Set IK keyframe",
-    "description": "Insert or update an IK keyframe at a time on a constraint IK channel (mix + bendPositive). Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).",
+    "description": "Insert or update an IK keyframe at a time on a constraint IK channel (mix + bendPositive). Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing. IK depth fields preserve omitted values.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -2197,7 +2229,11 @@
               "additionalProperties": false
             }
           ]
-        }
+        },
+        "replaceCurve": { "$ref": "#/properties/curve" },
+        "softness": { "type": "number", "minimum": 0 },
+        "stretch": { "type": "boolean" },
+        "compress": { "type": "boolean" }
       },
       "required": ["documentId", "animationId", "ikConstraintId", "time", "mix", "bendPositive"],
       "additionalProperties": false,
@@ -2223,7 +2259,7 @@
   {
     "name": "import.spineProject",
     "title": "Import Spine project",
-    "description": "Import a user-owned exported Spine project (a .json or a .skel binary) through the clean-room importer, open it as a new editable document, and return a summary plus any lossy-conversion warnings. Import only: this never writes or exports any Spine format (LAW 4 / PP-A5).",
+    "description": "Import a user-owned Spine JSON export through the clean-room importer. Real .skel binary exports are gated until verified; export JSON from Spine instead. This tool imports data with placeholder atlas geometry and returns an explicit loss report; the editor import flow additionally loads sibling atlas/images. Open the result as a new editable document and return a summary plus any lossy-conversion warnings. Import only: this never writes or exports any Spine format (LAW 4 / PP-A5).",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3246,7 +3282,7 @@
   {
     "name": "path.setKeyframe",
     "title": "Set path keyframe",
-    "description": "Insert or update a path-constraint keyframe at a time. Each channel (position/spacing/mixRotate/mixX/mixY) is optional; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).",
+    "description": "Insert or update a path-constraint keyframe at a time. Each channel (position/spacing/mixRotate/mixX/mixY) is optional; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -3276,7 +3312,8 @@
               "additionalProperties": false
             }
           ]
-        }
+        },
+        "replaceCurve": { "$ref": "#/properties/curve" }
       },
       "required": ["documentId", "animationId", "pathConstraintId", "time"],
       "additionalProperties": false,
@@ -4089,6 +4126,74 @@
     }
   },
   {
+    "name": "slot.flow.setGraph",
+    "title": "Set complete feature flow",
+    "description": "Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "graph": {
+          "type": "object",
+          "properties": {
+            "states": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "cinematic": {
+                    "type": "object",
+                    "properties": {
+                      "vfxPreset": { "type": "string", "minLength": 1 },
+                      "animation": { "type": "string", "minLength": 1 }
+                    },
+                    "additionalProperties": false
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "transitions": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "from": { "type": "string", "minLength": 1 },
+                  "on": {
+                    "type": "object",
+                    "properties": {
+                      "type": { "type": "string", "minLength": 1 },
+                      "dataEquals": {
+                        "type": "object",
+                        "properties": {
+                          "field": { "type": "string", "minLength": 1 },
+                          "equals": { "type": ["number", "string", "boolean"] }
+                        },
+                        "required": ["field", "equals"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": ["type"],
+                    "additionalProperties": false
+                  },
+                  "to": { "type": "string", "minLength": 1 }
+                },
+                "required": ["from", "on", "to"],
+                "additionalProperties": false
+              }
+            },
+            "entry": { "type": "string", "minLength": 1 }
+          },
+          "required": ["states", "transitions", "entry"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "graph"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
     "name": "slot.get",
     "title": "Get slot",
     "description": "Get one slot (and its attachment names) by id.",
@@ -4234,6 +4339,43 @@
       "type": "object",
       "properties": { "documentId": { "type": "string", "minLength": 1 } },
       "required": ["documentId"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.scene.setRefs",
+    "title": "Set scene artifact references",
+    "description": "Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "refs": {
+          "type": "object",
+          "properties": {
+            "skeletons": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "minLength": 1 },
+                  "hash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                },
+                "required": ["name", "hash"],
+                "additionalProperties": false
+              }
+            },
+            "vfxPresets": {
+              "type": "array",
+              "items": { "$ref": "#/properties/refs/properties/skeletons/items" }
+            }
+          },
+          "required": ["skeletons", "vfxPresets"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "refs"],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     }
@@ -4399,6 +4541,133 @@
         "order": { "type": "array", "items": { "type": "integer", "minimum": 0 } }
       },
       "required": ["documentId", "sequenceName", "order"],
+      "additionalProperties": false,
+      "$schema": "http://json-schema.org/draft-07/schema#"
+    }
+  },
+  {
+    "name": "slot.winseq.setConfig",
+    "title": "Set complete win sequencer",
+    "description": "Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "documentId": { "type": "string", "minLength": 1 },
+        "config": {
+          "type": "object",
+          "properties": {
+            "sequences": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "properties": {
+                  "steps": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "atMs": { "type": "integer", "minimum": 0 },
+                        "target": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": { "type": "string", "const": "allWinningCells" }
+                              },
+                              "required": ["kind"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": { "type": "string", "const": "byLine" },
+                                "index": { "type": "integer", "minimum": 0 }
+                              },
+                              "required": ["kind", "index"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": { "type": "string", "const": "bySymbol" },
+                                "symbol": { "type": "string", "minLength": 1 }
+                              },
+                              "required": ["kind", "symbol"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "action": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": { "kind": { "type": "string", "const": "animateWin" } },
+                              "required": ["kind"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": { "type": "string", "const": "vfx" },
+                                "preset": { "type": "string", "minLength": 1 },
+                                "anchorRule": {
+                                  "type": "string",
+                                  "enum": ["eachCell", "gridCenter"]
+                                }
+                              },
+                              "required": ["kind", "preset", "anchorRule"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": { "type": "string", "const": "rollupStart" },
+                                "curve": {
+                                  "type": "string",
+                                  "enum": ["linear", "easeInQuad", "easeOutQuad", "easeInOutCubic"]
+                                }
+                              },
+                              "required": ["kind", "curve"],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "kind": { "type": "string", "const": "escalationBanner" },
+                                "tier": { "type": "string", "enum": ["big", "mega", "epic"] }
+                              },
+                              "required": ["kind", "tier"],
+                              "additionalProperties": false
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["atMs", "target", "action"],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": ["steps"],
+                "additionalProperties": false
+              }
+            },
+            "thresholds": {
+              "type": "object",
+              "properties": {
+                "big": { "type": "number", "minimum": 0 },
+                "mega": { "type": "number", "minimum": 0 },
+                "epic": { "type": "number", "minimum": 0 }
+              },
+              "required": ["big", "mega", "epic"],
+              "additionalProperties": false
+            },
+            "defaultSequence": { "type": "string", "minLength": 1 }
+          },
+          "required": ["sequences", "thresholds", "defaultSequence"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["documentId", "config"],
       "additionalProperties": false,
       "$schema": "http://json-schema.org/draft-07/schema#"
     }
@@ -4649,7 +4918,7 @@
   {
     "name": "transform.setKeyframe",
     "title": "Set transform keyframe",
-    "description": "Insert or update a transform keyframe at a time on a constraint channel. `mix` carries the six per-channel factors; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear).",
+    "description": "Insert or update a transform keyframe at a time on a constraint channel. `mix` carries the six per-channel factors; an omitted channel keeps its base value at solve time. Updating an existing time keeps its curve; a new keyframe takes the optional insert `curve` (default linear). `replaceCurve` explicitly replaces existing easing.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -4686,7 +4955,8 @@
               "additionalProperties": false
             }
           ]
-        }
+        },
+        "replaceCurve": { "$ref": "#/properties/curve" }
       },
       "required": ["documentId", "animationId", "transformConstraintId", "time", "mix"],
       "additionalProperties": false,

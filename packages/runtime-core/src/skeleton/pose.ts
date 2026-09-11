@@ -180,6 +180,8 @@ export interface PhysicsSettings {
 // it with zero allocation. It is mesh-vertex sampling scratch only, never part of the saved document.
 export interface DeformScratch {
   offsets: Float64Array;
+  mixed: Float64Array;
+  outgoing: Float64Array;
 }
 
 // Pre-allocated, index-addressed storage for a skeleton solve (handoff section 6). Every buffer is
@@ -383,7 +385,11 @@ export function allocatePose(
       pathConstraints,
       physicsConstraints,
     ),
-    deformScratch: { offsets: new Float64Array(0) },
+    deformScratch: {
+      offsets: new Float64Array(0),
+      mixed: new Float64Array(0),
+      outgoing: new Float64Array(0),
+    },
     preparedAnimations: new WeakMap<Animation, PreparedAnimation>(),
   };
 }

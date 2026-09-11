@@ -5,13 +5,10 @@ import { defineConfig } from 'vitest/config';
 // need a real GC, so the worker is launched with --expose-gc.
 export default defineConfig({
   test: {
+    maxWorkers: 2,
     environment: 'node',
     include: ['test/**/*.test.ts'],
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        execArgv: ['--expose-gc'],
-      },
-    },
+    execArgv: ['--expose-gc'],
   },
 });

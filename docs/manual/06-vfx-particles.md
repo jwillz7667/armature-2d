@@ -118,3 +118,15 @@ const frame = system.readState();    // packed particle data for the renderer
 
 `stop(id)` is a soft stop (spawning ceases, live particles finish); `stop(id, true)` clears
 instantly. `triggerBundle` does the same for a whole bundle with per-item derived seeds.
+
+## 6.9 Author in the Effects panel
+
+1. Choose **Import textures** and select a PNG folder. The effects atlas and its pixels travel with the project.
+2. Create an effect, then add emitter, sprite, or ribbon layers. Select a layer to edit its name, blending, and full parameters. Reorder layers with the up/down controls.
+3. For emitters, set capacity, spawn schedule, shape, randomized ranges, forces, texture frames, and optional particle trails. Enabling a trail creates its width and alpha curves in the same undoable edit.
+4. Expand each lifetime curve to see its sampled graph. Edit stops, scalar/RGB values, and linear, stepped, or Bezier easing. The endpoints remain anchored; interior stops can be inserted, moved, or removed.
+5. Open **Bundles** to create a reusable sequence. Add effects with start offsets, anchor roles, and seed salts; reorder or remove items, then choose **Preview bundle**.
+6. Choose a preview seed and still, circle, or line anchor motion. Restart begins a fresh simulation. Named left/right/top/bottom anchors make bundle placement visible. Preview uses a fixed clock, so the same deterministic effect and seed replay consistently.
+7. Save the project and reopen it to continue editing the library, bundles, and texture pixels. Undo/redo shares the skeleton and slot scene history.
+
+The headless workflow tests cover save/reopen and seeded playback at 30 and 60 Hz. Installed desktop GPU acceptance remains a release gate.

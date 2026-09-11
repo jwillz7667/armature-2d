@@ -5,6 +5,7 @@ import { defineConfig } from 'vitest/config';
 // the filesystem and compare bytes, exactly like the conformance fixtures (ADR-0006 determinism contract).
 export default defineConfig({
   test: {
+    maxWorkers: 2,
     environment: 'node',
     include: ['test/**/*.test.ts'],
   },

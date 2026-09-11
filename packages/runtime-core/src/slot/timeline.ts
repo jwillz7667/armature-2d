@@ -46,7 +46,7 @@ export type GridAnchor =
 // The fully resolved presentation timeline for one spin. `directives` is sorted by (atMs asc, seq asc).
 export interface PresentationTimeline {
   spinId: string; // copied from SpinResult, for traceability only.
-  durationMs: number; // total resolved length, integer milliseconds (max atMs across directives, or 0).
+  durationMs: number; // total resolved length, including counter-rollup endMs as well as directive atMs.
   directives: readonly PresentationDirective[]; // sorted by (atMs asc, seq asc); see section 5.4.1.
 }
 

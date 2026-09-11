@@ -1,15 +1,21 @@
 import { Container, Text, TextStyle, type Ticker } from 'pixi.js';
-import type { EscalationTier } from '@marionette/runtime-core';
+import type { SpinResult } from '@marionette/math-bridge';
+import { prepareSlotPreview, type SlotPreviewInput } from './slot-preview-input';
+import { createSlotPreviewSimulation, type SlotPreviewSimulation } from './slot-preview-simulation';
+import { atlasTextureStore, effectsTextureStore } from '../../editor-state/atlas-texture-store';
+import type { EscalationTier, PresentationTimeline } from '@marionette/runtime-core';
 import {
   SlotSceneView,
+  SkeletonView,
+  ParticleLayerView,
   cellCenter,
   gridMetrics,
   gridSize,
   type GridMetrics,
   type SlotSceneCallbacks,
 } from '@marionette/runtime-web';
-import type { GridConfig, SlotScene } from '@marionette/format/slot-types';
-import { documentHost, exportSlotSceneDocument } from '../../document';
+import type { GridConfig } from '@marionette/format/slot-types';
+import { documentHost } from '../../document';
 import { createPreviewStage, type PreviewStage } from '../preview/preview-stage';
 import { fitSize } from '../preview/preview-fit';
 import {
@@ -27,8 +33,6 @@ import {
 import {
   DEFAULT_SLOT_PREVIEW_SCENARIO,
   resolveSlotPlayhead,
-  scenarioScene,
-  scenarioTimeline,
   type SlotPreviewScenarioId,
 } from './slot-preview-model';
 
@@ -40,11 +44,9 @@ import {
 // scene (exportSlotSceneDocument, a pure projection) and re-sequences when the scene changes, but never
 // issues a command.
 //
-// The editor has no external symbol skeleton documents loaded, so the SlotSceneView's per-cell symbol
-// resolver returns null (no skeleton is mounted) and this view adds a lightweight glyph overlay that labels
-// each cell with its resolved SymbolId, positioned through the SAME runtime-web grid-layout functions the
-// SlotSceneView uses (so the glyph and the highlight box always align). The counter rollup / escalation /
-// flow / vfx directives surface through the SlotSceneView callbacks to a panel HUD.
+// Symbols resolve against the project's authored skeleton and texture store. Unresolved symbols keep
+// diagnostic labels. Effects and bundles use the same fixed preview clock; entered flow animations
+// mount as cinematics. Recorded outcomes remain transient inputs outside the document.
 //
 // Lifecycle mirrors the viewport: async Application init guarded against an unmount race, a ticker that
 // throttles while the dockview tab is hidden, and a full destroy that tears down every SkeletonView the
@@ -75,6 +77,7 @@ const EMPTY_HUD: SlotPreviewHud = {
 };
 
 export interface SlotPreviewCallbacks {
+  readonly onTimeline?: (timeline: PresentationTimeline) => void;
   readonly onTransport: (transport: PreviewTransport) => void;
   readonly onScenario: (scenario: SlotPreviewScenarioId) => void;
   readonly onHud: (hud: SlotPreviewHud) => void;
@@ -82,6 +85,8 @@ export interface SlotPreviewCallbacks {
 }
 
 export interface SlotPreviewHandle {
+  setRecordedScenario: (result: SpinResult | null) => void;
+  setSeed: (seed: number) => void;
   setScenario: (scenario: SlotPreviewScenarioId) => void;
   resyncFromDocument: () => void;
   play: () => void;
@@ -104,14 +109,23 @@ export function mountSlotPreview(
   let scenarioId: SlotPreviewScenarioId = DEFAULT_SLOT_PREVIEW_SCENARIO;
 
   let slotView: SlotSceneView | null = null;
+  let input: SlotPreviewInput | null = null;
+  let simulation: SlotPreviewSimulation | null = null;
+  let particleView: ParticleLayerView | null = null;
+  let cinematicView: SkeletonView | null = null;
+  let cinematic: { animation: string; startMs: number } | null = null;
+  let recorded: SpinResult | null = null;
+  let seed = 1;
+  const detachAtlas = atlasTextureStore.subscribe(() => rebuildSafely());
+  const detachEffects = effectsTextureStore.subscribe(() =>
+    particleView?.setTextureResolver(effectsTextureStore.getResolver()),
+  );
   let glyphLayer: Container | null = null;
   let glyphs: Text[] = []; // row-major, one per cell
   let metrics: GridMetrics | null = null;
   let durationMs = 0;
   // The (rows,cols) signature of the mounted SlotSceneView; a scene resize that changes it forces a rebuild
   // (the view fixes its grid at construction). Content-only edits re-sequence without a rebuild.
-  let builtRows = -1;
-  let builtCols = -1;
   let builtSceneHash: string | null = null;
 
   let hud: SlotPreviewHud = EMPTY_HUD;
@@ -133,19 +147,30 @@ export function mountSlotPreview(
   const sceneCallbacks: SlotSceneCallbacks = {
     onRollup: (value) => setHud({ rollupValue: value }),
     onEscalation: (tier) => setHud({ escalation: tier }),
-    onFlowEnter: (state) => setHud({ flowState: state }),
-    onFlowExit: () => setHud({ flowState: null }),
+    onFlowEnter: (state, atMs) => {
+      setHud({ flowState: state });
+      const animation = input?.scene.featureFlows.states[state]?.cinematic?.animation;
+      cinematic =
+        animation && input?.skeleton?.animations[animation] ? { animation, startMs: atMs } : null;
+      if (!cinematic) cinematicView?.clear();
+    },
+    onFlowExit: () => {
+      setHud({ flowState: null });
+      cinematic = null;
+      cinematicView?.clear();
+    },
     onVfxBurst: (preset) => setHud({ lastVfx: preset }),
     onMultiplierOrb: (valueX) => setHud({ lastVfx: `x${valueX}` }),
   };
 
-  // Read the live authored scene as a format SlotScene plus its content hash (for the resync gate).
-  const readScene = (): { scene: SlotScene; hash: string } => {
-    const doc = exportSlotSceneDocument(documentHost.current().model.slotScene(), 'preview');
-    return { scene: doc.scene, hash: doc.hash };
-  };
-
   const teardownScene = (): void => {
+    particleView?.destroy();
+    particleView = null;
+    cinematicView?.destroy();
+    cinematicView = null;
+    cinematic = null;
+    simulation = null;
+    input = null;
     if (slotView !== null) {
       stage?.content.removeChild(slotView.root);
       slotView.destroy();
@@ -166,14 +191,22 @@ export function mountSlotPreview(
     if (stage === null) return;
     teardownScene();
 
-    const { scene, hash } = readScene();
-    const resized = scenarioScene(scene, scenarioId);
-    const grid: GridConfig = resized.grid;
+    input = prepareSlotPreview(documentHost.current(), scenarioId, recorded);
+    const { scene, hash, timeline } = input;
+    const grid: GridConfig = scene.grid;
+    simulation = createSlotPreviewSimulation(input.effects, timeline, grid, seed);
 
     const view = new SlotSceneView(grid, {
-      // No external symbol skeletons in the editor preview: the board choreography renders via the highlight
-      // overlay + phases + the glyph overlay below; a resolver would need loaded symbol documents.
-      symbolResolver: () => null,
+      tumble: scene.tumble,
+      symbolResolver: (symbol) =>
+        input?.skeleton && input.resolved.has(symbol)
+          ? {
+              document: input.skeleton,
+              animSet: input.scene.symbols[symbol]!,
+              textureResolver: atlasTextureStore.getResolver(),
+              fitToCell: true,
+            }
+          : null,
       callbacks: sceneCallbacks,
       highlightColor: HIGHLIGHT_COLOR,
     });
@@ -195,24 +228,31 @@ export function mountSlotPreview(
       }
     }
 
-    const timeline = scenarioTimeline(scene, scenarioId);
     view.setTimeline(timeline);
+    callbacks.onTimeline?.(timeline);
+    cinematicView = new SkeletonView();
+    cinematicView.setBoneChromeVisible(false);
+    cinematicView.setTextureResolver(atlasTextureStore.getResolver());
+    stage.content.addChild(cinematicView.root);
+    particleView = new ParticleLayerView(effectsTextureStore.getResolver());
+    const size = gridSize(gm);
+    particleView.setViewport(size.width, size.height);
+    stage.content.addChild(particleView.root);
 
     slotView = view;
     glyphLayer = layer;
     glyphs = cellGlyphs;
     metrics = gm;
     durationMs = timeline.durationMs;
-    builtRows = grid.rows;
-    builtCols = grid.cols;
     builtSceneHash = hash;
 
     hud = EMPTY_HUD;
     callbacks.onHud(hud);
     transport = restartPreview(transport);
     lastFitW = -1; // force a refit for the new board size
+    view.update(0);
     refreshGlyphs();
-    callbacks.onNotice(null);
+    callbacks.onNotice(input.notices.length ? input.notices.join('\n') : null);
     notifyTransport();
   };
 
@@ -227,7 +267,7 @@ export function mountSlotPreview(
         if (glyph === undefined) continue;
         const symbol = description.symbols[row]?.[col] ?? null;
         glyph.text = symbol ?? '';
-        glyph.visible = symbol !== null;
+        glyph.visible = symbol !== null && !input?.resolved.has(symbol);
       }
     }
   };
@@ -251,16 +291,37 @@ export function mountSlotPreview(
 
     if (slotView === null || !transport.isPlaying) return;
 
-    transport = advancePreview(transport, ticker.deltaMS);
+    const priorTimeMs = simulation?.timeMs ?? 0;
+    simulation?.step(ticker.deltaMS / 1000);
+    transport = advancePreview(transport, Math.min(ticker.deltaMS, 250));
     const playhead = resolveSlotPlayhead(transport.elapsedMs, durationMs, TAIL_HOLD_MS);
     if (playhead.shouldRestart) {
-      transport = restartPreview(transport);
-      hud = EMPTY_HUD;
-      hudDirty = true;
-      slotView.update(0);
-      refreshGlyphs();
+      rebuildSafely();
+      return;
     } else {
-      slotView.update(playhead.timeMs);
+      const timeMs = simulation?.timeMs ?? playhead.timeMs;
+      slotView.update(Math.min(timeMs, durationMs));
+      if (particleView && simulation) particleView.update(simulation.system.readState());
+      if (cinematicView && cinematic && input?.skeleton) {
+        cinematicView.syncAnimatedLoop(
+          input.skeleton,
+          cinematic.animation,
+          Math.max(0, timeMs - cinematic.startMs) / 1000,
+          Math.max(0, timeMs - priorTimeMs) / 1000,
+        );
+        if (metrics) {
+          const size = gridSize(metrics);
+          const bounds = cinematicView.root.getLocalBounds();
+          if (bounds.width > 0 && bounds.height > 0) {
+            const scale = Math.min(size.width / bounds.width, size.height / bounds.height) * 0.8;
+            cinematicView.root.scale.set(scale);
+            cinematicView.root.position.set(
+              size.width / 2 - (bounds.x + bounds.width / 2) * scale,
+              size.height / 2 - (bounds.y + bounds.height / 2) * scale,
+            );
+          }
+        }
+      }
     }
 
     glyphAccumMs += ticker.deltaMS;
@@ -277,6 +338,16 @@ export function mountSlotPreview(
     }
   };
 
+  const rebuildSafely = (): void => {
+    if (disposed) return;
+    try {
+      rebuild();
+    } catch (error) {
+      teardownScene();
+      callbacks.onNotice(error instanceof Error ? error.message : 'Slot preview failed.');
+    }
+  };
+
   void (async () => {
     const created = await createPreviewStage(host, transport.background);
     if (disposed) {
@@ -284,37 +355,41 @@ export function mountSlotPreview(
       return;
     }
     stage = created;
-    rebuild();
+    rebuildSafely();
     stage.app.ticker.add(tick);
-  })();
+  })().catch((error: unknown) => {
+    if (!disposed)
+      callbacks.onNotice(
+        error instanceof Error ? error.message : 'Unable to initialize the preview.',
+      );
+  });
 
   return {
+    setRecordedScenario(result: SpinResult | null): void {
+      recorded = result;
+      rebuildSafely();
+    },
+    setSeed(next: number): void {
+      if (!Number.isInteger(next) || next < 0 || next > 0xffffffff) return;
+      seed = next;
+      rebuildSafely();
+    },
     setScenario(next: SlotPreviewScenarioId): void {
-      if (next === scenarioId) return;
+      if (next === scenarioId && recorded === null) return;
+      recorded = null;
       scenarioId = next;
       callbacks.onScenario(next);
-      rebuild();
+      rebuildSafely();
     },
     resyncFromDocument(): void {
       if (stage === null) return;
-      const { scene, hash } = readScene();
-      if (hash === builtSceneHash) return; // authored scene unchanged: keep the running preview
-      const resized = scenarioScene(scene, scenarioId);
-      // A grid resize needs a fresh SlotSceneView (its grid is fixed at construction); a content-only edit
-      // just re-sequences the timeline in place.
-      if (resized.grid.rows !== builtRows || resized.grid.cols !== builtCols || slotView === null) {
-        rebuild();
-        return;
+      try {
+        const next = prepareSlotPreview(documentHost.current(), scenarioId, recorded);
+        if (next.hash !== builtSceneHash) rebuildSafely();
+      } catch (error) {
+        teardownScene();
+        callbacks.onNotice(error instanceof Error ? error.message : 'Slot preview failed.');
       }
-      const timeline = scenarioTimeline(scene, scenarioId);
-      slotView.setTimeline(timeline);
-      durationMs = timeline.durationMs;
-      builtSceneHash = hash;
-      transport = restartPreview(transport);
-      hud = EMPTY_HUD;
-      callbacks.onHud(hud);
-      refreshGlyphs();
-      notifyTransport();
     },
     play(): void {
       transport = playPreview(transport);
@@ -329,12 +404,7 @@ export function mountSlotPreview(
       notifyTransport();
     },
     restart(): void {
-      transport = restartPreview(transport);
-      hud = EMPTY_HUD;
-      callbacks.onHud(hud);
-      slotView?.update(0);
-      refreshGlyphs();
-      notifyTransport();
+      rebuildSafely();
     },
     cycleBackground(): void {
       transport = cyclePreviewBackground(transport);
@@ -346,6 +416,8 @@ export function mountSlotPreview(
     },
     destroy(): void {
       disposed = true;
+      detachAtlas();
+      detachEffects();
       teardownScene();
       glyphStyle.destroy();
       if (stage !== null) {

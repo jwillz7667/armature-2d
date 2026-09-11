@@ -12,12 +12,14 @@ import {
   resolveRenderMesh,
   resolveAttachment,
   sampleMeshVertices,
+  sampleMeshVerticesWithState,
   sampleSkeleton,
   sampleSlotSequenceFrame,
   skinMeshInto,
   SLOT_COLOR_STRIDE,
   type Mat2x3,
   type Pose,
+  type AnimationState,
 } from '@marionette/runtime-core';
 import type { AtlasIndex, TextureSampler } from './atlas';
 import type { Color } from './color';
@@ -83,12 +85,12 @@ function readBoneWorld(pose: Pose, boneIndex: number): Mat2x3 {
 
 // The mesh-deform source for gathering: the (animationId, time) whose deform channel is sampled on top of
 // the skin. `animationId: null` is the setup pose (pure skin, deform is zero at setup). For an
-// AnimationState frame this is the base track-0 entry (its animationId + trackTime), matching runtime-web's
-// SkeletonView.syncState (deform under AnimationState is scoped to track 0; ADR-0005 defines no cross-track
-// deform blend), so the preview and the shipped renderer sample the same deform.
+// AnimationState frame, animationState blends all mesh tracks (ADR-0016); animationId/sampleTime
+// retain the track-0 clock for region sequences, matching SkeletonView.syncState.
 export interface MeshDeformSource {
   readonly animationId: string | null;
   readonly sampleTime: number;
+  readonly animationState?: AnimationState;
 }
 
 // Solve the pose into the caller's buffer for a single-animation (or setup-pose) frame and return the mesh
@@ -281,6 +283,7 @@ export function gatherDrawItemsFromPose(
           sampler,
           dark,
           sourceSkin,
+          deform.animationState,
         ),
       );
     }
@@ -334,10 +337,13 @@ function meshItem(
   sampler: TextureSampler,
   dark: Color | null,
   skinName = DEFAULT_SKIN_NAME,
+  animationState?: AnimationState,
 ): DrawItem {
   const vertexCount = mesh.uvs.length / 2;
   const out = new Float32Array(vertexCount * 2);
-  if (animationId === null) {
+  if (animationState !== undefined) {
+    sampleMeshVerticesWithState(animationState, pose, skinName, slotName, attachmentName, out);
+  } else if (animationId === null) {
     // Setup pose: the pure skin of the current bone worlds (deform is zero at setup by definition).
     skinMeshInto(mesh, pose, boneIndex, out);
   } else {

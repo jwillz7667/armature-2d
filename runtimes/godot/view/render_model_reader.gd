@@ -113,6 +113,12 @@ static func _read_attachment(attachment) -> RenderModel.RenderAttachment:
 			linked.skin = skin_value if typeof(skin_value) == TYPE_STRING else null
 			linked.color = _read_color(attachment.get("color"))
 			result.linked_mesh = linked
+		"clipping":
+			result.kind = RenderModel.KIND_CLIPPING
+			var clip := RenderModel.RenderClipping.new()
+			clip.end = _req_string(attachment, "end")
+			clip.clip_vertices = _req_number_array(attachment, "vertices")
+			result.clipping = clip
 		_:
 			result.kind = RenderModel.KIND_NON_DRAWING
 

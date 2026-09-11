@@ -105,8 +105,11 @@ namespace Marionette.Runtime.View
                         ReadColor(attachment.Member("color"))));
                 }
 
+                case "clipping":
+                    return RenderAttachment.OfClipping(new Marionette.Runtime.Core.Document.ClippingAttachment(
+                        ReqString(attachment, "end"), ReqNumberArray(attachment, "vertices")));
                 default:
-                    // clipping, boundingbox, point, path: geometry the solve reads for constraints/hit-testing
+                    // boundingbox, point, path: geometry the solve reads for constraints/hit-testing
                     // but the renderer never draws. Recorded so the builder skips it explicitly.
                     return RenderAttachment.NonDrawing();
             }
