@@ -17,8 +17,10 @@ import {
   getTrackEntry,
   MAT2X3_STRIDE,
   resetToSetupPose,
+  resetPhysics,
   resolveRenderMesh,
   sampleMeshVertices,
+  sampleMeshVerticesWithState,
   sampleSkeleton,
   sampleSlotSequenceFrame,
   setActiveSkin,
@@ -257,6 +259,10 @@ export class SkeletonView {
     this.root.addChild(this.attachmentsLayer, this.bonesLayer, this.masksLayer);
   }
 
+  setBoneChromeVisible(visible: boolean): void {
+    this.bonesLayer.visible = visible;
+  }
+
   // Inject (or clear) the host's region -> Texture resolver. Region textures are resolved once when the
   // scene is built, so this invalidates the cached scene: the next sync / syncAnimated rebuilds the
   // attachment bindings against the new resolver (re-slicing nothing, just re-binding textures and
@@ -342,10 +348,15 @@ export class SkeletonView {
   // render that frame. A thin wrapper over loopTime + syncAnimated that reads the authored duration; it
   // owns no clock (the caller supplies `elapsed` from its own transport, TASK-1.6.6), so it stays
   // deterministic and testable. Throws AnimationNotFoundError for an unknown id, matching sampleSkeleton.
-  syncAnimatedLoop(document: SkeletonDocument, animationId: string, elapsed: number): void {
+  syncAnimatedLoop(
+    document: SkeletonDocument,
+    animationId: string,
+    elapsed: number,
+    frameDt = 0,
+  ): void {
     const animation = document.animations[animationId];
     if (animation === undefined) throw new AnimationNotFoundError(animationId);
-    this.syncAnimated(document, animationId, loopTime(elapsed, animation.duration));
+    this.syncAnimated(document, animationId, loopTime(elapsed, animation.duration), frameDt);
   }
 
   // Solve and render a multi-track AnimationState (ADR-0005) through the SAME render-from-pose path the
@@ -355,11 +366,8 @@ export class SkeletonView {
   // syncAnimated does. The pose is built once per document and reused, so a steady-state frame allocates
   // only the region products.
   //
-  // Mesh DEFORM scoping (v1): ADR-0005 does not define cross-track deform blending, so deform under
-  // AnimationState is sampled from the TRACK-0 current entry's animation and trackTime ONLY (the base
-  // layer), on top of the state-solved skin. A crossfade on track 0 uses its incoming (current) entry.
-  // When track 0 is empty, meshes render as the pure skin of the state-solved pose (no deform). This is a
-  // deliberate, documented scope, NOT invented cross-track deform math.
+  // Mesh offsets blend across tracks and crossfade entries after skinning (ADR-0016). Track 0 remains
+  // the sequence-attachment clock; deformation uses every unmasked track, including a sparse base.
   //
   // SKIN-SCOPED CONSTRAINTS under AnimationState: the ACTIVE skin is forwarded to applyAnimationState, so a
   // skin-scoped constraint (ADR-0009 section 5) toggles with the active skin here EXACTLY as on the
@@ -367,15 +375,33 @@ export class SkeletonView {
   // unscoped rig is unaffected (every constraint is always active). This matches the scoped attachment
   // resolution this view already does (PP-C6), so multi-track playback and single-animation playback scope
   // constraints identically.
-  syncState(document: SkeletonDocument, state: AnimationState): void {
+  syncState(document: SkeletonDocument, state: AnimationState, frameDt = 0): void {
     const scene = this.ensureScene(document);
-    applyAnimationState(state, scene.pose, scene.skinState.activeSkin);
+    applyAnimationState(state, scene.pose, scene.skinState.activeSkin, frameDt);
     const track0 = getTrackEntry(state, 0);
     if (track0 === null) {
-      this.renderFromPose(scene, null, 0);
+      this.renderFromPose(scene, null, 0, state);
     } else {
-      this.renderFromPose(scene, track0.animationId, track0.trackTime);
+      this.renderFromPose(scene, track0.animationId, track0.trackTime, state);
     }
+  }
+
+  resetSimulation(): void {
+    if (this.cached !== null) resetPhysics(this.cached.pose);
+  }
+
+  // Authoring chrome reads the world matrices that actually produced the displayed frame. The copy
+  // keeps a pointer gesture's start snapshot stable while subsequent frames update the live pose.
+  readBoneWorlds(): ReadonlyMap<string, Mat2x3> {
+    const worlds = new Map<string, Mat2x3>();
+    const scene = this.cached;
+    if (scene === null) return worlds;
+    for (const bone of scene.boneRecords) {
+      const b = bone.boneIndex * MAT2X3_STRIDE;
+      const w = scene.pose.world;
+      worlds.set(bone.name, [w[b]!, w[b + 1]!, w[b + 2]!, w[b + 3]!, w[b + 4]!, w[b + 5]!]);
+    }
+    return worlds;
   }
 
   // A read-only snapshot of the current scene for tests and tooling (no WebGL needed). Computed from
@@ -679,7 +705,12 @@ export class SkeletonView {
   // null means setup pose (skin only; deform is zero at setup). The only per-frame allocation is the
   // region product matrix from runtime-core's multiply (the affine library exposes no in-place product
   // to this layer); the pose, records, display objects, and mesh position buffers are all reused.
-  private renderFromPose(scene: CachedScene, animationId: string | null, t: number): void {
+  private renderFromPose(
+    scene: CachedScene,
+    animationId: string | null,
+    t: number,
+    state?: AnimationState,
+  ): void {
     const world = scene.pose.world;
 
     for (const record of scene.boneRecords) {
@@ -713,7 +744,16 @@ export class SkeletonView {
       }
 
       if (meshEntry !== undefined && resolved !== null) {
-        this.renderMesh(scene, record, meshEntry, resolved.name, resolved.skinName, animationId, t);
+        this.renderMesh(
+          scene,
+          record,
+          meshEntry,
+          resolved.name,
+          resolved.skinName,
+          animationId,
+          t,
+          state,
+        );
         continue;
       }
 
@@ -916,8 +956,18 @@ export class SkeletonView {
     skinName: string,
     animationId: string | null,
     t: number,
+    state?: AnimationState,
   ): void {
-    if (animationId === null) {
+    if (state !== undefined) {
+      sampleMeshVerticesWithState(
+        state,
+        scene.pose,
+        skinName,
+        record.slot,
+        activeName,
+        entry.positions,
+      );
+    } else if (animationId === null) {
       // Setup pose: skin the SOURCE geometry (the resolved parent mesh for a linked mesh, PP-C8).
       skinMeshInto(entry.sourceMesh, scene.pose, record.boneIndex, entry.positions);
     } else {
@@ -1002,6 +1052,7 @@ export class SkeletonView {
             t,
             scene.pose,
             scene.pose.slotNames[slotIndex]!,
+            sequence,
           );
     if (frameIndex < 0) return path;
     return sequenceRegionName(path, sequence, frameIndex);

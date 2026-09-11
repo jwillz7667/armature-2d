@@ -22,7 +22,11 @@ export class ReorderLayersCommand implements Command {
       const effect = ctx.effects.getEffect(this.effectId);
       if (!effect) throw new EffectEditError('notFound', `effect ${this.effectId} does not exist`);
       const current = new Set<string>(effect.layerOrder);
-      if (this.order.length !== current.size || !this.order.every((id) => current.has(id))) {
+      if (
+        this.order.length !== current.size ||
+        new Set(this.order).size !== current.size ||
+        !this.order.every((id) => current.has(id))
+      ) {
         throw new EffectEditError(
           'notFound',
           'reorder order must be a permutation of the effect layer ids',

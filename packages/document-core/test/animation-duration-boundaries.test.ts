@@ -13,6 +13,25 @@ import { makeTestEnv, seeds } from './seeds';
 // Exercise the command against each real timeline family in the shared rig corpus, isolated from
 // bone keys which previously hid missing guards. Format validation supplies the independent oracle.
 const cases: { name: string; document: unknown }[] = [];
+
+it('requires positive duration even when all keys are at time zero', () => {
+  const seed = seeds.animated;
+  const source = Object.values(seed.animations)[0]!;
+  const root = seed.bones[0]!.name;
+  const animation: Animation = {
+    ...source,
+    bones: { [root]: { rotate: [{ time: 0, value: { angle: 15 }, curve: 'linear' }] } },
+    slots: {},
+  };
+  const doc = loadDocument({ ...seed, animations: { zero: animation } }, makeTestEnv().env);
+  const id = doc.model.animations()[0]!.id;
+  const before = doc.model.snapshot();
+  expect(() => doc.history.execute(new SetAnimationDurationCommand(id, 0))).toThrow(
+    AnimationDurationError,
+  );
+  expect(doc.model.snapshot()).toEqual(before);
+  expect(doc.history.canUndo).toBe(false);
+});
 const directory = new URL('../../conformance/src/rigs/', import.meta.url);
 for (const file of readdirSync(directory).filter((name) => name.endsWith('.json'))) {
   const rig = parseDocument(JSON.parse(readFileSync(new URL(file, directory), 'utf8')), {

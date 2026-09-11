@@ -1,3 +1,4 @@
+import type { BlendMode } from '@marionette/format/effects-types';
 import type { Command, CommandContext } from '../command/command';
 import { CommandNotAppliedError, EffectEditError } from '../command/errors';
 import type { EffectId } from '../model/ids';
@@ -7,6 +8,7 @@ import type { EffectCommandSpec } from './effects-spec';
 // absent field is left unchanged). `simulationDt > 0` is a typed guard (EFFECT_SIMULATION_DT at the command
 // boundary).
 export interface EffectMetaPatch {
+  readonly blendMode?: BlendMode;
   readonly duration?: number | null;
   readonly deterministic?: boolean;
   readonly simulationDt?: number;
@@ -36,6 +38,7 @@ export class SetEffectMetaCommand implements Command {
       const effect = ctx.effects.getEffect(this.effectId);
       if (!effect) throw new EffectEditError('notFound', `effect ${this.effectId} does not exist`);
       this.before = {
+        ...(this.patch.blendMode !== undefined ? { blendMode: effect.blendMode } : {}),
         ...(this.patch.duration !== undefined ? { duration: effect.duration } : {}),
         ...(this.patch.deterministic !== undefined ? { deterministic: effect.deterministic } : {}),
         ...(this.patch.simulationDt !== undefined ? { simulationDt: effect.simulationDt } : {}),

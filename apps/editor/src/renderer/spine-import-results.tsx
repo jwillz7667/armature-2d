@@ -71,12 +71,25 @@ export function SpineImportResults(): ReactElement | null {
 
   const succeeded = report.status === 'imported';
   const title = succeeded ? `Imported "${report.name ?? 'project'}"` : 'Spine import failed';
+  const download = (): void => {
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(report, null, 2)], { type: 'application/json' }),
+    );
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = 'spine-import-report.json';
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
 
   return (
     <div style={overlayStyle} role="dialog" aria-modal="true" aria-label="Spine import results">
       <div style={dialogStyle}>
         <div style={headerStyle}>
           <strong style={{ fontSize: 15 }}>{title}</strong>
+          <button type="button" style={closeButtonStyle} onClick={download}>
+            Save report
+          </button>
           <button type="button" style={closeButtonStyle} onClick={dismiss}>
             Close
           </button>
@@ -115,7 +128,8 @@ export function SpineImportResults(): ReactElement | null {
         ) : (
           succeeded && (
             <div style={{ color: '#8a8a9a' }}>
-              No lossy conversions. Everything imported cleanly.
+              No unsupported fields were reported for this input. Review the animation against your
+              source project.
             </div>
           )
         )}

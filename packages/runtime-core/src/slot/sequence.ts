@@ -244,9 +244,8 @@ function resolveTargetCells(
 //                     The rollup TARGET is always result.totalWin exactly. A second authored rollupStart in
 //                     the same sequence would emit a second rollup; the LINE-WIN contract is one rollupStart
 //                     per sequence (the authoring panel pins one), and the suppression key is `cascades`.
-//   - escalationBanner -> a no-op here. Escalation is driven by the threshold table in STAGE 6
-//                     (emitEscalation) so the crossed-tier banners are a pure function of totalWin/bet,
-//                     independent of authored step placement; the authored tier is recorded intent only.
+//   - escalationBanner -> stage 6 emits each crossed tier at its first authored placement, or time
+//                     zero when no placement is authored. Thresholds decide eligibility only.
 // All times are integer ms; all amounts integer base units. The function reads `result.wins`/`totalWin`/
 // `bet`/`cascades` and the authored config; it never reads a clock/RNG and never decides an outcome.
 function emitWinSequence(builder: DirectiveBuilder, result: SpinResult, scene: SlotScene): void {
@@ -433,13 +432,10 @@ function emitNodeCinematic(
 //   6. this step's `counterRollup` chain link `{ fromUnits: prevCumulative, toUnits: step.cumulativeWin,
 //      startMs, endMs, curve: tumble.rollupCurve }` (the contiguous CASCADE-WIN chain, section 5.4.3).
 //
-// atMs ACCUMULATION (documented, integer ms): a running `atMs` starts at 0 and ADVANCES by
-// `explodeMs + dropMs + settleMs + stepGapMs` per step (the authored TumbleChoreography timings). Within a
-// step ALL of explode/win/drop/refill share the step's START atMs (their relative order is pinned by `seq`,
-// not by atMs); the rollup link spans `[stepStart, stepStart + dropMs]` (the drop window) so the displayed
-// total ticks up as the symbols fall. A zero-duration TumbleChoreography (the default for a non-cascade
-// game) collapses every step to atMs 0; the order is still total via `seq`. All amounts are integer base
-// units; the chain reads `cumulativeWin`, NEVER sums `stepWin` (LAW 1).
+// Cascades begin after reel landing. Each step plays its win animation, then removes cells after
+// explodeMs, drops survivors for dropMs, refills columns with refillStaggerMs, and settles before
+// the next step. Counter links cover the complete step and meet at their endpoints. Engine amounts
+// and refill symbols are consumed verbatim.
 //
 // prevCumulative RULE: `0` for the first step (k === 0), else `cascades[k-1].cumulativeWin`. The chain is
 // therefore contiguous and non-overlapping (each link starts where the previous ended), and its terminal
@@ -464,17 +460,21 @@ function emitCascades(builder: DirectiveBuilder, result: SpinResult, scene: Slot
   const { rows, cols } = scene.grid;
   const tumble: TumbleChoreography = scene.tumble;
   const rollupCurve: CurveType = tumble.rollupCurve;
-  const stepSpanMs = tumble.explodeMs + tumble.dropMs + tumble.settleMs + tumble.stepGapMs;
 
   let board: readonly (readonly SymbolId[])[] = result.initialGrid;
-  let atMs = 0;
+  let atMs = Math.max(0, cols - 1) * scene.grid.reelStopStaggerMs;
   let prevCumulative = 0;
   for (let k = 0; k < cascades.length; k += 1) {
     const step: CascadeStep = cascades[k]!;
+    const refills = orderedRefill(step);
+    const removeMs = atMs + tumble.explodeMs;
+    const refillMs = removeMs + tumble.dropMs;
+    const refillTailMs = Math.max(0, refills.length - 1) * tumble.refillStaggerMs;
+    const endMs = refillMs + refillTailMs + tumble.settleMs + tumble.stepGapMs;
 
     // 1. Explode: the removed cells mapped to {row,col}, de-duplicated and ordered (col asc, then row asc).
     const removedCells = orderedRemovedCells(step);
-    builder.push({ kind: 'cascadeExplode', cells: removedCells, atMs });
+    builder.push({ kind: 'cascadeExplode', cells: removedCells, atMs: removeMs });
 
     // 2. The win animation for each removed cell, in the same (col, row) order.
     for (const cell of removedCells) {
@@ -485,14 +485,20 @@ function emitCascades(builder: DirectiveBuilder, result: SpinResult, scene: Slot
 
     // 4. The survivor slides for this step (column-down gravity), plus the chained next board.
     const drop = solveCascadeStep(board, step.removed, step.refill, rows, cols);
-    builder.push({ kind: 'cascadeDrop', moves: drop.moves, atMs });
+    builder.push({ kind: 'cascadeDrop', moves: drop.moves, atMs: removeMs });
     board = drop.board;
 
     // 5. The refilled columns LEFT-TO-RIGHT, using the engine's refill symbols verbatim. The engine's
     // `refill` array order is followed but de-conflicted by column so the emission is column-sorted (a
     // refill array that lists columns out of order still emits left-to-right).
-    for (const colRefill of orderedRefill(step)) {
-      builder.push({ kind: 'cascadeRefill', col: colRefill.col, symbols: colRefill.symbols, atMs });
+    for (let index = 0; index < refills.length; index++) {
+      const colRefill = refills[index]!;
+      builder.push({
+        kind: 'cascadeRefill',
+        col: colRefill.col,
+        symbols: colRefill.symbols,
+        atMs: refillMs + index * tumble.refillStaggerMs,
+      });
     }
 
     // 6. This step's contiguous rollup chain link, reading the engine's authoritative cumulativeWin.
@@ -501,13 +507,13 @@ function emitCascades(builder: DirectiveBuilder, result: SpinResult, scene: Slot
       fromUnits: prevCumulative,
       toUnits: step.cumulativeWin,
       startMs: atMs,
-      endMs: atMs + tumble.dropMs,
+      endMs,
       curve: rollupCurve,
       atMs,
     });
 
     prevCumulative = step.cumulativeWin;
-    atMs += stepSpanMs;
+    atMs = endMs;
   }
 }
 
@@ -537,22 +543,23 @@ function orderedRefill(
 // Escalation phase (TASK-4.8.4, construction-order stage 6, section 5.4.1). Emit one `escalation{tier}`
 // directive for EACH crossed tier in ASCENDING tier order (big, then mega, then epic), driven PURELY by
 // `totalWin/bet` against the threshold table (the engine amount decides the tier; the author decides the
-// visuals). This is independent of the authored win-sequence steps: an authored escalationBanner action is
-// a no-op, and a crossed tier always emits here even if no step named it. A tier is crossed iff
-// `totalWin >= threshold * bet` (integer-safe). All escalation directives share atMs 0 (they are banners
-// for the whole spin); their relative order is pinned by `seq` (ascending tier order, the push order here).
+// visuals). The first authored placement of a crossed tier supplies its time; absent placements use zero.
+// A tier is crossed iff totalWin >= threshold * bet. Equal-time banners keep ascending tier order.
 function emitEscalation(builder: DirectiveBuilder, result: SpinResult, scene: SlotScene): void {
   const thresholds = scene.winSequencer.thresholds;
   for (const tier of ESCALATION_TIERS_ASCENDING) {
     if (tierCrossed(result, thresholds, tier)) {
-      builder.push({ kind: 'escalation', tier, atMs: 0 });
+      const authored = selectSequenceSteps(result, scene.winSequencer).find(
+        (step) => step.action.kind === 'escalationBanner' && step.action.tier === tier,
+      );
+      builder.push({ kind: 'escalation', tier, atMs: authored?.atMs ?? 0 });
     }
   }
 }
 
 // The single public entry (TASK-4.7.7). `sequence(result, scene)` is referentially transparent (LAW 1):
 // it allocates one builder, runs the emission stages in construction order, sorts once, and returns the
-// timeline. `durationMs` is the max atMs across emitted directives (or 0 if none), an integer. The editor
+// timeline. `durationMs` includes the end of counter intervals as well as directive times. The editor
 // preview (passing a snapshot projection) and runtime-web (passing the validated scene) call THIS exact
 // symbol: one code path, no second sequencer.
 export function sequence(result: SpinResult, scene: SlotScene): PresentationTimeline {
@@ -581,8 +588,9 @@ export function sequence(result: SpinResult, scene: SlotScene): PresentationTime
   const directives = builder.build();
   let durationMs = 0;
   for (let i = 0; i < directives.length; i += 1) {
-    const atMs = directives[i]!.atMs;
-    if (atMs > durationMs) durationMs = atMs;
+    const directive = directives[i]!;
+    const endMs = directive.kind === 'counterRollup' ? directive.endMs : directive.atMs;
+    if (endMs > durationMs) durationMs = endMs;
   }
   return { spinId: result.spinId, durationMs, directives };
 }

@@ -1,3 +1,4 @@
+import { inspectPng } from '@marionette/format';
 import { decodePng } from '@marionette/atlas-pack';
 import {
   encodeApng,
@@ -52,18 +53,19 @@ export interface RunMediaExportParams {
   readonly control?: MediaExportControl;
 }
 
-// Decode the atlas page PNG bytes into the render-preview pixel source. A page that fails to decode is
-// skipped (the region renders as the white placeholder, matching runtime-web's unresolved-texture path),
-// so a partially-corrupt atlas still previews rather than failing the whole export.
+// Supplied artwork must decode within the budget before any output is written.
 function toAtlasPixelSource(pages: readonly AtlasImportPage[]): AtlasPixelSource {
   const map = new Map<string, AtlasPagePixels>();
+  let pixels = 0;
+  let bytes = 0;
   for (const page of pages) {
-    try {
-      const decoded = decodePng(page.data);
-      map.set(page.file, { width: decoded.width, height: decoded.height, rgba: decoded.rgba });
-    } catch {
-      // Skip an undecodable page; the region falls back to the placeholder sampler.
-    }
+    if (map.has(page.file)) throw new Error(`Duplicate atlas page ${page.file}`);
+    const dimensions = inspectPng(page.data);
+    pixels += dimensions.width * dimensions.height;
+    bytes += page.data.byteLength;
+    if (pixels > 64 * 1024 * 1024 || bytes > 512 * 1024 * 1024)
+      throw new Error('Export textures exceed their resource budget');
+    map.set(page.file, decodePng(page.data));
   }
   return { pages: map };
 }
@@ -75,6 +77,7 @@ function buildSequenceOptions(
 ): RenderSequenceOptions {
   return {
     document,
+    ...(options.activeSkin !== undefined ? { activeSkin: options.activeSkin } : {}),
     atlas,
     viewport: { width: options.width, height: options.height, fit: 'content' },
     background: options.background ?? TRANSPARENT,
@@ -134,6 +137,14 @@ export async function runMediaExport(params: RunMediaExportParams): Promise<Medi
   const base = renderSequence(buildSequenceOptions(document, atlas, options));
   const sequence = withProgress(base, control);
   const frameCount = sequence.frameCount;
+  if (
+    options.medium !== 'png-sequence' &&
+    sequence.width * sequence.height * frameCount > 128 * 1024 * 1024
+  ) {
+    throw new Error(
+      'Animated image export exceeds the 128 megapixel clip budget. Reduce the size or duration, or export a PNG sequence.',
+    );
+  }
 
   if (options.medium === 'gif') {
     return { kind: 'single', bytes: encodeGif(sequence, toGifOptions(options)), frameCount };

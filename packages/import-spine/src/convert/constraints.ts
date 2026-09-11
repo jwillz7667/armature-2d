@@ -11,6 +11,7 @@ import {
   asRecord,
   ptr,
   readNumber,
+  readBoolean,
   readOptionalNumber,
   readRequiredString,
   readString,
@@ -42,7 +43,7 @@ export function convertIkConstraints(
     const name = readRequiredString(rec, 'name', path, diag);
     const target = readRequiredString(rec, 'target', path, diag);
     if (name === undefined || target === undefined) continue;
-    const bendPositive = rec['bendPositive'] === undefined ? true : rec['bendPositive'] === true;
+    const bendPositive = readBoolean(rec, 'bendPositive', path, diag, true);
     out.push({
       name,
       bones: readStringArrayField(rec, 'bones', path, diag),
@@ -50,9 +51,9 @@ export function convertIkConstraints(
       mix: readNumber(rec, 'mix', path, diag, 1),
       bend: bendPositive ? 1 : -1,
       softness: readNumber(rec, 'softness', path, diag, 0),
-      stretch: rec['stretch'] === true,
-      compress: rec['compress'] === true,
-      uniform: rec['uniform'] === true,
+      stretch: readBoolean(rec, 'stretch', path, diag, false),
+      compress: readBoolean(rec, 'compress', path, diag, false),
+      uniform: readBoolean(rec, 'uniform', path, diag, false),
       ...readOrder(rec, path, diag),
     });
   }
@@ -94,8 +95,8 @@ export function convertTransformConstraints(
       offsetScaleX: readNumber(rec, 'scaleX', path, diag, 0),
       offsetScaleY: readNumber(rec, 'scaleY', path, diag, 0),
       offsetShearY: readNumber(rec, 'shearY', path, diag, 0),
-      local: rec['local'] === true,
-      relative: rec['relative'] === true,
+      local: readBoolean(rec, 'local', path, diag, false),
+      relative: readBoolean(rec, 'relative', path, diag, false),
       ...readOrder(rec, path, diag),
     });
   }

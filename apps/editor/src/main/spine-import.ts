@@ -1,49 +1,98 @@
-import { readFile } from 'node:fs/promises';
-import { extname } from 'node:path';
+import { Worker } from 'node:worker_threads';
 import { BrowserWindow, dialog } from 'electron';
-import type { IpcResult, SpineImportResponse } from '../shared';
-import { convertSpineProject, type SpineFileContents } from './spine-import-convert';
+import { spineImportResponseSchema, type IpcResult, type SpineImportResponse } from '../shared';
 
-// The Import Spine Project dialog + filesystem wrapper (main process only; the renderer is sandboxed, no
-// Node). The renderer never supplies a filesystem path: it always comes from a main-process dialog
-// (path-injection defense), exactly like file:open. The pure conversion lives in spine-import-convert.ts
-// (headless-testable); this module only owns the dialog and the file read. Import only, never export.
+const SPINE_FILTERS = [{ name: 'Spine Project', extensions: ['json', 'skel'] }];
+let busy = false;
 
-const SPINE_FILTERS = [
-  { name: 'Spine Project', extensions: ['json', 'skel'] },
-  { name: 'All Files', extensions: ['*'] },
-];
+function runImportWorker(path: string): Promise<SpineImportResponse> {
+  return new Promise((resolve, reject) => {
+    const worker = new Worker(new URL('./spine-import-worker.js', import.meta.url), {
+      workerData: path,
+      resourceLimits: { maxOldGenerationSizeMb: 768 },
+    });
+    let settled = false;
+    const finish = (response?: SpineImportResponse, error?: Error): void => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      void worker.terminate();
+      if (error) reject(error);
+      else if (response) resolve(response);
+      else reject(new Error('Spine import worker produced no result'));
+    };
+    const timer = setTimeout(
+      () =>
+        finish(
+          undefined,
+          new Error('Spine import exceeded 60 seconds. Reduce the source project size.'),
+        ),
+      60000,
+    );
+    worker.on('message', (value: unknown) => {
+      const result = spineImportResponseSchema.safeParse(value);
+      if (result.success) finish(result.data);
+      else finish(undefined, new Error('Invalid Spine import worker response'));
+    });
+    worker.on('error', (error) => finish(undefined, error));
+    worker.on('exit', () => finish());
+  });
+}
 
-// Show the open dialog, read the chosen file (text for JSON, bytes for .skel), and convert it. A read
-// failure is a typed IPC handler error; a cancel is a normal outcome; an import failure is a `failed`
-// response (surfaced by the renderer results dialog), never a thrown IPC error.
 export async function importSpineProjectFromFile(): Promise<IpcResult<SpineImportResponse>> {
-  const openOptions = {
-    title: 'Import Spine Project',
-    properties: ['openFile' as const],
-    filters: SPINE_FILTERS,
-  };
-  const focused = BrowserWindow.getFocusedWindow();
-  const result = focused
-    ? await dialog.showOpenDialog(focused, openOptions)
-    : await dialog.showOpenDialog(openOptions);
-  const path = result.filePaths[0];
-  if (result.canceled || path === undefined) {
-    return { ok: true, data: { status: 'canceled' } };
-  }
-
-  const isBinary = extname(path).toLowerCase() === '.skel';
-  let contents: SpineFileContents;
-  try {
-    contents = isBinary
-      ? { kind: 'skel', bytes: new Uint8Array(await readFile(path)) }
-      : { kind: 'json', text: await readFile(path, 'utf8') };
-  } catch {
+  if (busy)
     return {
       ok: false,
-      error: { code: 'IPC_HANDLER_ERROR', message: `could not read file ${path}` },
+      error: { code: 'IPC_HANDLER_ERROR', message: 'A Spine import is already running' },
     };
+  busy = true;
+  try {
+    const focused = BrowserWindow.getFocusedWindow();
+    const openOptions = {
+      title: 'Import Spine Project',
+      properties: ['openFile' as const],
+      filters: SPINE_FILTERS,
+    };
+    const result = focused
+      ? await dialog.showOpenDialog(focused, openOptions)
+      : await dialog.showOpenDialog(openOptions);
+    const path = result.filePaths[0];
+    if (result.canceled || !path) return { ok: true, data: { status: 'canceled' } };
+    const data = await runImportWorker(path);
+    if (data.status === 'imported' && data.warnings.length) {
+      const options = {
+        type: 'warning' as const,
+        title: 'Review Spine import changes',
+        message: `This import has ${data.warnings.length} conversion notice(s).`,
+        detail:
+          data.warnings
+            .slice(0, 40)
+            .map((w) => `${w.path || '(project)'}: ${w.why}`)
+            .join('\n\n') +
+          (data.warnings.length > 40
+            ? '\n\nAdditional notices are available in the import report.'
+            : ''),
+        buttons: ['Cancel', 'Import with these changes'],
+        defaultId: 0,
+        cancelId: 0,
+        noLink: true,
+      };
+      const decision =
+        focused && !focused.isDestroyed()
+          ? await dialog.showMessageBox(focused, options)
+          : await dialog.showMessageBox(options);
+      if (decision.response !== 1) return { ok: true, data: { status: 'canceled' } };
+    }
+    return { ok: true, data };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: 'IPC_HANDLER_ERROR',
+        message: error instanceof Error ? error.message : 'Spine import failed',
+      },
+    };
+  } finally {
+    busy = false;
   }
-
-  return { ok: true, data: convertSpineProject(path, contents) };
 }

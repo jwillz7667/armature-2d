@@ -1,43 +1,15 @@
-# Three-runtime conformance + cross-language equivalence (phase-5 WP-5.5, conformance-and-ci.md D.9/D.13).
-#
-# Status: ACTIVE (PP-E3). Both native runtimes are landed, so the engine jobs now run for real:
-#   - conformance-unity  runs the shared C# solve core (ADR-0001) via `dotnet test`, no Unity editor.
-#   - conformance-godot  runs the GDScript solve core through the real headless Godot engine.
-#   - cross-language-equivalence  proves the TS integer determinism surface (spinSeed, hash32, the
-#     mulberry32 stream, CRC-32, the committed binary twin CRCs) matches the committed cross-language
-#     golden, the corpus BOTH native runtimes reproduce bit for bit.
-# Each engine job still gates behind a directory probe (detect-runtimes) so the workflow degrades to
-# skipped-as-success if a runtime is ever removed, but in practice both are present and all jobs run.
-#
-# Required-check topology (R5, TASK-5.5.6): this repo has TWO required status checks, configured per-repo
-# in branch protection / rulesets (they cannot be set from workflow YAML):
-#   1. `ci-pass`                 (ci.yml)                  every PR and push.
-#   2. `conformance-native-pass` (this workflow)           path-filtered PRs + push to main + nightly.
-# We deliberately keep two workflows rather than folding the native jobs into ci-pass: the engine jobs are
-# heavier (a dotnet restore, a pinned Godot download) and only a change under runtimes / packages/format /
-# packages/runtime-core / packages/conformance can move native conformance, so they run only when one of
-# those paths changes (plus the nightly full run and every push to main). See the note under
-# `conformance-native-pass` on the path-filter interaction with required checks.
-
 name: Conformance (native)
 
 on:
   pull_request:
-    # Path filter (explicit, includes the transitive solve/codec owners so a core or codec change cannot
-    # skip the engine jobs through a missed trigger): runtimes, conformance corpus, the binary codec +
-    # container (packages/format), and the solve oracle the native cores mirror (packages/runtime-core).
-    paths:
-      - 'runtimes/**'
-      - 'packages/conformance/**'
-      - 'packages/format/**'
-      - 'packages/runtime-core/**'
-      - '.github/workflows/conformance-native.yml'
   push:
     branches: [main]
   schedule:
-    # Nightly full run on main: the native jobs (a dotnet restore + a pinned Godot download) are heavier
-    # than the TS suites, so they run nightly in addition to the path-filtered PR runs.
     - cron: '0 4 * * *'
+  workflow_call:
+
+permissions:
+  contents: read
 
 env:
   TURBO_TELEMETRY_DISABLED: '1'
@@ -78,12 +50,15 @@ jobs:
       - uses: actions/checkout@v4
       - id: probe
         run: |
+          set -euo pipefail
+          test -d runtimes/unity
+          test -d runtimes/godot
           {
             echo "unity=$([ -d runtimes/unity ] && echo true || echo false)"
             echo "godot=$([ -d runtimes/godot ] && echo true || echo false)"
           } >> "$GITHUB_OUTPUT"
 
-  # PATH-FILTERED / nightly (TASK-5.5.1): Unity conformance via the shared C# solve core.
+  # Every PR / nightly (TASK-5.5.1): Unity conformance via the shared C# solve core.
   #
   # No GameCI / no Unity editor by design: per ADR-0001 the Marionette solve is one engine-agnostic C#
   # library (netstandard2.1, zero UnityEngine references) that Unity and Godot render over; its conformance
@@ -95,7 +70,6 @@ jobs:
   conformance-unity:
     runs-on: ubuntu-latest
     needs: detect-runtimes
-    if: ${{ needs.detect-runtimes.outputs.unity == 'true' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -104,7 +78,7 @@ jobs:
       - name: Shared C# solve core conformance (dotnet test, WP-5.3, TASK-5.5.1)
         run: dotnet test runtimes/unity --nologo
 
-  # PATH-FILTERED / nightly (TASK-5.5.2): Godot conformance through the real `godot --headless` engine path
+  # Every PR / nightly (TASK-5.5.2): Godot conformance through the real `godot --headless` engine path
   # (DECISION-5.4), not a bare C# console. The pinned official Godot build is downloaded, SHA256-verified,
   # and cached by version; the harness reads the committed rigs / fixtures / vectors from
   # packages/conformance directly (no build step, no pnpm), and the wrapper fails on a MISSING success
@@ -112,7 +86,6 @@ jobs:
   conformance-godot:
     runs-on: ubuntu-latest
     needs: detect-runtimes
-    if: ${{ needs.detect-runtimes.outputs.godot == 'true' }}
     steps:
       - uses: actions/checkout@v4
       # Shared libraries the official Godot editor binary dynamically links even under --headless (it opens
@@ -147,26 +120,14 @@ jobs:
           "$GODOT" --version
           runtimes/godot/tests/run.sh
 
-  # Aggregator with skipped-as-success semantics (mirrors ci.yml ci-pass). A genuinely skipped native job
-  # (its runtime removed, or a PR outside the path filter that still triggered a partial run) counts as
-  # success; a real failure or cancellation turns this red. This is the second required status check
-  # (TASK-5.5.6); the repo owner marks BOTH `ci-pass` and `conformance-native-pass` as required.
-  #
-  # Path-filter caveat for the repo owner: because the trigger is path-filtered, a PR that touches none of
-  # the filtered paths does not start this workflow at all, so `conformance-native-pass` is not reported on
-  # that PR. That is correct (such a PR cannot move native conformance), but GitHub's required-status
-  # machinery will wait on an unreported required check. Resolve it per GitHub's documented pattern for a
-  # skipped-but-required check (a companion no-op job of the same name on the inverse path filter), or scope
-  # the requirement through a ruleset that treats a not-triggered workflow as satisfied. See the report.
+  # Always report the required check on every PR; omitted or skipped native jobs fail.
   conformance-native-pass:
     runs-on: ubuntu-latest
     if: always()
     needs: [detect-runtimes, cross-language-equivalence, conformance-unity, conformance-godot]
     steps:
-      - name: Verify no native conformance job failed (skipped counts as success)
+      - name: Verify every native conformance job succeeded
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
         run: |
-          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
-            echo "A native conformance job failed."
-            exit 1
-          fi
-          echo "Native conformance checks passed (Unity C# core + Godot headless + cross-language vectors)."
+          node -e 'const jobs=JSON.parse(process.env.JOB_RESULTS); for(const name of ["detect-runtimes","cross-language-equivalence","conformance-unity","conformance-godot"]) { if(jobs[name]?.result !== "success") throw new Error(name + " did not succeed"); }'

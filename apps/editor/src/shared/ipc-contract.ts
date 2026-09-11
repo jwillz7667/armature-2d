@@ -12,6 +12,11 @@ export const IpcChannel = {
   getVersion: 'app:getVersion',
   fileSave: 'file:save',
   fileOpen: 'file:open',
+  fileConfirmUnsaved: 'file:confirmUnsaved',
+  fileCloseApproved: 'file:closeApproved',
+  fileRecoverySave: 'file:recoverySave',
+  fileRecoveryOpen: 'file:recoveryOpen',
+  fileRecoveryDiscard: 'file:recoveryDiscard',
   atlasImport: 'atlas:import',
   // Import a user-owned exported Spine project (.json or .skel). Main owns the file dialog (no renderer
   // path, the path-injection defense), runs the clean-room importer OUTSIDE the renderer document path,
@@ -85,6 +90,9 @@ export const MENU_ACTION_IDS = [
   'file:new',
   'file:open',
   'file:save',
+  'file:saveAs',
+  'file:close',
+  'file:recover',
   'file:importSprites',
   'file:importSpine',
   'file:export',
@@ -123,7 +131,13 @@ export type GetVersionResponse = z.infer<typeof getVersionResponseSchema>;
 // z.instanceof validates it without the base64 size bloat and extra decode step. `file` is the
 // AtlasPage.file basename, the key runtime-web's buildRegionTextures resolves each page texture by.
 export const atlasImportPageSchema = z
-  .object({ file: z.string().min(1), data: z.instanceof(Uint8Array) })
+  .object({
+    file: z.string().min(1).max(1024),
+    data: z
+      .instanceof(Uint8Array)
+      .refine((data) => data.byteLength <= 256 * 1024 * 1024, 'texture exceeds the size limit'),
+    scope: z.enum(['skeleton', 'effects']).optional(),
+  })
   .strict();
 
 export type AtlasImportPage = z.infer<typeof atlasImportPageSchema>;
@@ -136,7 +150,14 @@ export type AtlasImportPage = z.infer<typeof atlasImportPageSchema>;
 // page PNG bytes (empty when no atlas is loaded); main persists them next to the project so a later open
 // can restore the textures (PP-D5) instead of falling back to placeholders.
 export const fileSaveRequestSchema = z
-  .object({ document: z.unknown(), pages: z.array(atlasImportPageSchema) })
+  .object({
+    document: z.unknown(),
+    pages: z.array(atlasImportPageSchema).max(4096),
+    options: z
+      .object({ documentId: z.string().uuid(), saveAs: z.boolean().optional() })
+      .strict()
+      .optional(),
+  })
   .strict();
 export const fileSaveResponseSchema = z.discriminatedUnion('status', [
   z.object({ status: z.literal('saved'), path: z.string().min(1) }).strict(),
@@ -151,6 +172,10 @@ export type FileSaveResponse = z.infer<typeof fileSaveResponseSchema>;
 // so the renderer restores the atlas textures on load instead of clearing to placeholders; it is empty
 // when the project has no atlas or its textures directory is absent (a partial or missing set is fine).
 export const fileOpenRequestSchema = z.undefined();
+export const recoveryOpenRequestSchema = z
+  .object({ startup: z.boolean().optional() })
+  .strict()
+  .optional();
 export const fileOpenResponseSchema = z.discriminatedUnion('status', [
   z
     .object({
@@ -158,12 +183,19 @@ export const fileOpenResponseSchema = z.discriminatedUnion('status', [
       name: z.string().min(1),
       document: z.unknown(),
       pages: z.array(atlasImportPageSchema),
+      documentId: z.string().uuid().optional(),
+      path: z.string().optional(),
+      warnings: z.array(z.string()).optional(),
     })
     .strict(),
   z.object({ status: z.literal('canceled') }).strict(),
 ]);
 
 export type FileOpenResponse = z.infer<typeof fileOpenResponseSchema>;
+export type FileSaveOptions = NonNullable<z.infer<typeof fileSaveRequestSchema>['options']>;
+export type UnsavedDecision = 'save' | 'discard' | 'cancel';
+export const fileSessionRequestSchema = z.object({ documentId: z.string().uuid() }).strict();
+export const confirmUnsavedResponseSchema = z.enum(['save', 'discard', 'cancel']);
 
 // spine:import. No request payload; the main process shows the .json/.skel open dialog, runs the
 // clean-room importer, and returns the converted document plus warnings, a typed failure, or a cancel.
@@ -172,13 +204,23 @@ export type FileOpenResponse = z.infer<typeof fileOpenResponseSchema>;
 // result into these shapes. `document` is opaque at the transport layer (z.unknown), exactly like
 // file:open: the importer already validated it and the renderer re-validates via loadDocument (LAW 3).
 export const spineImportWarningSchema = z
-  .object({ feature: z.string().min(1), path: z.string(), why: z.string().min(1) })
+  .object({
+    feature: z.string().min(1),
+    path: z.string(),
+    why: z.string().min(1),
+    detail: z.record(z.union([z.string(), z.number().finite(), z.boolean()])).optional(),
+  })
   .strict();
 
 export type SpineImportWarning = z.infer<typeof spineImportWarningSchema>;
 
 export const spineImportErrorSchema = z
-  .object({ code: z.string().min(1), path: z.string(), message: z.string().min(1) })
+  .object({
+    code: z.string().min(1),
+    path: z.string(),
+    message: z.string().min(1),
+    detail: z.record(z.union([z.string(), z.number().finite(), z.boolean()])).optional(),
+  })
   .strict();
 
 export type SpineImportError = z.infer<typeof spineImportErrorSchema>;
@@ -191,6 +233,7 @@ export const spineImportResponseSchema = z.discriminatedUnion('status', [
       name: z.string().min(1),
       document: z.unknown(),
       warnings: z.array(spineImportWarningSchema),
+      pages: z.array(atlasImportPageSchema).max(4096).optional(),
     })
     .strict(),
   z
@@ -220,6 +263,7 @@ export const atlasImportResponseSchema = z.discriminatedUnion('status', [
       status: z.literal('imported'),
       atlas: z.unknown(),
       pages: z.array(atlasImportPageSchema),
+      warnings: z.array(spineImportWarningSchema).optional(),
     })
     .strict(),
   z.object({ status: z.literal('canceled') }).strict(),
@@ -233,7 +277,23 @@ export type AtlasImportResponse = z.infer<typeof atlasImportResponseSchema>;
 // (basename-confined at the staging boundary). The response reuses atlasImportResponseSchema.
 export const atlasImportImagesRequestSchema = z
   .object({
-    images: z.array(z.object({ name: z.string().min(1), data: z.instanceof(Uint8Array) }).strict()),
+    images: z
+      .array(
+        z
+          .object({
+            name: z.string().min(1).max(1024),
+            data: z
+              .instanceof(Uint8Array)
+              .refine((data) => data.byteLength <= 256 * 1024 * 1024, 'image exceeds 256 MiB'),
+          })
+          .strict(),
+      )
+      .max(4096)
+      .refine(
+        (images) =>
+          images.reduce((total, image) => total + image.data.byteLength, 0) <= 512 * 1024 * 1024,
+        'images exceed 512 MiB',
+      ),
   })
   .strict();
 
@@ -389,6 +449,7 @@ export const mediaExportOptionsSchema = z
   .object({
     medium: z.enum(['png-sequence', 'gif', 'apng']),
     animation: z.string().min(1).nullable(),
+    activeSkin: z.string().min(1).optional(),
     fps: z.number().int().min(1).max(120),
     width: z.number().int().min(1).max(4096),
     height: z.number().int().min(1).max(4096),
@@ -538,7 +599,17 @@ export interface MarionetteApi {
   saveDocument(
     document: unknown,
     pages: readonly AtlasImportPage[],
+    options?: FileSaveOptions,
   ): Promise<IpcResult<FileSaveResponse>>;
+  confirmUnsaved(): Promise<IpcResult<UnsavedDecision>>;
+  closeApproved(): Promise<IpcResult<{ readonly status: 'closed' }>>;
+  saveRecovery(
+    document: unknown,
+    pages: readonly AtlasImportPage[],
+    options: FileSaveOptions,
+  ): Promise<IpcResult<FileSaveResponse>>;
+  openRecovery(options?: { readonly startup?: boolean }): Promise<IpcResult<FileOpenResponse>>;
+  discardRecovery(documentId: string): Promise<IpcResult<{ readonly status: 'discarded' }>>;
   // Open a document; main shows the dialog, reads and validates the file. Returns the parsed document
   // or a canceled status.
   openDocument(): Promise<IpcResult<FileOpenResponse>>;

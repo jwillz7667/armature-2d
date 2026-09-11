@@ -1,3 +1,4 @@
+import { setEmitterTrailSpec } from './set-emitter-trail.command';
 import { addBundleItemSpec } from './add-bundle-item.command';
 import { addLayerSpec } from './add-layer.command';
 import { addLifeStopSpec } from './add-life-stop.command';
@@ -37,6 +38,7 @@ export const effectsCommandRegistry: readonly EffectCommandSpec[] = [
   removeLayerSpec,
   reorderLayersSpec,
   setLayerFieldSpec,
+  setEmitterTrailSpec,
   setLayerBlendModeSpec,
   // Life-curve (TASK-3.7.3)
   addLifeStopSpec,

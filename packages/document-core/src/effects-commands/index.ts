@@ -45,3 +45,5 @@ export type { BundleItemPatch } from './set-bundle-item.command';
 
 export { effectsCommandRegistry } from './registry';
 export type { EffectCommandSpec, EffectCommandFixture } from './effects-spec';
+
+export { SetEmitterTrailCommand, setEmitterTrailSpec } from './set-emitter-trail.command';

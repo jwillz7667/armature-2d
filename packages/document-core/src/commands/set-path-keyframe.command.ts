@@ -20,6 +20,7 @@ export interface PathKeyframeChannels {
 // time, and curve are kept); otherwise a new frame is minted and inserted, keeping the channel strictly
 // time-sorted. On insert the new frame takes `insertCurve` (default 'linear'). before/after are whole-channel
 // mementos, so undo is bit-exact. Does NOT coalesce (a keyframe edit is discrete, not a continuous scrub).
+// Existing-key curves are preserved unless options.replaceCurve explicitly replaces the easing.
 export class SetPathKeyframeCommand implements Command {
   readonly kind = 'path.setKeyframe';
   readonly label = 'Set Path Keyframe';
@@ -32,6 +33,7 @@ export class SetPathKeyframeCommand implements Command {
     private readonly time: number,
     private readonly channels: PathKeyframeChannels,
     private readonly insertCurve: CurveType = 'linear',
+    private readonly options: { readonly replaceCurve?: CurveType } = {},
   ) {}
 
   do(ctx: CommandContext): void {
@@ -42,14 +44,19 @@ export class SetPathKeyframeCommand implements Command {
       this.before = channel;
       const existing = channel.find((kf) => kf.time === this.time);
       if (existing) {
-        const updated = makePathKeyframe(existing.id, existing.time, this.channels, existing.curve);
+        const updated = makePathKeyframe(
+          existing.id,
+          existing.time,
+          this.channels,
+          this.options.replaceCurve ?? existing.curve,
+        );
         this.after = channel.map((kf) => (kf.id === existing.id ? updated : kf));
       } else {
         const inserted = makePathKeyframe(
           ctx.ids.mint('keyframe'),
           this.time,
           this.channels,
-          this.insertCurve,
+          this.options.replaceCurve ?? this.insertCurve,
         );
         this.after = [...channel, inserted].sort((a, b) => a.time - b.time);
       }

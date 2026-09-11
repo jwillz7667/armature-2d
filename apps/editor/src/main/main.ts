@@ -5,7 +5,8 @@
 import { app, BrowserWindow, Menu, nativeImage, session } from 'electron';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { approvedClosures, sameApplicationLocation, trustWindow } from './ipc/trusted-sender';
 import { cspForMode, type BuildMode } from './csp';
 import { createWindowOptions } from './window-options';
 import { registerIpc } from './ipc/register-ipc';
@@ -66,6 +67,20 @@ async function createWindow(): Promise<void> {
   const iconPath = resolveIconPath();
   applyDevDockIcon(iconPath);
   const window = new BrowserWindow(createWindowOptions({ preloadPath, iconPath }));
+  const devServerUrl = app.isPackaged ? undefined : process.env.ELECTRON_RENDERER_URL;
+  const rendererFile = join(currentDir, '../renderer/index.html');
+  const location = devServerUrl ?? pathToFileURL(rendererFile).href;
+  trustWindow(window, location);
+  window.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  window.webContents.on('will-navigate', (event, url) => {
+    if (!sameApplicationLocation(url, location)) event.preventDefault();
+  });
+  window.webContents.on('will-attach-webview', (event) => event.preventDefault());
+  window.on('close', (event) => {
+    if (approvedClosures.has(window) || window.webContents.isDestroyed()) return;
+    event.preventDefault();
+    window.webContents.send(IpcChannel.menuAction, 'file:close');
+  });
   window.once('ready-to-show', () => window.show());
 
   // Surface a preload load failure loudly in the main-process console instead of a silent bridge outage
@@ -76,16 +91,19 @@ async function createWindow(): Promise<void> {
 
   installApplicationMenu(window);
 
-  const devServerUrl = process.env.ELECTRON_RENDERER_URL;
   if (devServerUrl) {
     await window.loadURL(devServerUrl);
   } else {
-    await window.loadFile(join(currentDir, '../renderer/index.html'));
+    await window.loadFile(rendererFile);
   }
 }
 
 app.whenReady().then(() => {
   applyCspHeader();
+  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) =>
+    callback(false),
+  );
+  session.defaultSession.setPermissionCheckHandler(() => false);
   registerIpc();
   void createWindow();
 

@@ -129,7 +129,7 @@ func _render_frame(frame_dt: float) -> void:
 			next = _duration
 	_time = next
 
-	Sample.sample_skeleton(_document, animation_name, _time, _pose, null, frame_dt)
+	Sample.sample_skeleton(_document, animation_name, _time, _pose, skin_name, frame_dt)
 	DrawItemBuilder.build_into(_document, _render_model, _atlas, _pose, skin_name, animation_name, _time, _draw_list)
 	MeshBufferAssembler.assemble(_draw_list, _batches)
 	_upload()

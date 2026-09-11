@@ -4,7 +4,7 @@ import type { AnimationEntity } from '../model/doc-state';
 // includes future split channels automatically; the constraint and nested deform families remain
 // explicit so an unrelated numeric property cannot accidentally become a timeline.
 export function lastAnimationKeyTime(animation: AnimationEntity): number {
-  let last = 0;
+  let last = -1; // Distinguish no keys from a key at time zero.
   const visit = (frames: readonly { readonly time: number }[]): void => {
     for (const frame of frames) last = Math.max(last, frame.time);
   };

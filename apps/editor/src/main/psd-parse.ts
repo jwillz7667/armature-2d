@@ -1,6 +1,7 @@
 import { initializeCanvas, readPsd, type Layer } from 'ag-psd';
 import {
   joinLayerName,
+  LayeredParseError,
   type LayeredDiagnostic,
   type LayeredDocument,
   type RasterLayer,
@@ -19,24 +20,58 @@ import {
 // once (a bare RGBA buffer is all we read via `useImageData`); the createCanvas method is never used and is
 // a throwing stub. Guarded so repeated imports register it exactly once.
 let canvasInitialized = false;
+let decodedPixels = 0;
 function ensureCanvasInitialized(): void {
   if (canvasInitialized) return;
   initializeCanvas(
     () => {
       throw new Error('ag-psd canvas is unavailable in the main process; use imageData');
     },
-    (width, height) =>
-      ({ width, height, data: new Uint8ClampedArray(width * height * 4) }) as ImageData,
+    (width, height) => {
+      decodedPixels += width * height;
+      if (
+        !Number.isSafeInteger(width) ||
+        !Number.isSafeInteger(height) ||
+        width < 1 ||
+        height < 1 ||
+        width > 16384 ||
+        height > 16384 ||
+        decodedPixels > 64 * 1024 * 1024
+      ) {
+        throw new LayeredParseError(
+          'PSD_RESOURCE_LIMIT',
+          'PSD exceeds image dimensions or 64 million decoded pixels',
+        );
+      }
+      return { width, height, data: new Uint8ClampedArray(width * height * 4) } as ImageData;
+    },
   );
   canvasInitialized = true;
 }
 
 export function parsePsd(bytes: Uint8Array, name: string): LayeredDocument {
+  decodedPixels = 0;
+  if (bytes.byteLength > 256 * 1024 * 1024)
+    throw new LayeredParseError('PSD_RESOURCE_LIMIT', 'PSD exceeds 256 MiB');
+  if (bytes.byteLength >= 26) {
+    const header = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+    if (header.getUint16(24) === 4)
+      throw new LayeredParseError(
+        'PSD_PARSE_FAILED',
+        'CMYK PSD imports are unsupported; convert a copy to RGB first',
+      );
+    const height = header.getUint32(14);
+    const width = header.getUint32(18);
+    if (width > 16384 || height > 16384 || width * height > 64 * 1024 * 1024)
+      throw new LayeredParseError('PSD_RESOURCE_LIMIT', 'PSD canvas exceeds image limits');
+  }
   ensureCanvasInitialized();
   const psd = readPsd(toArrayBuffer(bytes), {
     useImageData: true,
+    totalMemoryLimit: 256 * 1024 * 1024,
     skipCompositeImageData: true,
     skipThumbnail: true,
+    skipLinkedFilesData: true,
     throwForMissingFeatures: false,
   });
 

@@ -481,3 +481,50 @@ describe('AnimationState allocation (INV-5, matches sampleSkeleton probe style)'
     expect(heapGrowth).toBeLessThan(512 * 1024);
   });
 });
+
+describe('AnimationState input and work budgets', () => {
+  it('rejects invalid API arguments before allocating tracks or changing playback', () => {
+    const state = makeAnimationState(rootDoc({ a: constRotate(10) }));
+    for (const index of [-1, 0.5, NaN, Infinity, 64, 1e9]) {
+      expect(() => setAnimation(state, index, 'a', true)).toThrow();
+    }
+    expect(() => setAnimation(state, 63, 'missing', true)).toThrow();
+    expect(state.tracks).toHaveLength(0);
+    const entry = setAnimation(state, 0, 'a', true);
+    for (const value of [NaN, Infinity, -1]) {
+      expect(() => updateAnimationState(state, value)).toThrow();
+      expect(() => crossfadeTo(state, 0, 'a', true, value)).toThrow();
+      expect(() => queueAnimation(state, 0, 'a', true, value)).toThrow();
+    }
+    expect(getTrackEntry(state, 0)).toBe(entry);
+    expect(entry.trackTime).toBe(0);
+  });
+
+  it('rejects excessive loop work atomically across all tracks', () => {
+    const state = makeAnimationState(
+      rootDoc({ normal: constRotate(0), tiny: { ...constRotate(0), duration: 1e-12 } }),
+    );
+    const first = setAnimation(state, 0, 'normal', true);
+    setAnimation(state, 1, 'tiny', true);
+    expect(() => updateAnimationState(state, 1)).toThrow(/4096/);
+    expect(first.trackTime).toBe(0);
+    expect(state.eventQueue.count).toBe(0);
+  });
+
+  it('queues at the next boundary after several loops and fires only the active segments', () => {
+    const a = { ...constRotate(0), events: [{ time: 0.8, name: 'old' }] };
+    const b = { ...constRotate(0), events: [{ time: 0.1, name: 'new' }] };
+    const state = makeAnimationState(rootDoc({ a, b }));
+    setAnimation(state, 0, 'a', true);
+    updateAnimationState(state, 2.5);
+    queueAnimation(state, 0, 'b', false, 0);
+    updateAnimationState(state, 0.2);
+    expect(getTrackEntry(state, 0)?.animationId).toBe('a');
+    updateAnimationState(state, 0.5);
+    expect(getTrackEntry(state, 0)?.animationId).toBe('b');
+    expect(getTrackEntry(state, 0)?.trackTime).toBeCloseTo(0.2);
+    expect(
+      state.eventQueue.events.slice(0, state.eventQueue.count).map((event) => event.name),
+    ).toEqual(['old', 'new']);
+  });
+});

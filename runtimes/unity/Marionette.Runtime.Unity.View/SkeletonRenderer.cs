@@ -48,9 +48,14 @@ namespace Marionette.Runtime.Unity.View
         [SerializeField]
         private Texture2D[] atlasPages = System.Array.Empty<Texture2D>();
 
+        [Tooltip("Optional atlas-targets.json sidecar. Its alpha policy overrides the manual setting.")]
+        [SerializeField] private TextAsset atlasTargetsManifest;
+        [SerializeField] private bool premultipliedAtlasPages;
+        private bool _atlasPremultiplied;
+
         [Header("Materials")]
-        [Tooltip("Material used when a slot's blend mode has no explicit override below. Its shader should "
-            + "multiply the main texture by the vertex color (see MarionetteSlot.shader).")]
+        [Tooltip("Optional normal-blend material. Overrides must expose the Marionette/Slot shader properties and "
+            + "support light and dark vertex tint (see MarionetteSlot.shader).")]
         [SerializeField]
         private Material normalMaterial;
 
@@ -106,6 +111,16 @@ namespace Marionette.Runtime.Unity.View
             _isPlaying = false;
         }
 
+        private void OnDestroy() { ReleaseRenderResources(); }
+
+        private void ReleaseRenderResources()
+        {
+            _meshBuilder?.Dispose();
+            _meshBuilder = null;
+            foreach (Material owned in _materials.Values) Destroy(owned);
+            _materials.Clear();
+        }
+
         // Assign the render inputs from code (the inspector-free path the example uses). In a normal project
         // you set these fields in the inspector instead. Call Load() afterward to (re)build. Any null
         // material argument leaves the existing assignment.
@@ -116,9 +131,13 @@ namespace Marionette.Runtime.Unity.View
             Material additive,
             Material multiply,
             Material screen,
-            string skin = "default")
+            string skin = "default",
+            TextAsset atlasManifest = null,
+            bool pagesPremultiplied = false)
         {
             documentJson = document;
+            atlasTargetsManifest = atlasManifest;
+            premultipliedAtlasPages = pagesPremultiplied;
             atlasPages = pages ?? System.Array.Empty<Texture2D>();
             skinName = skin;
             if (normal != null)
@@ -147,12 +166,14 @@ namespace Marionette.Runtime.Unity.View
         public void Load()
         {
             _isLoaded = false;
+            ReleaseRenderResources();
             if (documentJson == null)
             {
                 Debug.LogWarning("SkeletonRenderer: no document JSON assigned.", this);
                 return;
             }
 
+            _atlasPremultiplied = atlasTargetsManifest != null ? AtlasAlpha.ReadPremultiplied(atlasTargetsManifest.text) : premultipliedAtlasPages;
             string json = documentJson.text;
             _document = RigReader.Parse(json);
             _renderModel = RenderModelReader.Parse(json);
@@ -239,22 +260,29 @@ namespace Marionette.Runtime.Unity.View
 
             _time = next;
 
-            Sample.SampleSkeleton(_document, animationName, _time, _pose, null, frameDt);
+            Sample.SampleSkeleton(_document, animationName, _time, _pose, skinName, frameDt);
             DrawItemBuilder.BuildInto(
                 _document, _renderModel, _atlas, _pose, skinName, animationName, _time, _drawList);
             MeshBufferAssembler.Assemble(_drawList, _batches);
 
             int sortingLayerId = SortingLayer.NameToID(sortingLayer);
             _meshBuilder.Upload(
-                _batches, _materials, _pageTextures, sortingLayerId, baseSortingOrder, normalMaterial);
+                _batches, _materials, _pageTextures, sortingLayerId, baseSortingOrder, normalMaterial, _atlasPremultiplied);
         }
 
         private void RegisterMaterial(string blend, Material material)
         {
-            if (material != null)
-            {
-                _materials[blend] = material;
-            }
+            Shader shader = material != null ? material.shader : Shader.Find("Marionette/Slot");
+            if (shader == null) throw new System.InvalidOperationException("Marionette/Slot shader is missing from the build");
+            Material owned = material != null ? new Material(material) : new Material(shader);
+            var source = blend == "multiply" ? UnityEngine.Rendering.BlendMode.DstColor : UnityEngine.Rendering.BlendMode.One;
+            var destination = blend == "additive" ? UnityEngine.Rendering.BlendMode.One :
+                blend == "screen" ? UnityEngine.Rendering.BlendMode.OneMinusSrcColor : UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha;
+            owned.SetInt("_SrcBlend", (int)source);
+            owned.SetInt("_DstBlend", (int)destination);
+            owned.SetInt("_SrcBlendAlpha", (int)(blend == "multiply" ? UnityEngine.Rendering.BlendMode.Zero : UnityEngine.Rendering.BlendMode.One));
+            owned.SetInt("_DstBlendAlpha", (int)(blend == "multiply" ? UnityEngine.Rendering.BlendMode.One : UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha));
+            _materials[blend] = owned;
         }
     }
 }

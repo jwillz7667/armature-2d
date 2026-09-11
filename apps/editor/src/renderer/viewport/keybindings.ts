@@ -1,6 +1,7 @@
 import {
   DeleteMeshVertexCommand,
   documentHost,
+  newDocumentSafely,
   openDocumentFromDialog,
   saveCurrentDocument,
   type FileActionOutcome,
@@ -22,10 +23,29 @@ import { deleteSelectedPathControlPoint } from './tools/path-tool';
 // command source (tools, gizmo, keybindings) stays consistent through one path.
 export function attachKeybindings(): () => void {
   const onKeyDown = (event: KeyboardEvent): void => {
-    if (isTextEntry(event.target)) return;
-
     const mod = event.metaKey || event.ctrlKey;
     const key = event.key.toLowerCase();
+
+    // Save / open. preventDefault stops the browser's own Save/Open. The actions are async (they cross
+    // the IPC boundary); the outcome is reported, never silently swallowed, but a non-error outcome
+    // (saved/opened/canceled) needs no UI in Phase 0.
+    if (mod && key === 's') {
+      event.preventDefault();
+      void saveCurrentDocument(event.shiftKey).then(reportOutcome);
+      return;
+    }
+    if (mod && key === 'o') {
+      event.preventDefault();
+      void openDocumentFromDialog().then(reportOutcome);
+      return;
+    }
+
+    if (mod && key === 'n') {
+      event.preventDefault();
+      void newDocumentSafely();
+      return;
+    }
+    if (isTextEntry(event.target)) return;
 
     if (mod && key === 'z' && !event.shiftKey) {
       event.preventDefault();
@@ -37,20 +57,6 @@ export function attachKeybindings(): () => void {
       documentHost.current().history.redo();
       return;
     }
-    // Save / open. preventDefault stops the browser's own Save/Open. The actions are async (they cross
-    // the IPC boundary); the outcome is reported, never silently swallowed, but a non-error outcome
-    // (saved/opened/canceled) needs no UI in Phase 0.
-    if (mod && key === 's') {
-      event.preventDefault();
-      void saveCurrentDocument().then(reportOutcome);
-      return;
-    }
-    if (mod && key === 'o') {
-      event.preventDefault();
-      void openDocumentFromDialog().then(reportOutcome);
-      return;
-    }
-
     // Tool switch (no modifier): V selects, B creates, M edits meshes, W paints weights, P edits paths.
     // Guarded by !mod so it never shadows a shortcut.
     if (mod) return;

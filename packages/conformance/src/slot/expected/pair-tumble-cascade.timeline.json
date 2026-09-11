@@ -6,7 +6,7 @@
   "sceneHash": "sha256:13e41f7d5c990d3f1ff5c575782c23627126f4ad7f5fac4e13f01f93dabfe601",
   "specHash": "sha256:cda03399c6f507558bdd74f0a69782aed6f672cf5990fd5b124d6e766666aa1e",
   "coreVersion": "runtime-core@0.0.0",
-  "toolchain": "node-22.13.1-v8",
+  "toolchain": "node-24.20.0-v8",
   "generatedBy": "generate-slot.ts",
   "sampleMs": [
     0,
@@ -21,7 +21,7 @@
   ],
   "timeline": {
     "spinId": "mock-tumble-cascade",
-    "durationMs": 1600,
+    "durationMs": 2900,
     "directives": [
       {
         "kind": "reelStop",
@@ -132,97 +132,6 @@
         "set": "win",
         "atMs": 0,
         "seq": 68
-      },
-      {
-        "kind": "cascadeExplode",
-        "cells": [
-          {
-            "row": 3,
-            "col": 0
-          },
-          {
-            "row": 4,
-            "col": 0
-          }
-        ],
-        "atMs": 0,
-        "seq": 69
-      },
-      {
-        "kind": "symbolAnimate",
-        "row": 3,
-        "col": 0,
-        "set": "win",
-        "atMs": 0,
-        "seq": 70
-      },
-      {
-        "kind": "symbolAnimate",
-        "row": 4,
-        "col": 0,
-        "set": "win",
-        "atMs": 0,
-        "seq": 71
-      },
-      {
-        "kind": "cascadeDrop",
-        "moves": [
-          {
-            "from": {
-              "row": 0,
-              "col": 0
-            },
-            "to": {
-              "row": 2,
-              "col": 0
-            },
-            "symbol": "H1"
-          },
-          {
-            "from": {
-              "row": 1,
-              "col": 0
-            },
-            "to": {
-              "row": 3,
-              "col": 0
-            },
-            "symbol": "H1"
-          },
-          {
-            "from": {
-              "row": 2,
-              "col": 0
-            },
-            "to": {
-              "row": 4,
-              "col": 0
-            },
-            "symbol": "H1"
-          }
-        ],
-        "atMs": 0,
-        "seq": 72
-      },
-      {
-        "kind": "cascadeRefill",
-        "col": 0,
-        "symbols": [
-          "H2",
-          "H3"
-        ],
-        "atMs": 0,
-        "seq": 73
-      },
-      {
-        "kind": "counterRollup",
-        "fromUnits": 0,
-        "toUnits": 100,
-        "startMs": 0,
-        "endMs": 300,
-        "curve": "easeInOutCubic",
-        "atMs": 0,
-        "seq": 74
       },
       {
         "kind": "reelStop",
@@ -655,6 +564,115 @@
         "seq": 65
       },
       {
+        "kind": "symbolAnimate",
+        "row": 3,
+        "col": 0,
+        "set": "win",
+        "atMs": 500,
+        "seq": 70
+      },
+      {
+        "kind": "symbolAnimate",
+        "row": 4,
+        "col": 0,
+        "set": "win",
+        "atMs": 500,
+        "seq": 71
+      },
+      {
+        "kind": "counterRollup",
+        "fromUnits": 0,
+        "toUnits": 100,
+        "startMs": 500,
+        "endMs": 1300,
+        "curve": "easeInOutCubic",
+        "atMs": 500,
+        "seq": 74
+      },
+      {
+        "kind": "cascadeExplode",
+        "cells": [
+          {
+            "row": 3,
+            "col": 0
+          },
+          {
+            "row": 4,
+            "col": 0
+          }
+        ],
+        "atMs": 750,
+        "seq": 69
+      },
+      {
+        "kind": "cascadeDrop",
+        "moves": [
+          {
+            "from": {
+              "row": 0,
+              "col": 0
+            },
+            "to": {
+              "row": 2,
+              "col": 0
+            },
+            "symbol": "H1"
+          },
+          {
+            "from": {
+              "row": 1,
+              "col": 0
+            },
+            "to": {
+              "row": 3,
+              "col": 0
+            },
+            "symbol": "H1"
+          },
+          {
+            "from": {
+              "row": 2,
+              "col": 0
+            },
+            "to": {
+              "row": 4,
+              "col": 0
+            },
+            "symbol": "H1"
+          }
+        ],
+        "atMs": 750,
+        "seq": 72
+      },
+      {
+        "kind": "cascadeRefill",
+        "col": 0,
+        "symbols": [
+          "H2",
+          "H3"
+        ],
+        "atMs": 1050,
+        "seq": 73
+      },
+      {
+        "kind": "symbolAnimate",
+        "row": 4,
+        "col": 0,
+        "set": "win",
+        "atMs": 1300,
+        "seq": 76
+      },
+      {
+        "kind": "counterRollup",
+        "fromUnits": 100,
+        "toUnits": 250,
+        "startMs": 1300,
+        "endMs": 2100,
+        "curve": "easeInOutCubic",
+        "atMs": 1300,
+        "seq": 79
+      },
+      {
         "kind": "cascadeExplode",
         "cells": [
           {
@@ -662,16 +680,8 @@
             "col": 0
           }
         ],
-        "atMs": 800,
+        "atMs": 1550,
         "seq": 75
-      },
-      {
-        "kind": "symbolAnimate",
-        "row": 4,
-        "col": 0,
-        "set": "win",
-        "atMs": 800,
-        "seq": 76
       },
       {
         "kind": "cascadeDrop",
@@ -721,7 +731,7 @@
             "symbol": "H1"
           }
         ],
-        "atMs": 800,
+        "atMs": 1550,
         "seq": 77
       },
       {
@@ -730,18 +740,26 @@
         "symbols": [
           "L2"
         ],
-        "atMs": 800,
+        "atMs": 1850,
         "seq": 78
       },
       {
+        "kind": "symbolAnimate",
+        "row": 4,
+        "col": 0,
+        "set": "win",
+        "atMs": 2100,
+        "seq": 81
+      },
+      {
         "kind": "counterRollup",
-        "fromUnits": 100,
-        "toUnits": 250,
-        "startMs": 800,
-        "endMs": 1100,
+        "fromUnits": 250,
+        "toUnits": 400,
+        "startMs": 2100,
+        "endMs": 2900,
         "curve": "easeInOutCubic",
-        "atMs": 800,
-        "seq": 79
+        "atMs": 2100,
+        "seq": 84
       },
       {
         "kind": "cascadeExplode",
@@ -751,16 +769,8 @@
             "col": 0
           }
         ],
-        "atMs": 1600,
+        "atMs": 2350,
         "seq": 80
-      },
-      {
-        "kind": "symbolAnimate",
-        "row": 4,
-        "col": 0,
-        "set": "win",
-        "atMs": 1600,
-        "seq": 81
       },
       {
         "kind": "cascadeDrop",
@@ -810,7 +820,7 @@
             "symbol": "H1"
           }
         ],
-        "atMs": 1600,
+        "atMs": 2350,
         "seq": 82
       },
       {
@@ -819,18 +829,8 @@
         "symbols": [
           "L3"
         ],
-        "atMs": 1600,
+        "atMs": 2650,
         "seq": 83
-      },
-      {
-        "kind": "counterRollup",
-        "fromUnits": 250,
-        "toUnits": 400,
-        "startMs": 1600,
-        "endMs": 1900,
-        "curve": "easeInOutCubic",
-        "atMs": 1600,
-        "seq": 84
       }
     ]
   },
@@ -839,8 +839,8 @@
       "seq": 74,
       "fromUnits": 0,
       "toUnits": 100,
-      "startMs": 0,
-      "endMs": 300,
+      "startMs": 500,
+      "endMs": 1300,
       "curve": "easeInOutCubic",
       "samples": [
         {
@@ -849,23 +849,23 @@
         },
         {
           "atMs": 150,
-          "value": 50
+          "value": 0
         },
         {
           "atMs": 300,
-          "value": 100
+          "value": 0
         },
         {
           "atMs": 800,
-          "value": 100
+          "value": 21
         },
         {
           "atMs": 950,
-          "value": 100
+          "value": 66
         },
         {
           "atMs": 1100,
-          "value": 100
+          "value": 93
         },
         {
           "atMs": 1600,
@@ -885,8 +885,8 @@
       "seq": 79,
       "fromUnits": 100,
       "toUnits": 250,
-      "startMs": 800,
-      "endMs": 1100,
+      "startMs": 1300,
+      "endMs": 2100,
       "curve": "easeInOutCubic",
       "samples": [
         {
@@ -907,23 +907,23 @@
         },
         {
           "atMs": 950,
-          "value": 175
+          "value": 100
         },
         {
           "atMs": 1100,
-          "value": 250
+          "value": 100
         },
         {
           "atMs": 1600,
-          "value": 250
+          "value": 131
         },
         {
           "atMs": 1750,
-          "value": 250
+          "value": 199
         },
         {
           "atMs": 1900,
-          "value": 250
+          "value": 240
         }
       ]
     },
@@ -931,8 +931,8 @@
       "seq": 84,
       "fromUnits": 250,
       "toUnits": 400,
-      "startMs": 1600,
-      "endMs": 1900,
+      "startMs": 2100,
+      "endMs": 2900,
       "curve": "easeInOutCubic",
       "samples": [
         {
@@ -965,11 +965,11 @@
         },
         {
           "atMs": 1750,
-          "value": 325
+          "value": 250
         },
         {
           "atMs": 1900,
-          "value": 400
+          "value": 250
         }
       ]
     }

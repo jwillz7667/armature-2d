@@ -1,3 +1,13 @@
+import './authoring.css';
+import { EffectLayerEditor } from './effect-layer-editor';
+import { EffectLifeCurves } from './effect-life-curves';
+import { runSpriteImport } from '../actions/import-sprites';
+import { EffectBundles } from './effect-bundles';
+import {
+  DEFAULT_EFFECT_PREVIEW_SEED,
+  type EffectPreviewMotion,
+} from './effect-preview/preview-simulation';
+import { TextInput, ChoiceInput, NumberInput, useAuthoringError } from './authoring-fields';
 import type { IDockviewPanelProps } from 'dockview';
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import type { BlendMode } from '@marionette/format/types';
@@ -15,6 +25,8 @@ import {
   RenameEffectCommand,
   SetEffectMetaCommand,
   SetLayerBlendModeCommand,
+  SetLayerFieldCommand,
+  ReorderLayersCommand,
   documentHost,
   type EffectEntity,
   type EffectId,
@@ -47,11 +59,17 @@ const DEFAULT_EFFECT_BASENAME = 'effect';
 export function EffectsPanel(_props: IDockviewPanelProps): ReactElement {
   const revision = useDocumentRevision();
   const doc = documentHost.current();
+  const [importNotice, setImportNotice] = useState('');
   const effects = useMemo(() => doc.effects.effects(), [doc, revision]);
 
   // The current effect id is ephemeral editor state (kept out of the document and out of the bone selection
   // store). It is resolved against the LIVE library below so a deleted/undone effect clears the selection.
   const [selectedEffectId, setSelectedEffectId] = useState<EffectId | null>(null);
+  const [selectedBundle, setSelectedBundle] = useState<string | null>(null);
+  useEffect(() => {
+    setSelectedEffectId(null);
+    setSelectedBundle(null);
+  }, [doc]);
 
   const selectedEffect = useMemo(
     () => (selectedEffectId !== null ? doc.effects.getEffect(selectedEffectId) : undefined),
@@ -81,21 +99,45 @@ export function EffectsPanel(_props: IDockviewPanelProps): ReactElement {
       blendMode: 'additive',
     });
     host.history.execute(command);
-    if (command.createdId !== undefined) setSelectedEffectId(command.createdId);
+    if (command.createdId !== undefined) {
+      setSelectedEffectId(command.createdId);
+      setSelectedBundle(null);
+    }
   }
 
   return (
-    <div style={rootStyle}>
+    <div style={rootStyle} className="authoring">
       <div style={sectionStyle}>
         <div style={toolbarStyle}>
           <button type="button" style={buttonStyle} onClick={createEffect}>
             New Effect
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              void runSpriteImport('effects').then((result) =>
+                setImportNotice(
+                  result.kind === 'error'
+                    ? result.message
+                    : result.kind === 'imported'
+                      ? `Imported ${result.regionCount} textures.`
+                      : '',
+                ),
+              );
+            }}
+          >
+            Import textures
           </button>
           <span style={countStyle}>
             {effects.length} {effects.length === 1 ? 'effect' : 'effects'}
           </span>
         </div>
 
+        {importNotice && (
+          <p role="status" style={{ padding: 8 }}>
+            {importNotice}
+          </p>
+        )}
         <div style={listStyle}>
           {effects.length === 0 ? (
             <div style={emptyStyle}>No effects yet. New Effect to author a particle effect.</div>
@@ -105,7 +147,10 @@ export function EffectsPanel(_props: IDockviewPanelProps): ReactElement {
                 key={effect.id}
                 effect={effect}
                 isSelected={effect.id === selectedEffectId}
-                onSelect={setSelectedEffectId}
+                onSelect={(id) => {
+                  setSelectedEffectId(id);
+                  setSelectedBundle(null);
+                }}
               />
             ))
           )}
@@ -118,14 +163,20 @@ export function EffectsPanel(_props: IDockviewPanelProps): ReactElement {
         ) : (
           <EffectDetail effect={selectedEffect} onDeleted={() => setSelectedEffectId(null)} />
         )}
+        <EffectBundles key={documentHost.identity()} onPreview={setSelectedBundle} />
       </div>
 
-      <EffectPreviewPane effectName={selectedEffect?.name ?? null} revision={revision} />
+      <EffectPreviewPane
+        effectName={selectedEffect?.name ?? null}
+        bundleName={selectedBundle}
+        revision={revision}
+      />
     </div>
   );
 }
 
 interface EffectPreviewPaneProps {
+  readonly bundleName: string | null;
   readonly effectName: string | null;
   readonly revision: number;
 }
@@ -137,7 +188,9 @@ interface EffectPreviewPaneProps {
 // together with no extra layout/menu wiring; the panel already stacks list + detail, and the GL host owns
 // its own Application lifecycle exactly like the viewport panel does.
 function EffectPreviewPane(props: EffectPreviewPaneProps): ReactElement {
-  const { effectName, revision } = props;
+  const { effectName, bundleName, revision } = props;
+  const [seed, setSeed] = useState(DEFAULT_EFFECT_PREVIEW_SEED);
+  const [motion, setMotion] = useState<EffectPreviewMotion>('still');
   const hostRef = useRef<HTMLDivElement | null>(null);
   const handleRef = useRef<EffectPreviewHandle | null>(null);
   const [transport, setTransport] = useState<PreviewTransport>(() => makePreviewTransport());
@@ -162,14 +215,40 @@ function EffectPreviewPane(props: EffectPreviewPaneProps): ReactElement {
   // Push the selected effect name and re-sync on document revision. Both are no-ops before the async GL init
   // completes (the handle queues them); after init the view rebuilds against the live library.
   useEffect(() => {
-    handleRef.current?.setEffectName(effectName);
-  }, [effectName]);
+    if (bundleName !== null) handleRef.current?.setBundleName(bundleName);
+    else handleRef.current?.setEffectName(effectName);
+  }, [effectName, bundleName]);
   useEffect(() => {
     handleRef.current?.resyncFromDocument();
   }, [revision]);
 
   return (
     <div style={previewSectionStyle}>
+      <div style={{ padding: '4px 8px' }}>
+        <strong>
+          {bundleName !== null ? `Bundle: ${bundleName}` : (effectName ?? 'Select an effect')}
+        </strong>
+        <NumberInput
+          label="Preview seed"
+          value={seed}
+          min={0}
+          max={4294967295}
+          step={1}
+          onChange={(value) => {
+            setSeed(value);
+            handleRef.current?.setSeed(value);
+          }}
+        />
+        <ChoiceInput
+          label="Anchor motion"
+          value={motion}
+          choices={['still', 'circle', 'line']}
+          onChange={(value) => {
+            setMotion(value);
+            handleRef.current?.setMotion(value);
+          }}
+        />
+      </div>
       <div style={previewToolbarStyle}>
         <button
           type="button"
@@ -196,7 +275,7 @@ function EffectPreviewPane(props: EffectPreviewPaneProps): ReactElement {
           BG: {transport.background}
         </button>
         <span style={previewStatsStyle} title="Live particle instances / particles">
-          {stats.liveParticles} particles
+          {stats.liveInstances} instances / {stats.liveParticles} particles
         </span>
       </div>
       <div style={previewHostWrapStyle}>
@@ -311,15 +390,10 @@ function EffectDetail(props: EffectDetailProps): ReactElement {
     () => effect.layerOrder.map((layerId) => effect.layers.get(layerId)),
     [effect],
   );
-  const atlasRegions = useMemo(
-    () =>
-      documentHost
-        .current()
-        .effects.atlas()
-        .pages.flatMap((page) => page.regions),
-    // The atlas is read live per render; the parent re-renders on every revision, so no extra dep is needed.
-    [effect],
-  );
+  const atlasRegions = documentHost
+    .current()
+    .effects.atlas()
+    .pages.flatMap((page) => page.regions);
   const [pendingKind, setPendingKind] = useState<NewLayerKind>('emitter');
 
   function commitName(raw: string): boolean {
@@ -412,12 +486,23 @@ function EffectDetail(props: EffectDetailProps): ReactElement {
 
       <div style={detailRowStyle}>
         <span style={labelStyle}>Blend</span>
-        <span
-          style={readonlyValueStyle}
-          title="The effect-level default blend mode (set at create time)"
+        <select
+          aria-label="Default blend mode"
+          value={effect.blendMode}
+          onChange={(event) => {
+            const blendMode = toBlendMode(event.currentTarget.value);
+            if (blendMode)
+              documentHost
+                .current()
+                .history.execute(new SetEffectMetaCommand(effect.id, { blendMode }));
+          }}
         >
-          {effect.blendMode}
-        </span>
+          {BLEND_MODES.map((mode) => (
+            <option key={mode} value={mode}>
+              {mode}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div style={subHeaderStyle}>
@@ -455,7 +540,12 @@ function EffectDetail(props: EffectDetailProps): ReactElement {
         <button
           type="button"
           style={smallButtonStyle}
-          title="Add a default layer of the chosen kind"
+          title={
+            atlasRegions.length
+              ? 'Add a default layer of the chosen kind'
+              : 'Import textures before adding a layer'
+          }
+          disabled={atlasRegions.length === 0}
           onClick={() => addLayer(effect.id, pendingKind, effect.blendMode, defaultRegion)}
         >
           Add
@@ -472,10 +562,38 @@ interface LayerRowProps {
 
 function LayerRow(props: LayerRowProps): ReactElement {
   const { effectId, layer } = props;
+  const { error, run } = useAuthoringError();
+  const effect = documentHost.current().effects.getEffect(effectId)!;
+  const index = effect.layerOrder.indexOf(layer.id);
+  const reorder = (delta: number) =>
+    run(() => {
+      const order = [...documentHost.current().effects.getEffect(effectId)!.layerOrder];
+      const from = order.indexOf(layer.id),
+        to = from + delta;
+      if (to < 0 || to >= order.length) return;
+      [order[from], order[to]] = [order[to]!, order[from]!];
+      documentHost.current().history.execute(new ReorderLayersCommand(effectId, order));
+    });
   return (
     <div style={layerBlockStyle}>
       <div style={layerRowStyle}>
         <span style={rowNameStyle}>{layer.body.name}</span>
+        <button
+          type="button"
+          disabled={index === 0}
+          onClick={() => reorder(-1)}
+          aria-label="Move layer earlier"
+        >
+          Up
+        </button>
+        <button
+          type="button"
+          disabled={index === effect.layerOrder.length - 1}
+          onClick={() => reorder(1)}
+          aria-label="Move layer later"
+        >
+          Down
+        </button>
         <span style={rowMetaStyle}>{layer.body.type}</span>
         <button
           type="button"
@@ -503,6 +621,22 @@ function LayerRow(props: LayerRowProps): ReactElement {
           ))}
         </select>
       </div>
+      {error}
+      <TextInput
+        label="Layer name"
+        value={layer.body.name}
+        onChange={(name) =>
+          run(() =>
+            documentHost
+              .current()
+              .history.execute(
+                new SetLayerFieldCommand(effectId, layer.id, 'name', { ...layer.body, name }),
+              ),
+          )
+        }
+      />
+      <EffectLayerEditor effectId={effectId} layer={layer} />
+      <EffectLifeCurves effectId={effectId} layer={layer} />
     </div>
   );
 }
@@ -614,7 +748,7 @@ const previewSectionStyle: CSSProperties = {
   display: 'flex',
   flexDirection: 'column',
   flex: '1 1 40%',
-  minHeight: 180,
+  minHeight: 280,
 };
 
 const previewToolbarStyle: CSSProperties = {
@@ -737,12 +871,6 @@ const subLabelStyle: CSSProperties = {
 };
 
 const unitStyle: CSSProperties = { color: '#888888' };
-
-const readonlyValueStyle: CSSProperties = {
-  flex: '0 0 auto',
-  color: '#cccccc',
-  fontVariantNumeric: 'tabular-nums',
-};
 
 const subHeaderStyle: CSSProperties = {
   display: 'flex',

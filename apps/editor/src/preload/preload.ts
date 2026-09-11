@@ -8,7 +8,15 @@ import { IpcChannel, exportProgressSchema, isMenuActionId, type MarionetteApi } 
 
 const api: MarionetteApi = {
   getVersion: () => ipcRenderer.invoke(IpcChannel.getVersion),
-  saveDocument: (document, pages) => ipcRenderer.invoke(IpcChannel.fileSave, { document, pages }),
+  saveDocument: (document, pages, options) =>
+    ipcRenderer.invoke(IpcChannel.fileSave, { document, pages, ...(options ? { options } : {}) }),
+  confirmUnsaved: () => ipcRenderer.invoke(IpcChannel.fileConfirmUnsaved),
+  closeApproved: () => ipcRenderer.invoke(IpcChannel.fileCloseApproved),
+  saveRecovery: (document, pages, options) =>
+    ipcRenderer.invoke(IpcChannel.fileRecoverySave, { document, pages, options }),
+  openRecovery: (options) => ipcRenderer.invoke(IpcChannel.fileRecoveryOpen, options),
+  discardRecovery: (documentId) =>
+    ipcRenderer.invoke(IpcChannel.fileRecoveryDiscard, { documentId }),
   openDocument: () => ipcRenderer.invoke(IpcChannel.fileOpen, undefined),
   importAtlas: () => ipcRenderer.invoke(IpcChannel.atlasImport, undefined),
   importAtlasImages: (images) => ipcRenderer.invoke(IpcChannel.atlasImportImages, { images }),

@@ -23,12 +23,19 @@ import {
   exportDocument,
   openDocumentFromDialog,
   saveCurrentDocument,
+  newDocumentSafely,
+  exportProjectDocument,
+  DocumentHost,
+  MoveBoneCommand,
+  attachProjectRecovery,
 } from '.';
 
 // Behavior the fake preload bridge should exhibit for one test. Defaults: save succeeds, open cancels.
 interface Behavior {
-  save?: (document: unknown) => IpcResult<FileSaveResponse>;
+  save?: (document: unknown) => IpcResult<FileSaveResponse> | Promise<IpcResult<FileSaveResponse>>;
   open?: () => IpcResult<FileOpenResponse>;
+  confirm?: 'save' | 'discard' | 'cancel';
+  recover?: MarionetteApi['openRecovery'];
 }
 
 // Install a fake window.marionette. file-actions reads the bridge at call time (never at import), so
@@ -36,6 +43,11 @@ interface Behavior {
 function installApi(behavior: Behavior): { savedDocument: () => unknown } {
   let saved: unknown;
   const api: MarionetteApi = {
+    confirmUnsaved: async () => ({ ok: true, data: behavior.confirm ?? 'discard' }),
+    closeApproved: async () => ({ ok: true, data: { status: 'closed' } }),
+    saveRecovery: async () => ({ ok: true, data: { status: 'saved', path: '/recovery.json' } }),
+    openRecovery: behavior.recover ?? (async () => ({ ok: true, data: { status: 'canceled' } })),
+    discardRecovery: async () => ({ ok: true, data: { status: 'discarded' } }),
     getVersion: async (): Promise<IpcResult<GetVersionResponse>> => ({
       ok: true,
       data: { version: '0.0.0' },
@@ -147,6 +159,7 @@ function addRootBone(): void {
 }
 
 afterEach(() => {
+  documentHost.newDocument();
   vi.unstubAllGlobals();
   useSelectionStore.getState().clear();
 });
@@ -160,7 +173,10 @@ describe('WP-0.8 renderer file actions', () => {
     const saveResult = await saveCurrentDocument();
     expect(saveResult).toEqual({ kind: 'saved', path: '/rig.json' });
     // What main received is exactly the validated, hashed export (the renderer never sends a path).
-    expect(api.savedDocument()).toEqual(exported);
+    expect(api.savedDocument()).toMatchObject({
+      projectFormatVersion: '0.1.0',
+      skeleton: exported,
+    });
 
     // Select a bone and confirm the live document has undo depth, so we can prove load resets both.
     const selectedId = documentHost.current().model.bones()[0]!.id;
@@ -210,4 +226,106 @@ describe('WP-0.8 renderer file actions', () => {
     // A failed open never swaps: the live document is exactly what it was.
     expect(exportDocument(documentHost.current().model)).toEqual(before);
   });
+});
+
+describe('project identity and unsaved work', () => {
+  it('keeps the saved pose reachable when nearby edits would otherwise coalesce', async () => {
+    installApi({});
+    addRootBone();
+    const doc = documentHost.current();
+    const id = doc.model.bones()[0]!.id;
+    doc.history.execute(new MoveBoneCommand(id, { x: 10, y: 0 }));
+    await saveCurrentDocument();
+    doc.history.execute(new MoveBoneCommand(id, { x: 20, y: 0 }));
+    doc.history.undo();
+    expect(doc.model.getBone(id)?.x).toBe(10);
+    expect(documentHost.isDirty()).toBe(false);
+  });
+  it('saves an empty project and marks it clean', async () => {
+    installApi({});
+    documentHost.newDocument();
+    expect((await saveCurrentDocument()).kind).toBe('saved');
+    expect(documentHost.isDirty()).toBe(false);
+  });
+  it('cancel protects a dirty document from New', async () => {
+    installApi({ confirm: 'cancel' });
+    addRootBone();
+    const current = documentHost.current();
+    await newDocumentSafely();
+    expect(documentHost.current()).toBe(current);
+    expect(documentHost.isDirty()).toBe(true);
+  });
+  it('a failed save prevents replacement after choosing Save', async () => {
+    installApi({
+      confirm: 'save',
+      save: () => ({ ok: false, error: { code: 'IPC_HANDLER_ERROR', message: 'disk full' } }),
+    });
+    addRootBone();
+    const current = documentHost.current();
+    await newDocumentSafely();
+    expect(documentHost.current()).toBe(current);
+  });
+  it('edits made while Save is pending remain dirty', async () => {
+    let finish: ((result: IpcResult<FileSaveResponse>) => void) | undefined;
+    installApi({
+      save: () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    });
+    addRootBone();
+    const saving = saveCurrentDocument();
+    addRootBone();
+    finish?.({ ok: true, data: { status: 'saved', path: '/project.json' } });
+    await saving;
+    expect(documentHost.isDirty()).toBe(true);
+    documentHost.current().history.undo();
+    expect(documentHost.isDirty()).toBe(false);
+  });
+  it('a stale save completion cannot mark a replacement document clean', async () => {
+    let finish: ((result: IpcResult<FileSaveResponse>) => void) | undefined;
+    installApi({
+      save: () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    });
+    addRootBone();
+    const saving = saveCurrentDocument();
+    documentHost.newDocument();
+    addRootBone();
+    finish?.({ ok: true, data: { status: 'saved', path: '/old.json' } });
+    await saving;
+    expect(documentHost.path).toBeNull();
+    expect(documentHost.isDirty()).toBe(true);
+  });
+  it('notifies on same-revision replacement and resets playback identities', () => {
+    const host = new DocumentHost();
+    const listener = vi.fn();
+    const unsubscribe = host.subscribe(listener);
+    const oldId = host.identity();
+    const project = exportProjectDocument(host.current());
+    host.load(project);
+    expect(host.current().model.revision).toBe(0);
+    expect(host.identity()).not.toBe(oldId);
+    expect(listener).toHaveBeenCalledOnce();
+    unsubscribe();
+  });
+});
+
+it('requests a startup recovery offer and detaches its recovery timer', async () => {
+  const recover = vi.fn(
+    async (): Promise<IpcResult<FileOpenResponse>> => ({ ok: true, data: { status: 'canceled' } }),
+  );
+  installApi({ recover });
+  window.addEventListener = vi.fn();
+  window.removeEventListener = vi.fn();
+  const detach = attachProjectRecovery();
+  try {
+    await Promise.resolve();
+    expect(recover).toHaveBeenCalledWith({ startup: true });
+  } finally {
+    detach();
+  }
+  expect(window.removeEventListener).toHaveBeenCalledWith('beforeunload', expect.any(Function));
 });

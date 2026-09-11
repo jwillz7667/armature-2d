@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { importSpineJson, importSpineSkel } from '../src/index';
+import { importSpineJson, importSpineSkel as importUnverifiedSkel } from '../src/index';
 import { encodeSkel, type SkelModel } from './fixtures/skel-encoder';
+
+// Synthetic codec coverage is explicit; production binary import remains gated.
+const importSpineSkel: typeof importUnverifiedSkel = (input, options) =>
+  importUnverifiedSkel(input, { ...options, allowUnverifiedBinary: true });
 
 // JSON/binary equivalence (PP-A5 slice 2): the .skel binary reader decodes into the SAME intermediate the
 // JSON path builds, so equivalent logical content produces DEEP-EQUAL documents (and identical warnings).
@@ -359,7 +363,7 @@ const weightedDeformPair: Pair = {
           },
         },
         events: [{ time: 1, name: 'step', int: 5 }],
-        draworder: [{ time: 0.5, offsets: [{ slot: 'meshslot', offset: 1 }] }],
+        draworder: [{ time: 0.5, offsets: [{ slot: 'meshslot', offset: 0 }] }],
       },
     },
   },
@@ -417,7 +421,7 @@ const weightedDeformPair: Pair = {
           },
         ],
         events: [{ time: 1, event: 'step', int: 5 }],
-        draworder: [{ time: 0.5, changes: [{ slot: 'meshslot', amount: 1 }] }],
+        draworder: [{ time: 0.5, changes: [{ slot: 'meshslot', amount: 0 }] }],
       },
     ],
   },

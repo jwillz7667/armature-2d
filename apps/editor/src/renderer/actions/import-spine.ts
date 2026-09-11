@@ -1,4 +1,4 @@
-import { documentHost } from '../document';
+import { documentHost, installOpenedProject } from '../document';
 import { bridge } from '../ipc-bridge';
 import { useSpineImportStore } from '../editor-state/spine-import-store';
 import type { SpineImportError, SpineImportWarning } from '../../shared';
@@ -32,6 +32,7 @@ function messageOf(error: unknown, fallback: string): string {
 
 export async function importSpineProjectFromDialog(): Promise<SpineProjectImportOutcome> {
   try {
+    const original = documentHost.current();
     const result = await bridge().importSpineProject();
     if (!result.ok) return { kind: 'error', message: result.error.message };
     const data = result.data;
@@ -45,13 +46,12 @@ export async function importSpineProjectFromDialog(): Promise<SpineProjectImport
       });
       return { kind: 'failed', errors: data.errors, warnings: data.warnings };
     }
-    try {
-      documentHost.load(data.document);
-    } catch (error) {
-      // A converted document that slips past the importer's validation still fails loudly on load; the
-      // current document is left untouched (documentHost.load throws without mutating).
-      return { kind: 'error', message: messageOf(error, 'load failed') };
-    }
+    const outcome = await installOpenedProject(
+      { status: 'opened', name: data.name, document: data.document, pages: data.pages ?? [] },
+      original,
+      true,
+    );
+    if (outcome.kind === 'error' || outcome.kind === 'canceled') return outcome;
     useSpineImportStore.getState().show({
       status: 'imported',
       name: data.name,
