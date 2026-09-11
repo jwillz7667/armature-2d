@@ -18,9 +18,9 @@ authoring UI and playback renderer trail the backend by roughly one phase (the v
 viewport, then the WP-2.1/2.3/2.4/2.6/2.7/2.8/2.9 authoring surfaces over the already-complete command
 layer), then the Phase 3 remainder (GL particle rendering + designer panel), then the Phase 4 remainder
 (GL slot render + scene preview), then Phase 5 continues as planned. NOTE: the WebGL pixel parity, the
-live real-engine acceptance step, and the byte-exact fixture-determinism gate on the pinned Node 24.20.0
-are not exercisable in a headless container; they are covered by pure-logic + parity + tolerance tests and
-the committed golden fixtures instead.** Build phase by phase, do not scaffold everything at once.
+live real-engine acceptance step require engine/device verification. The byte-exact fixture-determinism
+gate runs in CI on pinned Node 24.20.0 and is required; tolerance tests do not replace it. September audit
+repairs and remaining acceptance gaps are recorded in `docs/audit/remediation-2026-09-07.md`.** Build phase by phase, do not scaffold everything at once.
 The authoritative spec is `MARIONETTE_HANDOFF.md`. The plan of record lives in `docs/plan/`; the master index
 and dependency graph are in `docs/DEV_PLAN.md`.
 
@@ -42,7 +42,7 @@ is tracked for Phase 4/5 in `docs/plan/product-editions.md`. Do not add edition 
    round-trip test is MANDATORY per command (do then undo => deep-equal prior state), and for a coalescing
    command it must cover the merged sequence (one undo restores the pre-interaction state).
 3. **THE FORMAT IS THE CONTRACT.** `packages/format` is the one expensive-to-change thing. `formatVersion` is the
-   semver of the FORMAT (currently `0.1.0`, `SUPPORTED_FORMAT_MAJOR = 0`), independent of app version. A schema or
+   semver of the skeleton FORMAT (currently `0.6.0`, `SUPPORTED_FORMAT_MAJOR = 0`), independent of app version. A schema or
    semantic change follows the MAJOR/MINOR/PATCH policy in `docs/plan/cross-cutting/format-contract.md` §10 and
    bumps `formatVersion` with a tested migration; a non-schema change (validator refactor, comment, error wording)
    does NOT bump it. Validate on import; malformed docs fail loudly with a typed `FormatError`.
@@ -93,7 +93,7 @@ packages/
   runtime-core/                  # platform-agnostic solve (skeleton, effects, slot). NO PixiJS. Behavioral source of truth.
   runtime-web/                   # TS + PixiJS playback; also powers the editor viewport
   document-core/                 # renderer-agnostic DocumentModel + commands + History (ADR-0001). NO React/PixiJS/DOM. Shared by the editor AND the headless MCP server.
-  mcp-server/                    # standalone headless MCP server (stdio CLI: marionette-mcp), 202 tools over the same commands (WP-M.1). Imports document-core/format/runtime-core/render-preview/atlas-pack/import-spine.
+  mcp-server/                    # standalone headless MCP server (stdio CLI: marionette-mcp), 208 tools over the same commands (WP-M.1). Imports document-core/format/runtime-core/render-preview/atlas-pack/import-spine.
   render-preview/                # deterministic CPU rasterizer -> PNG (ADR-0006) for headless render feedback
   atlas-pack/                    # deterministic atlas pipeline (ADR-0007), shared by editor main + mcp-server
   math-bridge/                   # SpinResult types + adapter to the existing engine (+ mock)

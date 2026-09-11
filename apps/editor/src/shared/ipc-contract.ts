@@ -172,6 +172,10 @@ export type FileSaveResponse = z.infer<typeof fileSaveResponseSchema>;
 // so the renderer restores the atlas textures on load instead of clearing to placeholders; it is empty
 // when the project has no atlas or its textures directory is absent (a partial or missing set is fine).
 export const fileOpenRequestSchema = z.undefined();
+export const recoveryOpenRequestSchema = z
+  .object({ startup: z.boolean().optional() })
+  .strict()
+  .optional();
 export const fileOpenResponseSchema = z.discriminatedUnion('status', [
   z
     .object({
@@ -604,7 +608,7 @@ export interface MarionetteApi {
     pages: readonly AtlasImportPage[],
     options: FileSaveOptions,
   ): Promise<IpcResult<FileSaveResponse>>;
-  openRecovery(): Promise<IpcResult<FileOpenResponse>>;
+  openRecovery(options?: { readonly startup?: boolean }): Promise<IpcResult<FileOpenResponse>>;
   discardRecovery(documentId: string): Promise<IpcResult<{ readonly status: 'discarded' }>>;
   // Open a document; main shows the dialog, reads and validates the file. Returns the parsed document
   // or a canceled status.
