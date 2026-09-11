@@ -1,151 +1,341 @@
-// Re-export the @marionette/document-core public surface so the editor renderer consumes the command
-// spine through ONE barrel (ADR-0001): tools, the gizmo, the viewport, and keybindings import commands
-// and types from here and never reach past the barrel into document-core internals (Mutator and the
-// write surface are not exported by document-core, the structural half of LAW 2). The DocumentHost
-// below owns the single live Document for the renderer. The document is deliberately NOT in Zustand;
-// only selection, tool, and camera are ephemeral editor state (the editor/document wall, handoff 8.2).
 export * from '@marionette/document-core';
 
-import { exportDocument, loadDocument, type Document } from '@marionette/document-core';
+import {
+  exportProjectDocument,
+  loadProjectDocument,
+  type Document,
+} from '@marionette/document-core';
 import { createInitialDocument, createProductionEnvironment } from '../composition-root';
-import { restoreAtlasTextures } from '../actions/restore-atlas';
-import { atlasTextureStore } from '../editor-state/atlas-texture-store';
+import {
+  atlasTextureStore,
+  effectsTextureStore,
+  prepareAtlas,
+  type PreparedAtlas,
+} from '../editor-state/atlas-texture-store';
 import { useSelectionStore } from '../editor-state/selection-store';
 import { useSkinPreviewStore } from '../editor-state/skin-preview-store';
+import { usePlaybackStore } from '../editor-state/playback-store';
+import { useSlotSelectionStore } from '../editor-state/slot-selection-store';
+import { useConstraintSelectionStore } from '../editor-state/constraint-selection-store';
+import { useEventSelectionStore } from '../editor-state/event-selection-store';
+import { useMeshEditStore } from '../editor-state/mesh-edit-store';
+import { reportProblem } from '../editor-state/problems-store';
 import { bridge } from '../ipc-bridge';
+import type { AtlasImportPage, FileOpenResponse } from '../../shared';
 
-// The renderer's single owner of the live Document. It holds the current Document (created at startup
-// through the composition root) and is the ONE place that reconciles the ephemeral selection store
-// after a committed mutation: every HistoryEvent applies the command's per-phase selectionHint and then
-// prunes any selected id that no longer resolves in the model (for example a bone removed by undoing
-// its CreateBone). Because every mutation path (the create tool, gizmo move/rotate sessions, and the
-// undo/redo keybindings) routes through the same History, this single subscription keeps selection
-// correct for all of them, so no call site has to apply hints itself. The viewport learns the document
-// changed by polling current().model.revision each frame (the editor/document wall keeps the document
-// out of Zustand). load() performs the WP-0.8 atomic swap when a file is opened.
-class DocumentHost {
-  private document: Document;
-  // Tears down the reconciler subscription on the CURRENT document; replaced atomically on load().
-  private detachReconciler: () => void;
+function fingerprint(document: Document): string {
+  // Revisions and selection are excluded, so Undo to the savepoint is clean. Snapshots also preserve
+  // unfinished edits that a strict runtime export may reject.
+  return JSON.stringify([document.model.snapshot(), document.effects.snapshot()]);
+}
 
-  constructor() {
-    this.document = createInitialDocument();
-    this.detachReconciler = this.attachReconciler(this.document);
-  }
+export class DocumentHost {
+  private document = createInitialDocument();
+  private detachReconciler = this.attachReconciler(this.document);
+  private sessionId: string = crypto.randomUUID();
+  private saved = fingerprint(this.document);
+  private serial = 0;
+  private observed = '';
+  private snapshotKey = '';
+  private snapshotText = '';
+  private raf: number | null = null;
+  private readonly listeners = new Set<() => void>();
+  path: string | null = null;
 
   current(): Document {
     return this.document;
   }
-
-  // Atomic document swap (handoff 8.2, WP-0.8): replace the live Document with one rebuilt from
-  // validated format JSON. loadDocument re-validates at the boundary (LAW 3) and throws a typed error
-  // on malformed input WITHOUT mutating anything, so a failed load leaves the current document intact
-  // (this method lets that throw propagate to the caller, which surfaces it). On success the old
-  // History subscription is detached and the reconciler is re-attached to the new History; selection is
-  // cleared because loaded entities carry freshly minted BoneIds that no prior selection can reference.
-  // Load is not a command and resets undo/redo: the new Document starts with empty history. The atlas
-  // page textures are ephemeral editor state belonging to the previous session, so they are cleared here;
-  // openDocumentFromDialog then RESTORES them from the project-relative textures directory the main process
-  // read back (PP-D5), so a saved-and-reopened project shows its textures rather than the placeholder.
-  load(json: unknown): void {
-    const next = loadDocument(json, createProductionEnvironment());
-    this.detachReconciler();
-    this.document = next;
-    this.detachReconciler = this.attachReconciler(next);
-    useSelectionStore.getState().clear();
-    atlasTextureStore.clear();
-    useSkinPreviewStore.getState().reset();
+  identity(): string {
+    return this.sessionId;
   }
-
-  // File > New: swap in a fresh, empty document (no bones, no atlas), the same atomic reconciler + cleared
-  // ephemeral state as load(). Not a command and resets undo/redo (a new document starts empty). The
-  // viewport shows nothing until the first CreateBone (the fresh document is genuinely empty).
+  capture(): string {
+    const key = `${this.sessionId}:${this.document.model.revision}:${this.document.effects.revision}`;
+    if (key !== this.snapshotKey) {
+      this.snapshotKey = key;
+      this.snapshotText = fingerprint(this.document);
+    }
+    return this.snapshotText;
+  }
+  isDirty(): boolean {
+    return this.capture() !== this.saved;
+  }
+  getRevision = (): number => this.serial;
+  subscribe = (listener: () => void): (() => void) => {
+    this.listeners.add(listener);
+    // One shared observer covers live gestures; committed commands and swaps notify synchronously.
+    if (this.raf === null && typeof requestAnimationFrame === 'function')
+      this.raf = requestAnimationFrame(this.poll);
+    return () => {
+      this.listeners.delete(listener);
+      if (this.listeners.size === 0 && this.raf !== null) {
+        cancelAnimationFrame(this.raf);
+        this.raf = null;
+      }
+    };
+  };
+  private poll = (): void => {
+    this.checkRevision();
+    this.raf = this.listeners.size ? requestAnimationFrame(this.poll) : null;
+  };
+  private checkRevision(): void {
+    const revision = `${this.sessionId}:${this.document.model.revision}:${this.document.effects.revision}`;
+    if (revision !== this.observed) {
+      this.observed = revision;
+      this.emit();
+    }
+  }
+  private emit(): void {
+    ++this.serial;
+    for (const listener of this.listeners) listener();
+  }
+  markSaved(id: string, snapshot: string, path: string): void {
+    if (id !== this.sessionId) return;
+    this.saved = snapshot;
+    this.path = path;
+    this.emit();
+  }
+  markDirty(): void {
+    this.saved = '';
+    this.emit();
+  }
+  load(
+    json: unknown,
+    options: {
+      readonly documentId?: string;
+      readonly path?: string;
+      readonly dirty?: boolean;
+    } = {},
+  ): void {
+    this.replace(loadProjectDocument(json, createProductionEnvironment()), options);
+  }
   newDocument(): void {
-    const next = createInitialDocument();
+    this.replace(createInitialDocument());
+  }
+  replace(
+    next: Document,
+    options: {
+      readonly documentId?: string;
+      readonly path?: string;
+      readonly dirty?: boolean;
+    } = {},
+  ): void {
     this.detachReconciler();
+    atlasTextureStore.clear();
+    effectsTextureStore.clear();
     this.document = next;
+    this.sessionId = options.documentId ?? crypto.randomUUID();
+    this.path = options.path ?? null;
+    this.saved = options.dirty ? '' : fingerprint(next);
     this.detachReconciler = this.attachReconciler(next);
     useSelectionStore.getState().clear();
-    atlasTextureStore.clear();
+    useSlotSelectionStore.getState().clearSlot();
+    useConstraintSelectionStore.getState().select(null);
+    useEventSelectionStore.getState().clearEvent();
+    useMeshEditStore.getState().clearVertex();
     useSkinPreviewStore.getState().reset();
+    usePlaybackStore.getState().setActiveAnimation(null);
+    usePlaybackStore.getState().setClipboard([]);
+    this.checkRevision();
   }
-
   private attachReconciler(document: Document): () => void {
     return document.history.subscribe((event) => {
       const selection = useSelectionStore.getState();
       selection.applyHint(event.selectionHint);
       selection.prune((id) => document.model.getBone(id) !== undefined);
+      void atlasTextureStore
+        .activate(document.model.preserved().atlas)
+        .catch((error: unknown) => reportProblem(messageOf(error, 'Texture restore failed')));
+      void effectsTextureStore
+        .activate(document.effects.atlas())
+        .catch((error: unknown) =>
+          reportProblem(messageOf(error, 'Effects texture restore failed')),
+        );
+      this.checkRevision();
     });
   }
 }
 
-// The renderer-wide singleton, constructed once on first import. The renderer is a DOM context, so the
-// production clock and IdFactory the composition root injects are legitimate here (and only here).
 export const documentHost = new DocumentHost();
-
-// The result of a save/open action, surfaced to the caller (the keybinding handler logs failures).
-// Modeled as a discriminated union so neither a user cancel nor a typed error is swallowed.
 export type FileActionOutcome =
   | { readonly kind: 'saved'; readonly path: string }
   | { readonly kind: 'opened'; readonly name: string }
   | { readonly kind: 'canceled' }
   | { readonly kind: 'error'; readonly message: string };
 
-// Export the live document to the format and hand it to the main process to write (WP-0.8). The export
-// runs in the renderer (it owns the model); exportDocument validates and stamps the content hash, so a
-// corrupt projection fails loudly here before any IPC. The main process re-validates and owns the save
-// dialog (the renderer never supplies a path: path-injection defense).
-export async function saveCurrentDocument(): Promise<FileActionOutcome> {
-  let exported: unknown;
+function projectPages(): readonly AtlasImportPage[] {
+  return [
+    ...atlasTextureStore.getPageBytes().map((page) => ({ ...page, scope: 'skeleton' as const })),
+    ...effectsTextureStore.getPageBytes().map((page) => ({ ...page, scope: 'effects' as const })),
+  ];
+}
+export async function saveCurrentDocument(saveAs = false): Promise<FileActionOutcome> {
+  const current = documentHost.current();
+  const id = documentHost.identity();
   try {
-    exported = exportDocument(documentHost.current().model);
-  } catch (error) {
-    return { kind: 'error', message: messageOf(error, 'export failed') };
-  }
-  try {
-    // Send the atlas page bytes alongside the document so main persists them next to the project for a
-    // later texture restore (PP-D5); the array is empty when no atlas is loaded.
-    const result = await bridge().saveDocument(exported, atlasTextureStore.getPageBytes());
-    if (!result.ok) return { kind: 'error', message: result.error.message };
+    current.history.checkpoint();
+    const snapshot = documentHost.capture();
+    const result = await bridge().saveDocument(exportProjectDocument(current), projectPages(), {
+      documentId: id,
+      saveAs,
+    });
+    if (!result.ok) return fail(result.error.message);
     if (result.data.status === 'canceled') return { kind: 'canceled' };
+    documentHost.markSaved(id, snapshot, result.data.path);
+    if (documentHost.identity() === id && !documentHost.isDirty())
+      await bridge().discardRecovery(id);
     return { kind: 'saved', path: result.data.path };
   } catch (error) {
-    // A missing bridge (failed preload) throws here; surface it instead of an opaque rejection.
-    return { kind: 'error', message: messageOf(error, 'save failed') };
+    return fail(messageOf(error, 'Save failed'));
   }
 }
 
-// Open a document chosen in the main-process dialog and swap it in (WP-0.8). The main process reads and
-// validates the file; the renderer re-validates and rebuilds via documentHost.load (validate-on-load,
-// LAW 3). A load that throws (a malformed document that slipped past the first validation) is caught
-// and reported, leaving the current document untouched.
-export async function openDocumentFromDialog(): Promise<FileActionOutcome> {
+let confirming: Promise<boolean> | null = null;
+let allowUnload = false;
+export async function confirmDiscardChanges(): Promise<boolean> {
+  if (confirming) return confirming;
+  if (!documentHost.isDirty()) return true;
+  const id = documentHost.identity();
+  confirming = (async () => {
+    try {
+      const result = await bridge().confirmUnsaved();
+      if (!result.ok) {
+        fail(result.error.message);
+        return false;
+      }
+      if (id !== documentHost.identity() || result.data === 'cancel') return false;
+      if (result.data === 'save')
+        return (await saveCurrentDocument()).kind === 'saved' && !documentHost.isDirty();
+      await bridge().discardRecovery(id);
+      return id === documentHost.identity();
+    } catch (error) {
+      fail(messageOf(error, 'Could not confirm unsaved changes'));
+      return false;
+    } finally {
+      confirming = null;
+    }
+  })();
+  return confirming;
+}
+export async function newDocumentSafely(): Promise<void> {
+  if (await confirmDiscardChanges()) documentHost.newDocument();
+}
+export async function closeDocumentSafely(): Promise<void> {
+  if (await confirmDiscardChanges()) {
+    allowUnload = true;
+    try {
+      const result = await bridge().closeApproved();
+      if (!result.ok) {
+        allowUnload = false;
+        fail(result.error.message);
+      }
+    } catch (error) {
+      allowUnload = false;
+      fail(messageOf(error, 'Could not close project'));
+    }
+  }
+}
+export async function openDocumentFromDialog(
+  recovery = false,
+  startup = false,
+): Promise<FileActionOutcome> {
+  const original = documentHost.current();
   try {
-    const result = await bridge().openDocument();
-    if (!result.ok) return { kind: 'error', message: result.error.message };
-    if (result.data.status === 'canceled') return { kind: 'canceled' };
-    try {
-      documentHost.load(result.data.document);
-    } catch (error) {
-      return { kind: 'error', message: messageOf(error, 'load failed') };
-    }
-    // Restore the atlas textures from the page bytes main read back from the project-relative textures
-    // directory (PP-D5). A restore failure is non-fatal: the document opened, so keep the placeholder
-    // rather than failing the open. load() cleared the previous session's textures, so this repopulates.
-    try {
-      await restoreAtlasTextures(documentHost.current().model.preserved().atlas, result.data.pages);
-    } catch (error) {
-      console.error(
-        `[marionette] atlas texture restore failed: ${messageOf(error, 'unknown error')}`,
-      );
-    }
-    return { kind: 'opened', name: result.data.name };
+    const result = recovery
+      ? await bridge().openRecovery(startup ? { startup: true } : undefined)
+      : await bridge().openDocument();
+    if (!result.ok) return fail(result.error.message);
+    if (result.data.status === 'canceled' || original !== documentHost.current())
+      return { kind: 'canceled' };
+    return await installOpenedProject(result.data, original, recovery);
   } catch (error) {
-    // A missing bridge (failed preload) throws here; surface it instead of an opaque rejection.
-    return { kind: 'error', message: messageOf(error, 'open failed') };
+    return fail(messageOf(error, 'Open failed'));
   }
 }
-
+export async function installOpenedProject(
+  data: Extract<FileOpenResponse, { status: 'opened' }>,
+  original: Document,
+  dirty = false,
+): Promise<FileActionOutcome> {
+  const next = loadProjectDocument(data.document, createProductionEnvironment());
+  const staged: PreparedAtlas[] = [];
+  try {
+    staged.push(
+      await prepareAtlas(
+        next.model.preserved().atlas,
+        data.pages.filter((page) => page.scope !== 'effects'),
+      ),
+    );
+    staged.push(
+      await prepareAtlas(
+        next.effects.atlas(),
+        data.pages.filter((page) => page.scope === 'effects'),
+      ),
+    );
+    if (original !== documentHost.current() || !(await confirmDiscardChanges()))
+      return { kind: 'canceled' };
+    if (original !== documentHost.current()) return { kind: 'canceled' };
+    documentHost.replace(next, {
+      ...(data.documentId ? { documentId: data.documentId } : {}),
+      ...(!dirty && data.path ? { path: data.path } : {}),
+      dirty,
+    });
+    atlasTextureStore.install(staged[0]!);
+    effectsTextureStore.install(staged[1]!);
+    staged.length = 0;
+    await atlasTextureStore.activate(next.model.preserved().atlas);
+    await effectsTextureStore.activate(next.effects.atlas());
+    for (const warning of data.warnings ?? []) reportProblem(warning, 'warning');
+    return { kind: 'opened', name: data.name };
+  } catch (error) {
+    return fail(messageOf(error, 'Project could not be opened'));
+  } finally {
+    for (const atlas of staged) atlas.dispose();
+  }
+}
+export function attachProjectRecovery(): () => void {
+  void openDocumentFromDialog(true, true);
+  let busy = false;
+  let last = '';
+  const timer = setInterval(() => {
+    const current = documentHost.current();
+    if (busy || confirming || !documentHost.isDirty() || current.history.inInteraction) return;
+    const key = `${documentHost.identity()}:${current.model.revision}:${current.effects.revision}`;
+    if (key === last) return;
+    busy = true;
+    try {
+      void bridge()
+        .saveRecovery(exportProjectDocument(current), projectPages(), {
+          documentId: documentHost.identity(),
+        })
+        .then((result) => {
+          if (result.ok) last = key;
+          else reportProblem(`Recovery copy could not be saved: ${result.error.message}`);
+        })
+        .catch((error: unknown) => reportProblem(messageOf(error, 'Recovery save failed')))
+        .finally(() => {
+          busy = false;
+        });
+    } catch (error) {
+      busy = false;
+      reportProblem(messageOf(error, 'Recovery save failed'));
+    }
+  }, 15000);
+  const unload = (event: BeforeUnloadEvent): void => {
+    if (!allowUnload && documentHost.isDirty()) {
+      event.preventDefault();
+      event.returnValue = '';
+    }
+  };
+  window.addEventListener('beforeunload', unload);
+  return () => {
+    clearInterval(timer);
+    window.removeEventListener('beforeunload', unload);
+  };
+}
 function messageOf(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
+}
+function fail(message: string): FileActionOutcome {
+  reportProblem(message);
+  return { kind: 'error', message };
 }

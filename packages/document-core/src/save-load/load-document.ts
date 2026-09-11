@@ -1,4 +1,5 @@
-import { parseDocument } from '@marionette/format';
+import { isProjectDocument, parseDocument, parseProjectDocument } from '@marionette/format';
+import { loadSlotSceneState } from './slot-scene-document';
 import { effectsDocumentToState, loadEffectsState } from '../effects-model/effects-import';
 import type { EffectsState } from '../effects-model/effects-state';
 import type {
@@ -785,6 +786,22 @@ export function loadDocument(json: unknown, env: DocumentEnvironment): Document 
   const ids = env.createIds();
   const state = formatToDocState(document, ids);
   return buildLoadedDocument(state, ids, env);
+}
+
+// Project loads are atomic: validate all members before exposing a fresh aggregate. Legacy skeleton
+// JSON continues through its migration path and starts with empty effects/default slot authoring.
+export function loadProjectDocument(json: unknown, env: DocumentEnvironment): Document {
+  if (!isProjectDocument(json)) {
+    return loadDocument(parseDocument(json, { verifyHash: true }), env);
+  }
+  const project = parseProjectDocument(json);
+  const ids = env.createIds();
+  const state = {
+    ...formatToDocState(project.skeleton, ids),
+    slotScene: loadSlotSceneState(project.slotScene),
+  };
+  const effectsState = loadEffectsState(project.effects, ids);
+  return buildLoadedDocument(state, ids, env, effectsState);
 }
 
 // Load a project's skeleton AND effects library into ONE Document with a single shared id factory and one

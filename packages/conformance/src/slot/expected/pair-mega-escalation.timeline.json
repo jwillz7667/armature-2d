@@ -6,7 +6,7 @@
   "sceneHash": "sha256:24d7360e6c8d9ba2aa6700b61b491d7f5c2cd2ded96595ceb5bb3ccc3b3a3ba3",
   "specHash": "sha256:edca24454facdddb0769d3d08da23e762d39958f8ef2a1e7e04772bc091b4fdb",
   "coreVersion": "runtime-core@0.0.0",
-  "toolchain": "node-22.13.1-v8",
+  "toolchain": "node-24.20.0-v8",
   "generatedBy": "generate-slot.ts",
   "sampleMs": [
     0,
@@ -18,7 +18,7 @@
   ],
   "timeline": {
     "spinId": "mock-mega-escalation",
-    "durationMs": 600,
+    "durationMs": 1600,
     "directives": [
       {
         "kind": "reelStop",
@@ -151,12 +151,6 @@
         "tier": "big",
         "atMs": 0,
         "seq": 73
-      },
-      {
-        "kind": "escalation",
-        "tier": "mega",
-        "atMs": 0,
-        "seq": 74
       },
       {
         "kind": "reelStop",
@@ -608,6 +602,12 @@
         "curve": "easeOutQuad",
         "atMs": 600,
         "seq": 72
+      },
+      {
+        "kind": "escalation",
+        "tier": "mega",
+        "atMs": 600,
+        "seq": 74
       }
     ]
   },

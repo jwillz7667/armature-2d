@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, mkdir, symlink, writeFile, link } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, sep } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -45,5 +45,55 @@ describe('createNodeFileStore', () => {
     await expect(store.read(join(tmpdir(), 'elsewhere.json'))).rejects.toMatchObject({
       code: 'PATH_FORBIDDEN',
     });
+  });
+
+  it('rejects linked directories for text, binary and listing operations', async () => {
+    const outside = await mkdtemp(join(tmpdir(), 'marionette-outside-'));
+    try {
+      await writeFile(join(outside, 'sentinel'), 'unchanged');
+      await symlink(
+        outside,
+        join(root, 'linked'),
+        process.platform === 'win32' ? 'junction' : 'dir',
+      );
+      const store = createNodeFileStore(root);
+      for (const operation of [
+        () => store.read('linked/sentinel'),
+        () => store.readBinary('linked/sentinel'),
+        () => store.write('linked/sentinel', 'changed'),
+        () => store.writeBinary('linked/new-file', new Uint8Array([1])),
+        () => store.listDir('linked'),
+      ])
+        await expect(operation()).rejects.toMatchObject({ code: 'PATH_FORBIDDEN' });
+      expect(await readFile(join(outside, 'sentinel'), 'utf8')).toBe('unchanged');
+      await expect(readFile(join(outside, 'new-file'))).rejects.toMatchObject({ code: 'ENOENT' });
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects linked files and hard-link writes without changing their targets', async () => {
+    await writeFile(join(root, 'original'), 'unchanged');
+    await link(join(root, 'original'), join(root, 'hard'));
+    const store = createNodeFileStore(root);
+    await expect(store.write('hard', 'changed')).rejects.toMatchObject({ code: 'PATH_FORBIDDEN' });
+    if (process.platform !== 'win32') {
+      await symlink(join(root, 'original'), join(root, 'soft'));
+      await expect(store.read('soft')).rejects.toMatchObject({ code: 'PATH_FORBIDDEN' });
+      await expect(store.write('soft', 'changed')).rejects.toMatchObject({
+        code: 'PATH_FORBIDDEN',
+      });
+    }
+    expect(await readFile(join(root, 'original'), 'utf8')).toBe('unchanged');
+  });
+
+  it('supports nested binary files and sorted directory listings', async () => {
+    await mkdir(join(root, 'assets'));
+    const store = createNodeFileStore(root);
+    await store.writeBinary('assets/b.png', new Uint8Array([1, 2, 3]));
+    await store.write('assets/a.json', '{}');
+    expect(Array.from(await store.readBinary('assets/b.png'))).toEqual([1, 2, 3]);
+    expect(await store.listDir('assets')).toEqual(['a.json', 'b.png']);
+    expect(await store.listDir('.')).toEqual([]);
   });
 });

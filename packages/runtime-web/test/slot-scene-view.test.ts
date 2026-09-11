@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { rollupValueAt } from '@marionette/runtime-core';
 import type {
   GridConfig,
@@ -10,6 +10,7 @@ import { symbolId } from '@marionette/format/slot';
 import type { Animation, SkeletonDocument } from '@marionette/format/types';
 import {
   SlotSceneView,
+  SkeletonView,
   applyDirective,
   cellCenter,
   cellIndex,
@@ -223,4 +224,47 @@ describe('PP-C4 SlotSceneView', () => {
     expect(() => view.update(100)).not.toThrow();
     expect(view.describe().mountedCells).toHaveLength(0);
   });
+});
+
+it('uses scheduled phase time and interpolates survivor drops before final placement', () => {
+  const sample = vi.spyOn(SkeletonView.prototype, 'syncAnimatedLoop');
+  const view = new SlotSceneView(grid2x2(), {
+    symbolResolver: symbolResolver(),
+    tumble: {
+      explodeMs: 0,
+      dropMs: 200,
+      dropEasing: 'linear',
+      refillStaggerMs: 0,
+      settleMs: 0,
+      stepGapMs: 0,
+      rollupCurve: 'linear',
+    },
+  });
+  view.setTimeline({
+    spinId: 'drop-clock',
+    durationMs: 300,
+    directives: [
+      { kind: 'symbolLand', row: 0, col: 0, symbol: A, atMs: 0, seq: 0 },
+      { kind: 'symbolAnimate', row: 0, col: 0, set: 'win', atMs: 100, seq: 1 },
+      {
+        kind: 'cascadeDrop',
+        moves: [{ from: { row: 0, col: 0 }, to: { row: 1, col: 0 }, symbol: A }],
+        atMs: 200,
+        seq: 2,
+      },
+    ],
+  });
+  view.update(150);
+  expect(sample).toHaveBeenLastCalledWith(expect.anything(), 'win', 0.05, 0.05);
+  view.update(300);
+  // The destination display is halfway between the two cell centers (50 and 160).
+  const destination = view.root.children[0]!.children[2]!;
+  expect(destination.y).toBeCloseTo(105);
+  view.update(400);
+  expect(destination.y).toBeCloseTo(160);
+  view.update(0);
+  expect(view.describe().symbols[0]![0]).toBe(A);
+  expect(destination.y).toBeCloseTo(160);
+  view.destroy();
+  sample.mockRestore();
 });

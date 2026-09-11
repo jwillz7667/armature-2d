@@ -239,6 +239,7 @@ export {
   RemoveLayerCommand,
   ReorderLayersCommand,
   SetLayerFieldCommand,
+  SetEmitterTrailCommand,
   SetLayerBlendModeCommand,
   AddLifeStopCommand,
   RemoveLifeStopCommand,
@@ -357,6 +358,7 @@ export {
   SetSkinAttachmentCommand,
   RemoveSkinAttachmentCommand,
   SetDeformKeyframeCommand,
+  SetDeformCurveCommand,
   DeleteDeformKeyframeCommand,
   MoveDeformKeyframeCommand,
   ClearAttachmentDeformCommand,
@@ -493,6 +495,8 @@ export {
   createDocument,
   loadDocument,
   loadDocumentWithEffects,
+  loadProjectDocument,
+  exportProjectDocument,
   effectsStateFromDocument,
   exportDocument,
   exportSlotSceneDocument,
@@ -500,3 +504,9 @@ export {
   SlotSceneDocumentError,
 } from './save-load';
 export type { SlotSceneDocumentErrorCode } from './save-load';
+
+export { SetWinSequencerCommand } from './commands/set-win-sequencer.command';
+
+export { SetFeatureFlowGraphCommand } from './commands/set-feature-flow-graph.command';
+
+export { SetSceneRefsCommand } from './commands/set-scene-refs.command';

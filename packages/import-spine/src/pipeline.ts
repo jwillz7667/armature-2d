@@ -1,6 +1,7 @@
 import { validateDocument } from '@marionette/format';
 import { convertDocument } from './convert/document';
 import { Diagnostics } from './diagnostics';
+import { reportUnhandledSetup, validateInputBudget } from './unsupported-fields';
 import type { SpineImportOptions, SpineImportResult } from './types';
 
 // The shared tail of every import path (JSON and .skel binary): convert the name-based intermediate value
@@ -15,6 +16,9 @@ export function finalizeSpineImport(
   options: SpineImportOptions | undefined,
 ): SpineImportResult {
   const diag = new Diagnostics();
+  if (!validateInputBudget(value, diag))
+    return { ok: false, errors: [...diag.errors], warnings: [] };
+  reportUnhandledSetup(value, diag);
   const converted = convertDocument(value, options, diag);
 
   if (converted === undefined || diag.hasErrors) {

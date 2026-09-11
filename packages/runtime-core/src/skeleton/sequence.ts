@@ -86,13 +86,14 @@ export function sampleSlotSequenceFrame(
   t: number,
   pose: Pose,
   slotName: string,
+  resolvedSequence?: { readonly count: number; readonly setupIndex: number },
 ): number {
   const slotIndex = pose.slotNames.indexOf(slotName);
   if (slotIndex < 0) return -1;
   const attachmentName = pose.slotAttachment[slotIndex];
   if (attachmentName === null || attachmentName === undefined) return -1;
 
-  const block = findSequenceBlock(document, slotName, attachmentName);
+  const block = resolvedSequence ?? findSequenceBlock(document, slotName, attachmentName);
   if (block === null) return -1;
 
   const animation = document.animations[animationId];

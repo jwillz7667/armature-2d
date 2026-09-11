@@ -4,6 +4,7 @@ import { defineConfig } from 'vitest/config';
 // the Node environment with no Electron, DOM, or WebGL context.
 export default defineConfig({
   test: {
+    maxWorkers: 2,
     environment: 'node',
     include: ['src/**/*.test.ts'],
   },

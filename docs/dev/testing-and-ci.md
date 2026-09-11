@@ -41,7 +41,7 @@ manual step. There are no GUI e2e tests yet.
 ## CI (`.github/workflows/ci.yml`)
 
 Triggers on every PR and push to `main`; superseded PR runs are cancelled. Every job runs on
-ubuntu-latest with Node from `.node-version` (22.13.1), pnpm from `packageManager` (11.8.0), pnpm
+ubuntu-latest with Node from `.node-version` (24.20.0), pnpm from `packageManager` (11.19.0), pnpm
 store caching, and `pnpm install --frozen-lockfile`.
 
 | Job | Runs |

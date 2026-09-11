@@ -10,6 +10,9 @@ concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+permissions:
+  contents: read
+
 env:
   TURBO_TELEMETRY_DISABLED: '1'
 
@@ -65,6 +68,13 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - name: Verify built worker startup and media exports
+        run: |
+          node tools/smoke-video-worker.mjs
+          node tools/smoke-media-worker.mjs
+          node tools/smoke-spine-worker.mjs
+          node tools/smoke-import-workers.mjs
+          node tools/smoke-mcp-cli.mjs
 
   format-semver:
     runs-on: ubuntu-latest
@@ -111,7 +121,6 @@ jobs:
 
   commitlint:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
         with:
@@ -123,30 +132,62 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: Lint PR commits (Conventional Commits)
-        run: >
-          pnpm exec commitlint
-          --from ${{ github.event.pull_request.base.sha }}
-          --to ${{ github.event.pull_request.head.sha }}
+        if: github.event_name == 'pull_request'
+        env:
+          COMMIT_BASE: ${{ github.event.pull_request.base.sha }}
+          COMMIT_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: pnpm exec commitlint --from "$COMMIT_BASE" --to "$COMMIT_HEAD"
 
-  # Required status check for this workflow. Its dependency set grows per phase (conformance-and-ci D.13);
-  # Phase 0 = typecheck, lint, test, build, format-semver, package-guard. Phase 3 adds the
-  # phase3-acceptance gate (the milestone DoD: particle conformance + the megaWin acceptance harness).
-  #
-  # The native runtimes (Unity C# core, Godot headless) gate through a SEPARATE required check,
-  # `conformance-native-pass` in conformance-native.yml, not through this job's `needs` (TASK-5.5.6). They
-  # live in their own path-filtered + nightly workflow because the engine jobs are heavier and only a
-  # runtimes / format / runtime-core / conformance change can move native conformance; folding them into
-  # ci-pass would run a dotnet restore and a pinned Godot download on every docs-only PR. The repo owner
-  # therefore marks TWO checks required in branch protection: `ci-pass` AND `conformance-native-pass`.
+  # Every required job must finish successfully, including commit lint. Missing/skipped jobs fail.
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit:dependencies
+
+  fixture-determinism:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Regenerate all fixtures on the pinned toolchain and reject drift
+        run: |
+          pnpm --filter @marionette/conformance generate
+          pnpm --filter @marionette/conformance generate:effects
+          pnpm --filter @marionette/conformance generate:slot
+          pnpm --filter @marionette/conformance generate:anim-state
+          git diff --exit-code -- packages/conformance/src
+
   ci-pass:
     runs-on: ubuntu-latest
     if: always()
-    needs: [typecheck, lint, test, build, format-semver, package-guard, phase3-acceptance]
+    needs:
+      [
+        typecheck,
+        lint,
+        test,
+        build,
+        format-semver,
+        package-guard,
+        phase3-acceptance,
+        commitlint,
+        dependency-audit,
+        fixture-determinism,
+      ]
     steps:
-      - name: Verify all required jobs succeeded
+      - name: Verify every required job succeeded
+        env:
+          JOB_RESULTS: ${{ toJSON(needs) }}
         run: |
-          if [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" = "true" ]; then
-            echo "One or more required checks failed."
-            exit 1
-          fi
-          echo "All required Phase-0 checks passed."
+          node -e 'const jobs=JSON.parse(process.env.JOB_RESULTS); const names=["typecheck","lint","test","build","format-semver","package-guard","phase3-acceptance","commitlint","dependency-audit","fixture-determinism"]; for(const name of names) { if(jobs[name]?.result !== "success") throw new Error(name + " did not succeed"); }'

@@ -374,3 +374,14 @@ export {
   findAttachmentSnapshot,
   findAnimationSnapshot,
 } from './spec';
+
+export { SetDeformCurveCommand } from './set-deform-curve.command';
+
+export { SetWinSequencerCommand, setWinSequencerSpec } from './set-win-sequencer.command';
+
+export {
+  SetFeatureFlowGraphCommand,
+  setFeatureFlowGraphSpec,
+} from './set-feature-flow-graph.command';
+
+export { SetSceneRefsCommand, setSceneRefsSpec } from './set-scene-refs.command';

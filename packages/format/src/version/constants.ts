@@ -32,3 +32,7 @@ export const FORMAT_COMMON_VERSION = '1.0.0';
 // at this same 0.1.0 (completing the initial contract, not breaking a released one), so growing them does
 // not bump the version.
 export const SLOT_SCENE_FORMAT_VERSION = '0.1.0';
+
+// Editable, self-contained desktop project envelope (ADR-0015). Runtime sibling schemas retain their
+// independent version lines; introducing the project container does not change exported skeletons.
+export const PROJECT_FORMAT_VERSION = '0.1.0';

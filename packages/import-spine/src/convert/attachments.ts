@@ -1,4 +1,5 @@
 import type { Attachment } from '@marionette/format';
+import { warnUnknownFields } from '../unsupported-fields';
 import { readColor } from '../color';
 import type { Diagnostics } from '../diagnostics';
 import {
@@ -29,6 +30,16 @@ export function convertAttachment(
   if (rec === undefined) return undefined;
   const type = readString(rec, 'type', base, diag, 'region');
   const regionPath = readString(rec, 'path', base, diag, attachmentName);
+  const allowed: Record<string, readonly string[]> = {
+    region: ['x', 'y', 'rotation', 'scaleX', 'scaleY', 'width', 'height', 'sequence'],
+    mesh: ['uvs', 'triangles', 'vertices', 'hull', 'edges', 'width', 'height', 'sequence'],
+    linkedmesh: ['parent', 'skin', 'deform', 'width', 'height', 'sequence'],
+    boundingbox: ['vertexCount', 'vertices'],
+    clipping: ['end', 'vertexCount', 'vertices'],
+    point: ['x', 'y', 'rotation'],
+    path: ['closed', 'constantSpeed', 'vertexCount', 'vertices', 'lengths'],
+  };
+  warnUnknownFields(rec, ['type', 'path', 'color', ...(allowed[type] ?? [])], base, diag);
 
   switch (type) {
     case 'region':
@@ -50,6 +61,7 @@ export function convertAttachment(
       return convertMesh(rec, regionPath, base, diag);
 
     case 'linkedmesh': {
+      warnSequence(rec, base, diag);
       const parent = readRequiredString(rec, 'parent', base, diag);
       if (parent === undefined) return undefined;
       return {

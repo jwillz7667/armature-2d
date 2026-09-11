@@ -5,13 +5,10 @@ import { defineConfig } from 'vitest/config';
 // launched with --expose-gc (the probe asserts the per-call heap delta stays near zero).
 export default defineConfig({
   test: {
+    maxWorkers: 2,
     environment: 'node',
     include: ['test/**/*.test.ts'],
     pool: 'forks',
-    poolOptions: {
-      forks: {
-        execArgv: ['--expose-gc'],
-      },
-    },
+    execArgv: ['--expose-gc'],
   },
 });

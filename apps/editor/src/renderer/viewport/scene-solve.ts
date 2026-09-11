@@ -22,6 +22,23 @@ import { worldToScreen, type Camera } from './camera';
 
 // Max screen distance (px) from a bone's drawn segment for a click to select it.
 const BONE_PICK_TOLERANCE = 10;
+const displayed = new WeakMap<DocumentReadModel, ReadonlyMap<BoneId, Mat2x3>>();
+
+export function publishDisplayedWorlds(
+  model: DocumentReadModel,
+  named: ReadonlyMap<string, Mat2x3>,
+): void {
+  const worlds = new Map<BoneId, Mat2x3>();
+  for (const bone of model.bones()) {
+    const world = named.get(bone.name);
+    if (world) worlds.set(bone.id, world);
+  }
+  displayed.set(model, worlds);
+}
+
+export function clearDisplayedWorlds(model: DocumentReadModel): void {
+  displayed.delete(model);
+}
 
 // Project the model's bones to the SkeletonDocument shape buildPose consumes (parent ids resolved to
 // names, in boneOrder). Only the bone array is meaningful to the solve; the remaining fields are empty
@@ -74,6 +91,8 @@ function readWorld(pose: Pose, index: number): Mat2x3 {
 // with the pose, so the i-th solved matrix belongs to the i-th model bone. Callers that need both a
 // bone and its parent matrix solve once and read both out of the returned map.
 export function solveWorldById(model: DocumentReadModel): Map<BoneId, Mat2x3> {
+  const current = displayed.get(model);
+  if (current !== undefined) return new Map(current);
   const bones = model.bones();
   const pose = buildPose(projectForSolve(model));
   resetToSetupPose(pose);

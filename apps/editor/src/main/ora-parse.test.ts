@@ -100,3 +100,21 @@ describe('parseOra', () => {
     }
   });
 });
+
+it('rejects excessive XML nesting without recursing through the layer tree', () => {
+  const stack = '<image><stack>'.repeat(140) + '</stack></image>'.repeat(140);
+  expect(() => parseOra(buildOra({ stack }), 'nested')).toThrow(/nesting/);
+});
+
+it('rejects archive entry expansion before decoding the advertised payload', () => {
+  const bytes = buildOra();
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  // Central-directory uncompressed size. No large allocation is needed for this regression.
+  for (let i = 0; i + 46 < bytes.length; i += 1) {
+    if (view.getUint32(i, true) === 0x02014b50) {
+      view.setUint32(i + 24, 65 * 1024 * 1024, true);
+      break;
+    }
+  }
+  expect(() => parseOra(bytes, 'oversized')).toThrow(/64 MiB/);
+});

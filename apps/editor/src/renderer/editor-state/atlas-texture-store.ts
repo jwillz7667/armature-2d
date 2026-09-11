@@ -1,90 +1,156 @@
 import type { Texture } from 'pixi.js';
-import type { RegionTextureResolver } from '@marionette/runtime-web';
+import type { AtlasRef } from '@marionette/format/types';
+import {
+  buildRegionTextures,
+  makeRegionTextureResolver,
+  type RegionTextureResolver,
+} from '@marionette/runtime-web';
 import type { AtlasImportPage } from '../../shared';
+import { loadPageTextures } from '../panels/atlas-textures';
 
-// Ephemeral editor state (the document/editor wall): the loaded atlas page textures and the region
-// resolver the viewport binds into its SkeletonView. The DocumentModel holds only the AtlasRef METADATA
-// (region rects, page basenames); the PIXELS are loaded here per import session and are NEVER serialized,
-// undoable, or part of the save. This is intentionally NOT in Zustand and NOT in the document: it is a
-// tiny observable singleton (mirroring documentHost) read imperatively by the viewport ticker, which lives
-// outside React.
-//
-// The store OWNS the page base textures so it can DESTROY them when a re-import replaces them, freeing GPU
-// memory without leaking across imports. The region sub-textures the resolver returns (built by
-// runtime-web's buildRegionTextures) are lightweight frames that SHARE these page sources, so destroying an
-// old page texture WITH its source is correct only when the old resolver is being replaced (its frames are
-// discarded together). Listeners are notified on every change so the viewport repaints.
+export interface PreparedAtlas {
+  readonly atlas: AtlasRef;
+  readonly pages: readonly AtlasImportPage[];
+  readonly resolver: RegionTextureResolver;
+  dispose(): void;
+}
 
-type Listener = () => void;
+export async function prepareAtlas(
+  atlas: AtlasRef,
+  pages: readonly AtlasImportPage[],
+): Promise<PreparedAtlas> {
+  if (pages.reduce((size, page) => size + page.data.byteLength, 0) > 512 * 1024 * 1024)
+    throw new Error('Textures exceed 512 MiB');
+  const textures = await loadPageTextures(pages);
+  let regions = new Map<string, Texture>();
+  const dispose = (): void => {
+    for (const region of regions.values()) region.destroy();
+    regions.clear();
+    for (const texture of textures.values()) texture.destroy(true);
+    textures.clear();
+  };
+  try {
+    for (const page of atlas.pages) {
+      const texture = textures.get(page.file);
+      if (texture && (texture.width !== page.width || texture.height !== page.height)) {
+        throw new Error(`Texture dimensions do not match the atlas: ${page.file}`);
+      }
+    }
+    regions = buildRegionTextures(atlas, textures);
+    return { atlas, pages, resolver: makeRegionTextureResolver(regions), dispose };
+  } catch (error) {
+    dispose();
+    throw error;
+  }
+}
 
-class AtlasTextureStore {
-  private resolver: RegionTextureResolver | null = null;
-  // The page base textures this store owns and is responsible for destroying on replace/clear.
-  private ownedPages: readonly Texture[] = [];
-  // The raw page PNG bytes behind the current resolver (PP-D5). Retained so a save can persist them next to
-  // the project for later texture restore; the renderer discards them from the GPU path but keeps the bytes
-  // here (ephemeral editor state, never in the document). Empty when no atlas is loaded.
-  private pageBytes: readonly AtlasImportPage[] = [];
-  private readonly listeners = new Set<Listener>();
+// Raw asset bytes are immutable and retained for this project's undo history. Only the ACTIVE atlas
+// owns GPU resources. Undo re-decodes retained bytes instead of referring to destroyed textures.
+export class AtlasTextureStore {
+  private readonly bytes = new Map<string, AtlasImportPage>();
+  private readonly prepared = new Map<string, PreparedAtlas>();
+  private active: PreparedAtlas | null = null;
+  private atlas: AtlasRef = { pages: [] };
+  private key = '';
+  private generation = 0;
+  private byteSize = 0;
+  private readonly listeners = new Set<() => void>();
 
   getResolver(): RegionTextureResolver | null {
-    return this.resolver;
+    return this.active?.resolver ?? null;
   }
-
-  // The atlas page PNG bytes to persist on save (empty when no atlas is loaded).
   getPageBytes(): readonly AtlasImportPage[] {
-    return this.pageBytes;
+    return this.atlas.pages.flatMap((page) => {
+      const bytes = this.bytes.get(page.file);
+      return bytes ? [bytes] : [];
+    });
   }
 
-  // Replace the current resolver and the page textures it was built from. The PREVIOUS owned pages are
-  // destroyed with their GPU source (destroy(true)) so re-importing does not leak: the old region
-  // sub-textures are views over those sources and are dropped together with the old resolver. The viewport
-  // re-syncs its SkeletonView (which rebuilds its scene against the new resolver before the next Pixi draw,
-  // see viewport-panel-content.tsx) so the destroyed old source is never rendered.
-  setResolver(
-    resolver: RegionTextureResolver,
-    ownedPages: readonly Texture[],
-    pageBytes: readonly AtlasImportPage[],
-  ): void {
-    this.destroyOwned();
-    this.resolver = resolver;
-    this.ownedPages = ownedPages;
-    this.pageBytes = pageBytes;
+  install(prepared: PreparedAtlas): void {
+    const additional = prepared.pages.reduce(
+      (total, page) => total + (this.bytes.has(page.file) ? 0 : page.data.byteLength),
+      0,
+    );
+    if (this.byteSize + additional > 512 * 1024 * 1024) {
+      throw new Error(
+        'Texture history exceeds 512 MiB. Save and reopen the project before importing more textures.',
+      );
+    }
+    // Imports use content-addressed filenames. A conflicting same-name payload is refused instead of
+    // silently changing what an earlier undo state points to.
+    for (const page of prepared.pages) {
+      const existing = this.bytes.get(page.file);
+      if (
+        existing &&
+        (existing.data.length !== page.data.length ||
+          existing.data.some((byte, index) => byte !== page.data[index]))
+      ) {
+        throw new Error(`Texture name already refers to different pixels: ${page.file}`);
+      }
+    }
+    for (const page of prepared.pages) {
+      if (!this.bytes.has(page.file))
+        this.bytes.set(page.file, { ...page, data: new Uint8Array(page.data) });
+    }
+    this.byteSize += additional;
+    const key = JSON.stringify(prepared.atlas);
+    this.prepared.get(key)?.dispose();
+    this.prepared.set(key, prepared);
+  }
+
+  async activate(atlas: AtlasRef): Promise<void> {
+    const key = JSON.stringify(atlas);
+    if (key === this.key) return;
+    const generation = ++this.generation;
+    this.key = key;
+    this.atlas = atlas;
+    this.active?.dispose();
+    this.active = null;
+    const staged = this.prepared.get(key);
+    this.prepared.delete(key);
+    if (staged) {
+      this.active = staged;
+      this.emit();
+      return;
+    }
+    this.emit();
+    const next = await prepareAtlas(atlas, this.getPageBytes());
+    if (generation !== this.generation) {
+      next.dispose();
+      return;
+    }
+    this.active = next;
     this.emit();
   }
 
-  // Drop the resolver and destroy the owned page textures (no-op when already empty). Used when the live
-  // document is replaced (a file open): the loaded pixels belong to the previous import session, so the
-  // viewport falls back to the 1x1 placeholder until sprites are re-imported.
+  discardPrepared(prepared: PreparedAtlas): void {
+    const key = JSON.stringify(prepared.atlas);
+    if (this.prepared.get(key) === prepared) this.prepared.delete(key);
+    if (this.active !== prepared) prepared.dispose();
+  }
+
   clear(): void {
-    if (this.resolver === null && this.ownedPages.length === 0) return;
-    this.destroyOwned();
-    this.resolver = null;
-    this.ownedPages = [];
-    this.pageBytes = [];
+    ++this.generation;
+    this.active?.dispose();
+    this.active = null;
+    for (const atlas of this.prepared.values()) atlas.dispose();
+    this.prepared.clear();
+    this.bytes.clear();
+    this.byteSize = 0;
+    this.key = '';
+    this.atlas = { pages: [] };
     this.emit();
   }
-
-  subscribe(listener: Listener): () => void {
+  subscribe(listener: () => void): () => void {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
     };
   }
-
-  private destroyOwned(): void {
-    for (const texture of this.ownedPages) {
-      // destroySource = true: the page's GPU source is shared only by the old region sub-textures, which
-      // are discarded with the old resolver, so freeing it here releases GPU memory and cannot tear down a
-      // live page.
-      texture.destroy(true);
-    }
-  }
-
   private emit(): void {
     for (const listener of this.listeners) listener();
   }
 }
 
-// Renderer-wide singleton, constructed once on first import (mirrors documentHost).
 export const atlasTextureStore = new AtlasTextureStore();
+export const effectsTextureStore = new AtlasTextureStore();

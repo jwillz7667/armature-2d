@@ -5,9 +5,9 @@
   "license": "SEE LICENSE IN LICENSE",
   "author": "Viral Ventures LLC (Maple Grove, MN)",
   "type": "module",
-  "packageManager": "pnpm@11.8.0",
+  "packageManager": "pnpm@11.19.0",
   "engines": {
-    "node": ">=22.13.0"
+    "node": ">=24.20.0"
   },
   "scripts": {
     "typecheck": "turbo run typecheck",
@@ -15,7 +15,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "test": "turbo run test",
+    "test": "turbo run test --concurrency=2",
     "build": "turbo run build",
     "conformance:particles": "pnpm --filter @marionette/conformance exec vitest run test/phase3-effects.test.ts",
     "phase3:acceptance": "pnpm --filter @marionette/conformance run phase3:acceptance",
@@ -23,20 +23,21 @@
     "check:dashes": "node tools/check-no-dashes.mjs",
     "check:format-semver": "node tools/check-format-semver.mjs",
     "check:format-version-stable": "node packages/format/scripts/assert-format-version-stable.mjs",
-    "ci:local": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && pnpm check:packages && pnpm check:dashes"
+    "ci:local": "pnpm typecheck && pnpm lint && pnpm format:check && pnpm test && pnpm build && pnpm check:packages && pnpm check:dashes",
+    "audit:dependencies": "pnpm audit --audit-level low"
   },
   "devDependencies": {
     "@commitlint/cli": "^19.6.1",
     "@commitlint/config-conventional": "^19.6.0",
     "@types/node": "^22.10.2",
-    "@vitest/coverage-v8": "^2.1.8",
-    "eslint": "^9.17.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-boundaries": "^5.0.1",
+    "@vitest/coverage-v8": "4.1.11",
+    "eslint": "10.10.0",
+    "eslint-config-prettier": "10.1.8",
+    "eslint-plugin-boundaries": "7.2.0",
     "prettier": "3.4.2",
     "turbo": "^2.3.3",
     "typescript": "^5.7.2",
-    "typescript-eslint": "^8.18.1",
-    "vitest": "^2.1.8"
+    "typescript-eslint": "8.70.0",
+    "vitest": "4.1.11"
   }
 }

@@ -5,6 +5,7 @@
 // migration framework land in later phases and extend this surface without breaking it.
 
 export { validateDocument, parseDocument } from './validate';
+export { inspectPng } from './assets/png';
 export type { ValidateOptions } from './validate';
 export { FormatValidationError } from './validate/errors';
 export type {
@@ -50,3 +51,18 @@ export type { BinaryDecodeErrorCode } from './binary';
 
 // The type-only contract surface (zero runtime); also available directly at @marionette/format/types.
 export type * from './types';
+export { atlasRefSchema } from './schema/atlas';
+export {
+  PROJECT_FORMAT_VERSION,
+  MAX_PROJECT_ASSET_BYTES,
+  MAX_PROJECT_BYTES,
+  projectDocumentSchema,
+  parseProjectDocument,
+  isProjectDocument,
+  computeProjectContentHash,
+  encodeProjectAsset,
+  decodeProjectAsset,
+  isSafeAssetPath,
+  ProjectValidationError,
+} from './project';
+export type { ProjectDocument, ProjectAsset, ProjectAssetScope } from './project';

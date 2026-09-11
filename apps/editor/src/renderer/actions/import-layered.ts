@@ -1,7 +1,6 @@
-import { documentHost } from '../document';
+import { documentHost, installOpenedProject } from '../document';
 import { bridge } from '../ipc-bridge';
 import { useLayeredImportStore } from '../editor-state/layered-import-store';
-import { restoreAtlasTextures } from './restore-atlas';
 import type { LayeredImportDiagnostic, SpineImportError } from '../../shared';
 
 // The Import Layered File action (PP-D5), shared by the File menu item and the Assets panel button so every
@@ -34,6 +33,7 @@ function messageOf(error: unknown, fallback: string): string {
 
 export async function importLayeredFromDialog(): Promise<LayeredImportOutcome> {
   try {
+    const original = documentHost.current();
     const result = await bridge().importLayeredFile();
     if (!result.ok) return { kind: 'error', message: result.error.message };
     const data = result.data;
@@ -45,30 +45,16 @@ export async function importLayeredFromDialog(): Promise<LayeredImportOutcome> {
       return { kind: 'failed', errors: data.errors, diagnostics: data.diagnostics };
     }
 
-    try {
-      documentHost.load(data.document);
-    } catch (error) {
-      // A built document that slips past validation still fails loudly on load; the current document is left
-      // untouched (documentHost.load throws without mutating).
-      return { kind: 'error', message: messageOf(error, 'load failed') };
-    }
-
-    // The atlas is baked into the loaded document, so publishing its page textures is all that remains (the
-    // load already installed the atlas metadata; no SetAtlasRef command). A texture failure leaves the
-    // placeholder (the document still carries the atlas) and is surfaced as a non-fatal error after the
-    // report is shown.
-    const atlas = documentHost.current().model.preserved().atlas;
-    let textureError: string | null = null;
-    try {
-      await restoreAtlasTextures(atlas, data.pages);
-    } catch (error) {
-      textureError = messageOf(error, 'failed to load atlas page textures');
-    }
+    const outcome = await installOpenedProject(
+      { status: 'opened', name: data.name, document: data.document, pages: data.pages },
+      original,
+      true,
+    );
+    if (outcome.kind === 'error' || outcome.kind === 'canceled') return outcome;
 
     useLayeredImportStore
       .getState()
       .show({ status: 'imported', name: data.name, diagnostics: data.diagnostics, errors: [] });
-    if (textureError !== null) return { kind: 'error', message: textureError };
     return { kind: 'imported', name: data.name, diagnostics: data.diagnostics };
   } catch (error) {
     // A missing bridge (failed preload) throws here; surface it instead of an opaque rejection.
