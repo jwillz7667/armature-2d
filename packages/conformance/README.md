@@ -26,7 +26,7 @@ per-ring source triangle and vertex count, positions, and barycentrics); all thr
 reproduce the ring structure EXACTLY and the positions/barycentrics within the `VERTEX` tolerance.
 
 Lock files are sha256 manifests over rig + spec + fixture + binary twin, keyed to the pinned
-toolchain (`node-22.13.1-v8`).
+toolchain (`node-24.20.0-v8`).
 
 The last two skeleton rigs are the PP-B1 coverage pair (conformance A.2): **rig-transform-modes**
 exercises all five bone transform modes under a rotated, non-uniformly-scaled, reflected animated
@@ -167,7 +167,7 @@ ADR or CHANGELOG entry). Never hand-edit a fixture.
 ```sh
 # Use the PINNED Node (fixtures store V8-computed floats as exact JSON; the drift gate is a
 # byte-exact git diff, so the generation toolchain must match .node-version exactly).
-nvm use "$(cat .node-version)"   # 22.13.1
+nvm use "$(cat .node-version)"   # 24.20.0
 pnpm --filter @marionette/conformance generate            # skeleton track
 pnpm --filter @marionette/conformance generate:effects
 pnpm --filter @marionette/conformance generate:anim-state

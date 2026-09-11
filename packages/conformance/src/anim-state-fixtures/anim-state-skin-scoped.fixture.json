@@ -4,7 +4,7 @@
   "scenarioHash": "sha256:a2b7d93be225b5b901ca066e4bf68b36af36bfacf2df506767e44d21f0ca70dc",
   "rigHash": "sha256:eea54fbe4882aac6c9af6dac617de9a4b3eb3c217d6cb9c42955a1c6a1874e94",
   "coreVersion": "runtime-core@0.0.0",
-  "toolchain": "node-22.13.1-v8",
+  "toolchain": "node-24.20.0-v8",
   "generatedBy": "generate-anim-state.ts",
   "samples": [
     {

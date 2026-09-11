@@ -39,6 +39,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node tools/release-check.mjs
       - run: pnpm install --frozen-lockfile
+      - run: pnpm audit:dependencies
       - name: Full local CI gate (typecheck + lint + test + build + package-guard + dash guard)
         run: pnpm ci:local
       - name: Verify format transition and built executables
@@ -49,6 +50,7 @@ jobs:
           node tools/smoke-video-worker.mjs
           node tools/smoke-media-worker.mjs
           node tools/smoke-spine-worker.mjs
+          node tools/smoke-import-workers.mjs
           node tools/smoke-mcp-cli.mjs
       - name: Ensure a draft release exists for this tag
         env:

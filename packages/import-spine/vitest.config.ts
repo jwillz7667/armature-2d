@@ -6,6 +6,7 @@ import { defineConfig } from 'vitest/config';
 // Spine exports, per the clean-room legal posture (see README).
 export default defineConfig({
   test: {
+    maxWorkers: 2,
     environment: 'node',
     include: ['test/**/*.test.ts'],
   },

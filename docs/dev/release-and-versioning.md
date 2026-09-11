@@ -40,16 +40,16 @@ change is planned; the next format bump would be a new capability with its own A
 ## Changing solve behavior
 
 Any change that alters numeric output of the per-frame solve, the effects simulation, or the slot
-sequencer requires regenerating the affected conformance fixtures on the pinned Node (22.13.1) in
+sequencer requires regenerating the affected conformance fixtures on the pinned Node (24.20.0) in
 the same PR, under the `behavior-change` label with CODEOWNERS review on `fixtures/**` and an ADR
 or CHANGELOG entry. Drift without regeneration fails CI by design.
 
 ## Toolchain pins
 
-- Node `22.13.1` (`.node-version`): the fixture-generation toolchain. Bumping it is a deliberate
+- Node `24.20.0` (`.node-version`): the fixture-generation toolchain. Bumping it is a deliberate
   act that regenerates every byte-locked artifact (fixtures, lock manifests, golden PNGs) in one
   reviewed PR.
-- pnpm `11.8.0` (`packageManager`): bump together with a green `pnpm ci:local` and lockfile diff
+- pnpm `11.19.0` (`packageManager`): bump together with a green `pnpm ci:local` and lockfile diff
   review.
 - Dependency policy: exact pins for load-bearing runtime deps (`zod`, `@noble/hashes`,
   `pixi.js 8.19.0`), caret ranges elsewhere, `--frozen-lockfile` in CI, weekly audit review.
