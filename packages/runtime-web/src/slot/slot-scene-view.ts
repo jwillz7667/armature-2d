@@ -1,11 +1,17 @@
 import { Container, Graphics } from 'pixi.js';
+import { rollupValueAt } from '@marionette/runtime-core';
 import type {
   EscalationTier,
   GridAnchor,
   PresentationDirective,
   PresentationTimeline,
 } from '@marionette/runtime-core';
-import type { GridConfig, SymbolAnimSet, SymbolId } from '@marionette/format/slot-types';
+import type {
+  GridConfig,
+  SymbolAnimSet,
+  SymbolId,
+  TumbleChoreography,
+} from '@marionette/format/slot-types';
 import type { SkeletonDocument } from '@marionette/format/types';
 import { SkeletonView } from '../scene/skeleton-view';
 import type { RegionTextureResolver } from '../scene/region-textures';
@@ -45,6 +51,7 @@ export interface ResolvedSymbol {
   readonly document: SkeletonDocument;
   readonly animSet: SymbolAnimSet;
   readonly textureResolver?: RegionTextureResolver | null;
+  readonly fitToCell?: boolean;
 }
 
 // Resolve a SymbolId to its rendering inputs, or null when the symbol is not renderable (drawn empty).
@@ -63,6 +70,7 @@ export interface SlotSceneCallbacks {
 }
 
 export interface SlotSceneViewOptions {
+  readonly tumble?: TumbleChoreography;
   readonly symbolResolver: SymbolResolver;
   readonly callbacks?: SlotSceneCallbacks;
   // The stroke color / width of the winning-cell highlight box (a plain rectangle overlay; win-line
@@ -84,6 +92,8 @@ interface CellBinding {
   resolved: ResolvedSymbol | null;
   // The clock time (ms) the current phase began, so the cell animation plays from its own local zero.
   phaseStartMs: number;
+  lastTimeMs: number;
+  motion: { x: number; y: number; startMs: number; endMs: number } | null;
 }
 
 // Headless snapshot of the last update() for tests / tooling (no WebGL needed).
@@ -114,6 +124,7 @@ export class SlotSceneView {
   private readonly callbacks: SlotSceneCallbacks;
   private readonly highlightColor: number;
   private readonly highlightWidth: number;
+  private readonly tumble: TumbleChoreography | undefined;
 
   private timeline: PresentationTimeline | null = null;
   private lastRollupValue: number | null = null;
@@ -129,6 +140,7 @@ export class SlotSceneView {
     this.callbacks = options.callbacks ?? {};
     this.highlightColor = options.highlightColor ?? DEFAULT_HIGHLIGHT_COLOR;
     this.highlightWidth = options.highlightWidth ?? DEFAULT_HIGHLIGHT_WIDTH;
+    this.tumble = options.tumble;
 
     this.state = makeSlotSceneState(grid.rows, grid.cols);
     this.cursor = makeTimelineCursor();
@@ -149,6 +161,8 @@ export class SlotSceneView {
           phase: null,
           resolved: null,
           phaseStartMs: 0,
+          lastTimeMs: 0,
+          motion: null,
         });
       }
     }
@@ -161,6 +175,7 @@ export class SlotSceneView {
     resetTimelineCursor(this.cursor);
     resetSlotSceneState(this.state);
     this.lastRollupValue = null;
+    this.resetCellClocks();
   }
 
   // Advance the scene to `timeMs`: dispatch every not-yet-fired directive (board reducer + host callbacks),
@@ -174,6 +189,7 @@ export class SlotSceneView {
     if (timeMs < this.cursor.currentTimeMs) {
       resetTimelineCursor(this.cursor);
       resetSlotSceneState(this.state);
+      this.resetCellClocks();
     }
     advanceTimelineTo(this.cursor, timeline, timeMs, (directive) => this.onFire(directive));
 
@@ -221,12 +237,55 @@ export class SlotSceneView {
   }
 
   // ---- internals ----
+  private resetCellClocks(): void {
+    for (const cell of this.cells) {
+      cell.phase = null;
+      cell.symbol = null;
+      cell.phaseStartMs = 0;
+      cell.lastTimeMs = 0;
+      cell.motion = null;
+      const center = cellCenter(this.metrics, cell.row, cell.col);
+      cell.container.position.set(center.x, center.y);
+      cell.view?.resetSimulation();
+    }
+  }
 
   // Fold a fired directive into the board and dispatch the event-out kinds to host callbacks. Callback
   // timestamps use the directive's own atMs (its deterministic scheduled time), not the frame clock, so a
   // vfx / banner fires at the same logical instant regardless of frame cadence.
   private onFire(directive: PresentationDirective): void {
     applyDirective(this.state, directive);
+    if (directive.kind === 'cascadeDrop') {
+      for (const move of directive.moves) {
+        const cell = this.cells[cellIndex(this.state, move.to.row, move.to.col)];
+        if (!cell) continue;
+        const from = cellCenter(this.metrics, move.from.row, move.from.col);
+        cell.motion = {
+          ...from,
+          startMs: directive.atMs,
+          endMs: directive.atMs + (this.tumble?.dropMs ?? 0),
+        };
+        cell.phaseStartMs = directive.atMs;
+        cell.phase = null;
+      }
+    }
+    if (directive.kind === 'cascadeRefill') {
+      for (let row = 0; row < directive.symbols.length; row++) {
+        const cell = this.cells[cellIndex(this.state, row, directive.col)];
+        if (cell) {
+          cell.motion = null;
+          cell.phaseStartMs = directive.atMs;
+          cell.phase = null;
+        }
+      }
+    }
+    if (directive.kind === 'symbolLand' || directive.kind === 'symbolAnimate') {
+      const cell = this.cells[cellIndex(this.state, directive.row, directive.col)];
+      if (cell) {
+        cell.phaseStartMs = directive.atMs;
+        cell.phase = null;
+      }
+    }
     const cb = this.callbacks;
     switch (directive.kind) {
       case 'vfxBurst': {
@@ -258,6 +317,26 @@ export class SlotSceneView {
   // cell plays its phase animation at its own local loop time. An empty cell hides its view.
   private syncCells(timeMs: number): void {
     for (const cell of this.cells) {
+      const center = cellCenter(this.metrics, cell.row, cell.col);
+      if (cell.motion && timeMs < cell.motion.endMs) {
+        const motion = cell.motion;
+        const progress =
+          rollupValueAt(
+            0,
+            65536,
+            motion.startMs,
+            motion.endMs,
+            Math.floor(timeMs),
+            this.tumble?.dropEasing ?? 'linear',
+          ) / 65536;
+        cell.container.position.set(
+          motion.x + (center.x - motion.x) * progress,
+          motion.y + (center.y - motion.y) * progress,
+        );
+      } else {
+        cell.motion = null;
+        cell.container.position.set(center.x, center.y);
+      }
       const idx = cellIndex(this.state, cell.row, cell.col);
       const symbol = this.state.symbols[idx]!;
       const phase = this.state.phases[idx]!;
@@ -277,6 +356,7 @@ export class SlotSceneView {
         if (cell.resolved !== null) {
           if (cell.view === null) {
             cell.view = new SkeletonView();
+            cell.view.setBoneChromeVisible(false);
             cell.container.addChild(cell.view.root);
           }
           cell.view.setTextureResolver(cell.resolved.textureResolver ?? null);
@@ -286,14 +366,37 @@ export class SlotSceneView {
       const resolved = cell.resolved;
       if (resolved === null || cell.view === null) continue;
 
-      if (phase !== cell.phase) {
+      const phaseChanged = phase !== cell.phase;
+      if (phaseChanged) {
         cell.phase = phase;
-        cell.phaseStartMs = timeMs;
+        cell.view.resetSimulation();
       }
 
       const animName = phaseAnimation(resolved.animSet, phase);
       const localElapsed = Math.max(0, timeMs - cell.phaseStartMs) / 1000;
-      cell.view.syncAnimatedLoop(resolved.document, animName, localElapsed);
+      const frameDt = Math.max(0, timeMs - Math.max(cell.lastTimeMs, cell.phaseStartMs)) / 1000;
+      cell.view.syncAnimatedLoop(
+        resolved.document,
+        animName,
+        localElapsed,
+        Math.min(frameDt, 0.25),
+      );
+      cell.lastTimeMs = timeMs;
+      if (resolved.fitToCell && phaseChanged) {
+        const bounds = cell.view.root.getLocalBounds();
+        if (bounds.width > 0 && bounds.height > 0) {
+          const scale =
+            Math.min(
+              this.metrics.cellWidth / bounds.width,
+              this.metrics.cellHeight / bounds.height,
+            ) * 0.85;
+          cell.view.root.scale.set(scale);
+          cell.view.root.position.set(
+            -(bounds.x + bounds.width / 2) * scale,
+            -(bounds.y + bounds.height / 2) * scale,
+          );
+        }
+      }
     }
   }
 

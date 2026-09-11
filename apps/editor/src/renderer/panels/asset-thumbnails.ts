@@ -1,3 +1,4 @@
+import { inspectPng } from '@marionette/format';
 import type { AtlasRef, AtlasRegion } from '@marionette/format/types';
 import type { AtlasImportPage } from '../../shared';
 
@@ -68,6 +69,7 @@ export async function buildThumbnails(
   for (const page of atlas.pages) {
     const data = bytesByFile.get(page.file);
     if (data === undefined) continue;
+    inspectPng(data);
     const bitmap = await createImageBitmap(new Blob([data], { type: 'image/png' }));
     try {
       for (const region of page.regions) {

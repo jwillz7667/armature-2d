@@ -1,11 +1,11 @@
 import type { Command, CommandContext } from '../command/command';
-import { CommandNotAppliedError } from '../command/errors';
+import { CommandNotAppliedError, EffectEditError } from '../command/errors';
 import type { BundleEntity } from '../effects-model/effects-state';
 import type { EffectCommandSpec } from './effects-spec';
 
 // Create a new, item-less bundle (section 10 CreateBundle). Bundles are addressed by name (the mutable
 // on-disk key, like the skeletal animations record); the bundle is appended at the end of bundleOrder. Name
-// uniqueness is an EXPORT-only contract, so a duplicate is NOT rejected here. Never coalesces; the undo
+// is the internal bundle identity, so duplicates are rejected before mutation. Never coalesces; the undo
 // removes the bundle by name.
 export class CreateBundleCommand implements Command {
   readonly kind = 'bundle.create';
@@ -15,6 +15,8 @@ export class CreateBundleCommand implements Command {
   constructor(private readonly name: string) {}
 
   do(ctx: CommandContext): void {
+    if (!this.name.trim() || ctx.effects.getBundle(this.name))
+      throw new EffectEditError('bundleName', `Choose a new, nonempty bundle name: ${this.name}`);
     const entity: BundleEntity = { name: this.name, itemOrder: [], items: new Map() };
     ctx.effects.insertBundle(entity, ctx.effects.bundles().length);
     this.applied = true;

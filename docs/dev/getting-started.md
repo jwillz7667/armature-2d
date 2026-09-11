@@ -5,11 +5,11 @@ animating, exporting) read the user manual instead: `docs/manual/README.md`.
 
 ## Prerequisites
 
-- **Node 22.13.1** exactly (`.node-version`). The conformance fixtures store V8-computed floats as
+- **Node 24.20.0** exactly (`.node-version`). The conformance fixtures store V8-computed floats as
   exact JSON and the drift gate diffs bytes, so fixture generation must run on this pin. Everyday
   dev and the tolerance-based tests pass on any Node >= 22.13.0 (`engines`), but use the pin to
   stay honest: `nvm use "$(cat .node-version)"` or your version manager's equivalent.
-- **pnpm 11.8.0**, pinned via the root `package.json` `packageManager` field. Enable with
+- **pnpm 11.19.0**, pinned via the root `package.json` `packageManager` field. Enable with
   `corepack enable`; do not install a global pnpm of a different major.
 - macOS (arm64 or x64), Windows, or Linux. The editor targets macOS and Windows; headless work
   (everything except `pnpm --filter editor dev`) runs anywhere including CI containers.

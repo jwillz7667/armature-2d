@@ -1,0 +1,11 @@
+[
+  {
+    "constant": "PROJECT_FORMAT_VERSION",
+    "from": null,
+    "to": "0.1.0",
+    "classification": "new",
+    "reason": "Introduce the independent editable project envelope while retaining existing runtime document versions and encodings.",
+    "adr": "docs/adr/0015-editable-project-envelope.md",
+    "tests": ["packages/document-core/test/project-document.test.ts"]
+  }
+]

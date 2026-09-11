@@ -301,6 +301,7 @@ export class EffectSystem {
   readState(): ReadonlyEffectFrame {
     this.frameViews.length = 0;
     for (const inst of this.live) {
+      if (inst.localTime < inst.startTime) continue;
       const emitters: ReadonlyEmitterView[] = [];
       for (const e of inst.emitters) {
         const pool = e.instance.pool;

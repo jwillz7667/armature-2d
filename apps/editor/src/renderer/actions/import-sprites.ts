@@ -1,10 +1,15 @@
 import { atlasRefSchema } from '@marionette/format';
 import type { AtlasRef } from '@marionette/format/types';
 import type { Document } from '@marionette/document-core';
-import { SetAtlasRefCommand, documentHost } from '../document';
-import { atlasTextureStore, prepareAtlas } from '../editor-state/atlas-texture-store';
+import { SetAtlasRefCommand, SetEffectsAtlasCommand, documentHost } from '../document';
+import {
+  atlasTextureStore,
+  effectsTextureStore,
+  prepareAtlas,
+} from '../editor-state/atlas-texture-store';
 import { mergeAtlases } from './merge-atlas';
 import { bridge } from '../ipc-bridge';
+import { reportProblem } from '../editor-state/problems-store';
 import type {
   AtlasImportGridRequest,
   AtlasImportImagesRequest,
@@ -44,11 +49,13 @@ function messageOf(error: unknown, fallback: string): string {
 async function applyImportedAtlas(
   response: Extract<AtlasImportResponse, { status: 'imported' }>,
   original: Document,
+  scope: 'skeleton' | 'effects' = 'skeleton',
 ): Promise<SpriteImportOutcome> {
   // Opaque IPC value; main is the trusted AtlasRef producer and the format validator re-checks it at
   // export (LAW 3), so this single narrowing assertion is justified.
   if (documentHost.current() !== original) return { kind: 'canceled' };
-  const revision = original.model.revision;
+  const revision = `${original.model.revision}:${original.effects.revision}`;
+  const store = scope === 'skeleton' ? atlasTextureStore : effectsTextureStore;
   const atlas = atlasRefSchema.parse(response.atlas);
   const renamed = new Map<string, string>();
   try {
@@ -70,16 +77,22 @@ async function applyImportedAtlas(
         return { ...page, file };
       }),
     };
-    const merged = mergeAtlases(original.model.preserved().atlas, changed);
+    const merged = mergeAtlases(
+      scope === 'skeleton' ? original.model.preserved().atlas : original.effects.atlas(),
+      changed,
+    );
     const allBytes = new Map(
-      [...atlasTextureStore.getPageBytes(), ...incoming].map((page) => [page.file, page]),
+      [...store.getPageBytes(), ...incoming].map((page) => [page.file, page]),
     );
     const pages = merged.pages.flatMap((page) => {
       const bytes = allBytes.get(page.file);
       return bytes ? [bytes] : [];
     });
     const staged = await prepareAtlas(merged, pages);
-    if (original !== documentHost.current() || original.model.revision !== revision) {
+    if (
+      original !== documentHost.current() ||
+      `${original.model.revision}:${original.effects.revision}` !== revision
+    ) {
       staged.dispose();
       return {
         kind: 'error',
@@ -87,26 +100,32 @@ async function applyImportedAtlas(
       };
     }
     try {
-      atlasTextureStore.install(staged);
-      original.history.execute(new SetAtlasRefCommand(merged));
-      await atlasTextureStore.activate(merged);
+      store.install(staged);
+      original.history.execute(
+        scope === 'skeleton' ? new SetAtlasRefCommand(merged) : new SetEffectsAtlasCommand(merged),
+      );
+      await store.activate(merged);
     } catch (error) {
-      atlasTextureStore.discardPrepared(staged);
+      store.discardPrepared(staged);
       throw error;
     }
   } catch (error) {
     return { kind: 'error', message: messageOf(error, 'failed to load atlas page textures') };
   }
+  for (const warning of response.warnings ?? [])
+    reportProblem(`${warning.path}: ${warning.why}`, 'warning');
   return { kind: 'imported', regionCount: countRegions(atlas) };
 }
 
-export async function runSpriteImport(): Promise<SpriteImportOutcome> {
+export async function runSpriteImport(
+  scope: 'skeleton' | 'effects' = 'skeleton',
+): Promise<SpriteImportOutcome> {
   try {
     const original = documentHost.current();
     const result = await bridge().importAtlas();
     if (!result.ok) return { kind: 'error', message: result.error.message };
     if (result.data.status === 'canceled') return { kind: 'canceled' };
-    return applyImportedAtlas(result.data, original);
+    return applyImportedAtlas(result.data, original, scope);
   } catch (error) {
     // A missing bridge (failed preload) throws here; surface it instead of an opaque rejection.
     return { kind: 'error', message: messageOf(error, 'import failed') };

@@ -108,3 +108,20 @@ static GPU capabilities only, so the same device always makes the same choice.
 - Watch the trim savings: generous transparent margins in source art are free (trimmed at
   pack), but huge fully-opaque backgrounds are not; crop background plates to what the camera
   sees.
+
+
+## Importing a Spine project
+
+Choose **File > Import Spine Project** and select a JSON export. Put `<export-name>.atlas`
+and its PNG pages beside the JSON first. The import reads real atlas geometry and pixels,
+normalizes supported rotations/trimming, and installs them with the converted rig. Source
+files are unchanged. A missing descriptor produces a data-only warning; a present invalid
+atlas fails import.
+
+Review the conversion notices before proceeding. The results window lists source locations
+and has **Save report** for the complete structured JSON report. Deform coordinate spaces,
+physics, frame sequences, and other unsupported fields are reported explicitly. Inspect the
+result against your source animation. Real binary `.skel` imports are gated until actual export
+fixtures establish a decoder profile; export JSON from Spine instead.
+
+See [the import capability matrix](../../packages/import-spine/README.md) for the exact scope.

@@ -166,7 +166,7 @@ describe('no any / no unjustified as in format + runtime-core (INV-4)', () => {
 describe('editor process split (phase-0 WP-0.1 matrix)', () => {
   it('bans the renderer importing main-process code', async () => {
     const ids = ruleIds(await lint(RENDERER, "import '../main/index';\n"));
-    expect(ids.some((r) => r === 'no-restricted-imports' || r === 'boundaries/element-types')).toBe(
+    expect(ids.some((r) => r === 'no-restricted-imports' || r === 'boundaries/dependencies')).toBe(
       true,
     );
   });
@@ -197,14 +197,14 @@ describe('conformance boundary (conformance-and-ci.md A.1, WP-V.0)', () => {
 
   it('bans document-core in conformance', async () => {
     const ids = ruleIds(await lint(CONFORMANCE, "import '@marionette/document-core';\n"));
-    expect(ids.some((r) => r === 'no-restricted-imports' || r === 'boundaries/element-types')).toBe(
+    expect(ids.some((r) => r === 'no-restricted-imports' || r === 'boundaries/dependencies')).toBe(
       true,
     );
   });
 
   it('bans runtime-web in conformance', async () => {
     const ids = ruleIds(await lint(CONFORMANCE, "import '@marionette/runtime-web';\n"));
-    expect(ids.some((r) => r === 'no-restricted-imports' || r === 'boundaries/element-types')).toBe(
+    expect(ids.some((r) => r === 'no-restricted-imports' || r === 'boundaries/dependencies')).toBe(
       true,
     );
   });

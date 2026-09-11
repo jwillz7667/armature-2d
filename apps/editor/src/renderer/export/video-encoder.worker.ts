@@ -1,11 +1,11 @@
 import {
   renderRgbaSequence,
-  type AtlasPagePixels,
   type AtlasPixelSource,
   type RenderSequenceOptions,
 } from '@marionette/render-preview/browser';
 import { Muxer as Mp4Muxer, ArrayBufferTarget as Mp4Target } from 'mp4-muxer';
 import { Muxer as WebMMuxer, ArrayBufferTarget as WebMTarget } from 'webm-muxer';
+import { decodeAtlasPixels } from './atlas-pixels';
 import { computeVideoTiming, suggestedBitrate, videoCodecFor } from './video-timing';
 import type {
   VideoEncodeRequest,
@@ -51,33 +51,6 @@ ctx.addEventListener('message', (event) => {
   });
 });
 
-// Decode a page PNG to straight-alpha RGBA using the worker's native codec (createImageBitmap +
-// OffscreenCanvas), so the worker never imports the Node-only atlas-pack file store. A page that fails to
-// decode is skipped (the region falls back to render-preview's white placeholder, parity with the
-// main-process media core, which decodes via atlas-pack in Node instead).
-async function toAtlasPixelSource(pages: VideoEncodeRequest['pages']): Promise<AtlasPixelSource> {
-  const map = new Map<string, AtlasPagePixels>();
-  for (const page of pages) {
-    try {
-      const bitmap = await createImageBitmap(new Blob([page.data]));
-      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
-      const context = canvas.getContext('2d');
-      if (context === null) continue;
-      context.drawImage(bitmap, 0, 0);
-      const image = context.getImageData(0, 0, bitmap.width, bitmap.height);
-      map.set(page.file, {
-        width: bitmap.width,
-        height: bitmap.height,
-        rgba: new Uint8Array(image.data.buffer.slice(0)),
-      });
-      bitmap.close();
-    } catch {
-      // Skip an undecodable page.
-    }
-  }
-  return { pages: map };
-}
-
 function sequenceOptions(
   request: VideoEncodeRequest,
   atlas: AtlasPixelSource,
@@ -101,7 +74,7 @@ async function encode(request: VideoEncodeRequest): Promise<void> {
   let encoder: VideoEncoder | null = null;
   let failure: Error | null = null;
   try {
-    const atlas = await toAtlasPixelSource(request.pages);
+    const atlas = await decodeAtlasPixels(request.pages);
     const sequence = renderRgbaSequence(sequenceOptions(request, atlas));
     const frameCount = sequence.frameCount;
     const timing = computeVideoTiming({ fps: request.fps, frameCount });

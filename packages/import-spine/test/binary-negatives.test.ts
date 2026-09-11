@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { importSpineSkel } from '../src/index';
+import { importSpineSkel as importUnverifiedSkel } from '../src/index';
 import type { SpineImportErrorCode } from '../src/types';
 import { SkelWriter, encodeSkel, type SkelModel } from './fixtures/skel-encoder';
+
+// Synthetic codec coverage is explicit; production binary import remains gated.
+const importSpineSkel: typeof importUnverifiedSkel = (input, options) =>
+  importUnverifiedSkel(input, { ...options, allowUnverifiedBinary: true });
 
 // Malformed-binary negatives (PP-A5 slice 2): a corrupt .skel must fail LOUDLY with a typed error, never
 // crash, hang, or return a bad document. Buffers are hand-built with the test encoder / raw writer per the
@@ -127,8 +131,7 @@ describe('importSpineSkel malformed-binary negatives', () => {
   });
 
   it('surfaces a decoded-but-format-invalid document as SPINE_DOCUMENT_INVALID', () => {
-    // A single keyframe at time 0 yields a zero-duration animation, which the format rejects
-    // (ANIM_DURATION). The binary decodes cleanly; the shared pipeline fails it loudly.
+    // Descending key times decode cleanly but fail the shared animation ordering validator.
     const model: SkelModel = {
       version: '4.1.24',
       bones: [{ name: 'root' }, { name: 'bone1', parent: 'root' }],
@@ -139,14 +142,28 @@ describe('importSpineSkel malformed-binary negatives', () => {
           slots: [{ slot: 'slot1', attachments: [{ placeholder: 'region1', type: 'region' }] }],
         },
       ],
-      animations: [{ name: 'idle', bones: [{ bone: 'bone1', rotate: [{ time: 0, angle: 0 }] }] }],
+      animations: [
+        {
+          name: 'idle',
+          bones: [
+            {
+              bone: 'bone1',
+              rotate: [
+                { time: 1, angle: 0 },
+                { time: 0, angle: 0 },
+              ],
+            },
+          ],
+        },
+      ],
     };
     const result = importSpineSkel(encodeSkel(model));
     expect(result.ok).toBe(false);
     if (result.ok) return;
     expect(
       result.errors.some(
-        (e) => e.code === 'SPINE_DOCUMENT_INVALID' && e.detail?.['formatCode'] === 'ANIM_DURATION',
+        (e) =>
+          e.code === 'SPINE_DOCUMENT_INVALID' && e.detail?.['formatCode'] === 'ANIM_TIME_ORDER',
       ),
     ).toBe(true);
   });

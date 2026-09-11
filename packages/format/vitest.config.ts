@@ -4,6 +4,7 @@ import { defineConfig } from 'vitest/config';
 // hashing, the golden corpus, and the barrel surface) are pure and run in the Node environment.
 export default defineConfig({
   test: {
+    maxWorkers: 2,
     environment: 'node',
     include: ['test/**/*.test.ts'],
   },
