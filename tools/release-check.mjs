@@ -37,11 +37,12 @@ export function assertSuccessfulRun(runs, sha, path) {
 async function main() {
   const root = JSON.parse(readFileSync('package.json', 'utf8'));
   const app = JSON.parse(readFileSync('apps/editor/package.json', 'utf8'));
-  assertReleaseIdentity(process.env.GITHUB_REF_NAME, root.version, app.version);
+  const tag = process.env.RELEASE_TAG ?? process.env.GITHUB_REF_NAME;
+  assertReleaseIdentity(tag, root.version, app.version);
   const sha = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const tagSha = execFileSync(
     'git',
-    ['rev-parse', '--verify', '--end-of-options', `${process.env.GITHUB_REF}^{commit}`],
+    ['rev-parse', '--verify', '--end-of-options', `refs/tags/${tag}^{commit}`],
     { encoding: 'utf8' },
   ).trim();
   if (sha !== tagSha || sha !== process.env.GITHUB_SHA)
@@ -56,7 +57,7 @@ async function main() {
       headers: {
         Authorization: `Bearer ${process.env.GH_TOKEN}`,
         Accept: 'application/vnd.github+json',
-        'X-GitHub-Api-Version': '2026-03-10',
+        'X-GitHub-Api-Version': '2022-11-28',
       },
       signal: AbortSignal.timeout(15000),
     });

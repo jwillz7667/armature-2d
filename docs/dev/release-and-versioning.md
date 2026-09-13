@@ -12,7 +12,7 @@ How versions work in this repository, what gates a change, and where the release
 | Shared format primitives | same file | `1.0.0` | frozen; a change here is a MAJOR event |
 | Boundary contract (math engine) | `packages/math-bridge/src/version.ts` | `1.0.0` | additive changes only without a bump |
 | MRNT container version | `packages/format/src/binary/` | `1` | new container features bump it |
-| App / package versions | root and workspace `package.json` | `0.0.0` | set by the release pipeline (WP-5.7) |
+| App version | root and editor `package.json` | `0.2.0-rc.1` | matches the release tag |
 
 The format version is the semver of THE FORMAT, deliberately independent of the app version: a
 document written today must load in every future app version that supports its MAJOR (with
@@ -113,3 +113,18 @@ One full game authored in Armature 2D, exported, and played back with conformanc
 and Unity, from a signed build produced by the release pipeline. Until then, every merge to `main`
 keeps the headless acceptance harnesses green so the eventual release is an artifact of routine,
 not a heroic integration.
+
+
+## Publishing a version request
+
+Update the root/editor versions, add `docs/releases/<version>.md`, and update
+`.github/release-request.json` in one reviewed PR. Merging the request to main starts the release
+workflow. It waits for CI and native conformance on that exact main commit before creating its
+immutable version tag, then runs the full release gate and all platform package builds. Manual
+version-tag pushes remain supported and require the same exact-main-commit evidence.
+
+After every platform succeeds, the workflow verifies that the complete installer set is present,
+uploads SHA256SUMS, and publishes the release. Versions with a semver suffix are published as
+prereleases and do not become the latest stable release. A failed gate or package build leaves
+any existing draft unpublished. Rerunning the same workflow requires the tag to still point to the
+same commit; tags are never moved to repair a release.
