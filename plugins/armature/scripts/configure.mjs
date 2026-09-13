@@ -14,6 +14,10 @@ try {
   const args = [join(root, 'scripts/launch.mjs'), project];
   const config = { mcpServers: { armature: { command: process.execPath, args } } };
   await writeFile(join(root, '.mcp.json'), `${JSON.stringify(config, null, 2)}\n`);
+  await writeFile(
+    join(root, 'mcp.json'),
+    `${JSON.stringify({ $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json', ...config }, null, 2)}\n`,
+  );
   // JSON basic strings are compatible with TOML for these paths (including Windows backslashes).
   const toml = `[mcp_servers.armature]\ncommand = ${JSON.stringify(process.execPath)}\nargs = [${args.map((value) => JSON.stringify(value)).join(', ')}]\n`;
   await writeFile(join(root, 'codex-config.toml'), toml);
