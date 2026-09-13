@@ -2,6 +2,8 @@ name: Release
 
 on:
   push:
+    branches: [main]
+    paths: ['.github/release-request.json']
     tags:
       - 'v*'
 
@@ -22,6 +24,9 @@ jobs:
   # upload into. Kept on one job so the draft exists before any matrix job starts uploading.
   gate:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      tag: ${{ steps.prepare.outputs.tag }}
     permissions:
       contents: write
       actions: read
@@ -34,9 +39,15 @@ jobs:
         with:
           node-version-file: .node-version
           cache: pnpm
+      - name: Prepare requested tag after exact main CI succeeds
+        id: prepare
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node tools/prepare-release.mjs
       - name: Verify tag, app version, main ancestry, and CI on this exact commit
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.prepare.outputs.tag }}
         run: node tools/release-check.mjs
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit:dependencies
@@ -55,13 +66,14 @@ jobs:
       - name: Ensure a draft release exists for this tag
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.prepare.outputs.tag }}
         run: |
           set -euo pipefail
-          if ! gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
-            gh release create "${GITHUB_REF_NAME}" \
+          if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release create "${RELEASE_TAG}" \
               --draft \
-              --title "${GITHUB_REF_NAME}" \
-              --notes "Armature 2D ${GITHUB_REF_NAME}. Installers are attached below. This build is unsigned; see docs/dev/release-and-versioning.md."
+              --title "${RELEASE_TAG}" \
+              --notes-file "docs/releases/${RELEASE_TAG#v}.md"
           fi
 
   native:
@@ -78,6 +90,8 @@ jobs:
       matrix:
         os: [macos-latest, windows-latest, ubuntu-latest]
     runs-on: ${{ matrix.os }}
+    env:
+      RELEASE_TAG: ${{ needs.gate.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -139,4 +153,32 @@ jobs:
             exit 1
           fi
           printf 'Uploading:\n'; printf '  %s\n' "${files[@]}"
-          gh release upload "${GITHUB_REF_NAME}" "${files[@]}" --clobber
+          gh release upload "${RELEASE_TAG}" "${files[@]}" --clobber
+
+  publish:
+    needs: [gate, native, package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RELEASE_TAG: ${{ needs.gate.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+      - name: Verify installer set and create checksums
+        run: |
+          gh release download "$RELEASE_TAG" --dir release-assets
+          node tools/release-assets.mjs release-assets
+          gh release upload "$RELEASE_TAG" release-assets/SHA256SUMS --clobber
+      - name: Publish the verified release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease --latest=false
+          else
+            gh release edit "$RELEASE_TAG" --draft=false --prerelease=false --latest
+          fi
