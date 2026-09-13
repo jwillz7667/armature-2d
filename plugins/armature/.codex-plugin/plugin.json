@@ -1,0 +1,20 @@
+{
+  "name": "armature",
+  "version": "0.1.0",
+  "description": "Author and render Armature 2D skeletons through a local MCP server.",
+  "author": {
+    "name": "Viral Ventures LLC"
+  },
+  "repository": "https://github.com/jwillz7667/armature-2d",
+  "license": "SEE LICENSE IN LICENSE",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Armature 2D",
+    "shortDescription": "Rig, animate and render with MCP.",
+    "longDescription": "Local headless authoring through the Armature command and undo system. Configure an explicit project folder before use.",
+    "developerName": "Viral Ventures LLC",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": "Create an animated skeleton and render a preview with Armature."
+  }
+}

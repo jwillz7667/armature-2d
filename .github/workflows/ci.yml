@@ -75,6 +75,33 @@ jobs:
           node tools/smoke-spine-worker.mjs
           node tools/smoke-import-workers.mjs
           node tools/smoke-mcp-cli.mjs
+          node tools/package-ai-plugin.mjs
+          node tools/smoke-ai-plugin.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: armature-mcp
+          path: |
+            dist/armature-mcp-*.tar.gz
+            dist/armature-mcp-*.sha256
+          if-no-files-found: error
+
+  mcp-portable:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec turbo run build --filter=@marionette/mcp-server...
+      - run: node tools/package-ai-plugin.mjs
+      - run: node tools/smoke-ai-plugin.mjs
 
   format-semver:
     runs-on: ubuntu-latest
@@ -178,6 +205,7 @@ jobs:
         lint,
         test,
         build,
+        mcp-portable,
         format-semver,
         package-guard,
         phase3-acceptance,
@@ -190,4 +218,4 @@ jobs:
         env:
           JOB_RESULTS: ${{ toJSON(needs) }}
         run: |
-          node -e 'const jobs=JSON.parse(process.env.JOB_RESULTS); const names=["typecheck","lint","test","build","format-semver","package-guard","phase3-acceptance","commitlint","dependency-audit","fixture-determinism"]; for(const name of names) { if(jobs[name]?.result !== "success") throw new Error(name + " did not succeed"); }'
+          node -e 'const jobs=JSON.parse(process.env.JOB_RESULTS); const names=["typecheck","lint","test","build","mcp-portable","format-semver","package-guard","phase3-acceptance","commitlint","dependency-audit","fixture-determinism"]; for(const name of names) { if(jobs[name]?.result !== "success") throw new Error(name + " did not succeed"); }'

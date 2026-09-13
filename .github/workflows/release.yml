@@ -63,6 +63,8 @@ jobs:
           node tools/smoke-spine-worker.mjs
           node tools/smoke-import-workers.mjs
           node tools/smoke-mcp-cli.mjs
+          node tools/package-ai-plugin.mjs
+          node tools/smoke-ai-plugin.mjs
       - name: Ensure a draft release exists for this tag
         env:
           GH_TOKEN: ${{ github.token }}
@@ -75,6 +77,12 @@ jobs:
               --title "${RELEASE_TAG}" \
               --notes-file "docs/releases/${RELEASE_TAG#v}.md"
           fi
+
+      - name: Upload verified AI integration to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ steps.prepare.outputs.tag }}
+        run: gh release upload "$RELEASE_TAG" dist/armature-mcp-*.tar.gz dist/armature-mcp-*.sha256 --clobber
 
   native:
     needs: gate
