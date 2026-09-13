@@ -273,6 +273,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.30.0
         version: 1.30.0(supports-color@7.2.0)(zod@3.25.76)
+      jose:
+        specifier: 6.2.3
+        version: 6.2.3
       pngjs:
         specifier: ^7.0.0
         version: 7.0.0

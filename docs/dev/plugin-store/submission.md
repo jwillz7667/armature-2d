@@ -1,11 +1,17 @@
 # Armature 2D public plugin submission
 
-Status: preparation only, not submitted or published.
+Status: saved OpenAI Platform draft, not submitted or published.
+
+Draft app ID: `asdk_app_6aa6cb80da2c8191a768d23d0411bc39`.
+Draft version: `0.1.0`. The portal rejected the prerelease version string.
+The listing, prompts, skill upload and review scenarios were entered. The skill
+scan was pending at the last check; the MCP URL and public policy URLs are unset.
+See [hosted MCP status](hosted-mcp.md) for backend implementation and launch gates.
 
 ## Listing draft
 
 Name: Armature 2D
-Publisher: Viral Ventures LLC (identity must be verified in the publishing organization)
+Draft publisher: JUSTIN THOMAS WILLIAMS (verified individual selected in the portal; business identity has not been verified)
 Category: Productivity
 Short description: Rig, animate and render 2D skeletons with Armature.
 Long description: Create and edit skeletal rigs through Armature's command and undo system. Author bones, slots, attachments, animation and constraints; inspect the document, render PNG previews, and validate and save skeleton JSON. The current engine operates in independent headless sessions. It does not control a running editor window or persist a complete effects/slot editor project.
@@ -43,9 +49,10 @@ they are not a claim that the hosted plugin has been tested.
    annotations on all 208 tools before exposing that endpoint. Never serve all users
    from a shared unrestricted project directory. Alternatively obtain OpenAI approval
    for local MCP support; no such approval has been obtained.
-2. Publisher access: sign into the publishing OpenAI organization, confirm Apps
-   Management write access and a verified developer/business identity. The browser
-   reached sign-in; organization identity and permissions have not been checked.
+2. Publisher access: sign-in and draft creation succeeded in the Personal organization.
+   The verified individual identity was selected and confirmed saved. Confirm the
+   final listing and policy publisher match before submitting; do not claim the
+   business identity has been verified.
 3. Public product website, support, privacy and terms URLs must match the publisher.
    Do not invent these URLs or claim a draft policy is approved. Domain verification
    requires the exact challenge issued by the portal.

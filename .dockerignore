@@ -1,0 +1,12 @@
+.git
+**/node_modules
+**/dist
+**/.turbo
+**/coverage
+.env
+.env.*
+**/.env
+**/.env.*
+*.p12
+*.pfx
+*.pem

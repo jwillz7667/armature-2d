@@ -196,6 +196,41 @@ jobs:
           pnpm --filter @marionette/conformance generate:anim-state
           git diff --exit-code -- packages/conformance/src
 
+  mcp-container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build and verify hosted MCP container
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker build -f deploy/mcp/Dockerfile -t armature-mcp:test .
+          docker volume create armature-mcp-test
+          trap 'docker rm -f armature-mcp-test >/dev/null 2>&1 || true; docker volume rm armature-mcp-test >/dev/null 2>&1 || true' EXIT
+          docker run -d --name armature-mcp-test -v armature-mcp-test:/data \
+            -e ARMATURE_PUBLIC_URL=https://armature.example.test/mcp \
+            -e ARMATURE_OAUTH_ISSUER=https://identity.example.test/ \
+            -e ARMATURE_OAUTH_JWKS_URL=https://identity.example.test/jwks armature-mcp:test
+          docker exec armature-mcp-test node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import { writeFile } from "node:fs/promises";
+            assert.equal(process.getuid(), 1000);
+            for (let i = 0; ; i++) {
+              try { assert.equal((await fetch("http://127.0.0.1:8080/healthz")).status, 200); break; }
+              catch (error) { if (i >= 50) throw error; await new Promise(r => setTimeout(r, 100)); }
+            }
+            await writeFile("/data/restart-check", "persisted");'
+          docker restart armature-mcp-test
+          docker exec armature-mcp-test node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import { readFile } from "node:fs/promises";
+            assert.equal(await readFile("/data/restart-check", "utf8"), "persisted");
+            for (let i = 0; ; i++) {
+              try { assert.equal((await fetch("http://127.0.0.1:8080/healthz")).status, 200); break; }
+              catch (error) { if (i >= 50) throw error; await new Promise(r => setTimeout(r, 100)); }
+            }'
+
   ci-pass:
     runs-on: ubuntu-latest
     if: always()
@@ -206,6 +241,7 @@ jobs:
         test,
         build,
         mcp-portable,
+        mcp-container,
         format-semver,
         package-guard,
         phase3-acceptance,
@@ -218,4 +254,4 @@ jobs:
         env:
           JOB_RESULTS: ${{ toJSON(needs) }}
         run: |
-          node -e 'const jobs=JSON.parse(process.env.JOB_RESULTS); const names=["typecheck","lint","test","build","mcp-portable","format-semver","package-guard","phase3-acceptance","commitlint","dependency-audit","fixture-determinism"]; for(const name of names) { if(jobs[name]?.result !== "success") throw new Error(name + " did not succeed"); }'
+          node -e 'const jobs=JSON.parse(process.env.JOB_RESULTS); const names=["typecheck","lint","test","build","mcp-portable","mcp-container","format-semver","package-guard","phase3-acceptance","commitlint","dependency-audit","fixture-determinism"]; for(const name of names) { if(jobs[name]?.result !== "success") throw new Error(name + " did not succeed"); }'
