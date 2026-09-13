@@ -1,0 +1,10 @@
+{
+  "name": "armature",
+  "version": "0.1.0",
+  "description": "Author and render Armature 2D skeletons through a local MCP server.",
+  "author": {
+    "name": "Viral Ventures LLC"
+  },
+  "repository": "https://github.com/jwillz7667/armature-2d",
+  "license": "SEE LICENSE IN LICENSE"
+}

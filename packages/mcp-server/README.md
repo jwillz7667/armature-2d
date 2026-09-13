@@ -2,7 +2,7 @@
 
 The headless control surface: a Model Context Protocol (MCP) server exposing the authoring
 capabilities of Armature 2D over stdio. An AI agent (or any MCP client) can build,
-inspect, render, and save everything the GUI can, because every mutating tool drives the same
+inspect, render, and save skeleton documents. This is not full editor feature parity. Every mutating tool drives the same
 `@marionette/document-core` commands through the same `History` (LAW 2, ADR-0001). The complete
 tool-by-tool reference is the user manual chapter `docs/manual/09-tool-reference.md`.
 
@@ -99,3 +99,8 @@ pnpm --filter @marionette/mcp-server test
 Dependencies: `@marionette/document-core`, `@marionette/format`, `@marionette/runtime-core`,
 `@marionette/render-preview`, `@marionette/atlas-pack` (workspace), `@modelcontextprotocol/sdk`,
 `zod`, `pngjs`.
+
+## Portable AI integration
+
+See [the portable plugin guide](../../plugins/armature/README.md) for building, downloading,
+and configuring Codex, Claude Code, or another local stdio MCP host.
