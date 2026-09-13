@@ -18,6 +18,9 @@ try {
     '.codex-plugin/plugin.json',
     '.claude-plugin/plugin.json',
     'README.md',
+    'plugin.json',
+    'assets/icon.png',
+    'skills/armature-authoring/SKILL.md',
     'scripts/launch.mjs',
     'scripts/configure.mjs',
   ]) {
@@ -29,13 +32,20 @@ try {
   await cp(join(root, 'LICENSE'), join(plugin, 'LICENSE'));
   await cp(join(root, 'docs/manual/mcp-tools.json'), join(plugin, 'mcp-tools.json'));
   await cp(join(root, 'docs/manual/09-tool-reference.md'), join(plugin, 'tool-reference.md'));
-  for (const path of ['.codex-plugin/plugin.json', '.claude-plugin/plugin.json']) {
+  for (const path of ['plugin.json', '.codex-plugin/plugin.json', '.claude-plugin/plugin.json']) {
     const manifest = JSON.parse(await readFile(join(plugin, path), 'utf8'));
     manifest.version = version;
     await writeFile(join(plugin, path), `${JSON.stringify(manifest, null, 2)}\n`);
   }
   // Never distribute developer-specific project grants or generated machine paths.
   await writeFile(join(plugin, '.mcp.json'), '{"mcpServers":{}}\n');
+  await writeFile(
+    join(plugin, 'mcp.json'),
+    JSON.stringify({
+      $schema: 'https://agent-plugins.org/schemas/1.0.0/mcp.schema.json',
+      mcpServers: {},
+    }) + '\n',
+  );
   await rm(join(plugin, 'codex-config.toml'), { force: true });
   const filename = `armature-mcp-${version}.tar.gz`;
   execFileSync('tar', ['-czf', join(output, filename), '-C', staging, 'armature']);

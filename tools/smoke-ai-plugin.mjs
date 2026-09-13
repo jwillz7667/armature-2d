@@ -38,6 +38,16 @@ try {
   await mkdir(project);
   execFileSync(process.execPath, [setup, project], { cwd: temp });
   const config = JSON.parse(await readFile(join(plugin, '.mcp.json'), 'utf8'));
+  const portable = JSON.parse(await readFile(join(plugin, 'mcp.json'), 'utf8'));
+  assert.deepEqual(portable.mcpServers, config.mcpServers);
+  assert.match(
+    await readFile(join(plugin, 'skills/armature-authoring/SKILL.md'), 'utf8'),
+    /name: armature-authoring/,
+  );
+  assert.equal(
+    (await readFile(join(plugin, 'assets/icon.png'))).subarray(0, 8).toString('hex'),
+    '89504e470d0a1a0a',
+  );
   assert.equal(config.mcpServers.armature.command, process.execPath);
   assert.deepEqual(config.mcpServers.armature.args, [
     await realpath(launcher),
@@ -47,7 +57,11 @@ try {
     await readFile(join(plugin, 'codex-config.toml'), 'utf8'),
     /\[mcp_servers.armature\]/,
   );
-  for (const manifest of ['.codex-plugin/plugin.json', '.claude-plugin/plugin.json']) {
+  for (const manifest of [
+    'plugin.json',
+    '.codex-plugin/plugin.json',
+    '.claude-plugin/plugin.json',
+  ]) {
     assert.equal(JSON.parse(await readFile(join(plugin, manifest), 'utf8')).version, version);
   }
   execFileSync(process.execPath, [join(root, 'tools/smoke-mcp-cli.mjs'), launcher], {

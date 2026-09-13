@@ -2,7 +2,8 @@
 
 Run the Armature headless engine inside an environment that supports Node and local
 stdio MCP. The bundle includes the server and its dependencies, 208 discoverable
-tools, schemas, reference documentation, and Codex/Claude Code plugin manifests.
+tools, schemas, reference documentation, a portable Codex manifest, an authoring skill,
+and Codex/Claude Code compatibility manifests.
 No Electron installation, npm download at startup, API key, or hosted service is required.
 The proprietary repository license also applies to this distribution.
 
@@ -41,7 +42,7 @@ node /absolute/path/armature/scripts/configure.mjs /absolute/path/my-project
 ```
 
 On Windows use absolute Windows paths and quote paths containing spaces. Setup writes
-`.mcp.json` and `codex-config.toml` inside the bundle only. It does not edit your client
+`mcp.json`, `.mcp.json` and `codex-config.toml` inside the bundle only. It does not edit your client
 configuration or grant permissions. Reconfigure after moving the bundle or changing projects.
 Do not redistribute a configured bundle containing your machine paths.
 
@@ -90,3 +91,6 @@ GPU rendering, and complete effects/slot project round trips are separate accept
 
 Configuration references: [OpenAI plugin packaging](https://developers.openai.com/plugins/build/plugins)
 and [Claude Code plugins](https://code.claude.com/docs/en/plugins-reference).
+
+Public store submission is tracked in `docs/dev/plugin-store/submission.md` in the repository.
+The current local MCP package has not been submitted to or published in the public store.
