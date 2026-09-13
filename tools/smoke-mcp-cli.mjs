@@ -13,6 +13,7 @@ const child = spawn(process.execPath, [cli, project], {
   cwd: resolve(project),
   stdio: ['pipe', 'pipe', 'pipe'],
 });
+const closed = new Promise((resolve) => child.once('close', resolve));
 const responses = new Map();
 let buffer = '',
   stderr = '',
@@ -155,5 +156,7 @@ try {
   );
 } finally {
   child.kill();
+  // Windows keeps the child working directory locked until process termination completes.
+  await closed;
   await rm(project, { recursive: true, force: true });
 }
