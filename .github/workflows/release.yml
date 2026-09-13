@@ -107,16 +107,18 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends rpm
 
-      # Skip mac signing cleanly when no certificate secret is configured: without this electron-builder
-      # would try local-keychain identity discovery and fail on a hosted runner.
-      - name: Configure mac signing skip when unsigned (macOS only)
-        if: runner.os == 'macOS' && env.CSC_LINK == ''
-        run: echo "CSC_IDENTITY_AUTO_DISCOVERY=false" >> "$GITHUB_ENV"
-        env:
-          CSC_LINK: ${{ secrets.CSC_LINK }}
-
-      - name: Build and package installers
+      # Candidate releases are deliberately unsigned and never receive certificate secrets.
+      - name: Build unsigned candidate installers
+        if: contains(needs.gate.outputs.tag, '-')
         run: pnpm --filter editor package:dist
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: Build signed stable installers
+        if: ${{ !contains(needs.gate.outputs.tag, '-') }}
+        run: |
+          pnpm --filter editor exec electron-vite build
+          pnpm --filter editor exec electron-builder --publish never --config.forceCodeSigning=true
         env:
           # Present only when the secrets are configured; empty otherwise (signing skipped, above).
           CSC_LINK: ${{ secrets.CSC_LINK }}
