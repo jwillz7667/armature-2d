@@ -9,7 +9,7 @@ try {
     throw new Error('Usage: node scripts/configure.mjs /absolute/project-directory');
   const project = await realpath(requested);
   if (!(await stat(project)).isDirectory()) throw new Error('Project root must be a directory.');
-  const root = fileURLToPath(new URL('../', import.meta.url));
+  const root = await realpath(fileURLToPath(new URL('../', import.meta.url)));
   await access(join(root, 'server/cli.mjs'));
   const args = [join(root, 'scripts/launch.mjs'), project];
   const config = { mcpServers: { armature: { command: process.execPath, args } } };

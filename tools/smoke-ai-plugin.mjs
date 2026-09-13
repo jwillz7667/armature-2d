@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtemp, mkdir, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, realpath, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,7 +39,10 @@ try {
   execFileSync(process.execPath, [setup, project], { cwd: temp });
   const config = JSON.parse(await readFile(join(plugin, '.mcp.json'), 'utf8'));
   assert.equal(config.mcpServers.armature.command, process.execPath);
-  assert.deepEqual(config.mcpServers.armature.args, [launcher, project]);
+  assert.deepEqual(config.mcpServers.armature.args, [
+    await realpath(launcher),
+    await realpath(project),
+  ]);
   assert.match(
     await readFile(join(plugin, 'codex-config.toml'), 'utf8'),
     /\[mcp_servers.armature\]/,
