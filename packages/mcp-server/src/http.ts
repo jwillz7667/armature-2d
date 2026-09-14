@@ -19,6 +19,7 @@ export interface HttpOptions {
   readonly allowedOrigins?: readonly string[];
   readonly maxSessions?: number;
   readonly idleMs?: number;
+  readonly openaiChallengeToken?: string;
 }
 
 function httpsUrl(value: string): URL {
@@ -36,6 +37,10 @@ export async function createHttpServer(options: HttpOptions) {
   if (resource.pathname !== '/mcp') throw new Error('publicUrl must end in /mcp');
   httpsUrl(options.issuer);
   const keys = createRemoteJWKSet(httpsUrl(options.jwksUrl));
+  const challenge = options.openaiChallengeToken;
+  if (challenge !== undefined && !/^[A-Za-z0-9_-]{16,256}$/.test(challenge)) {
+    throw new Error('Invalid OpenAI domain challenge token');
+  }
   const maxSessions = options.maxSessions ?? 32;
   const idleMs = options.idleMs ?? 30 * 60_000;
   if (
@@ -101,6 +106,15 @@ export async function createHttpServer(options: HttpOptions) {
         ![resource.origin, ...(options.allowedOrigins ?? [])].includes(req.headers.origin))
     ) {
       send(res, 403, 'Forbidden host or origin');
+      return;
+    }
+    if (
+      req.method === 'GET' &&
+      req.url === '/.well-known/openai-apps-challenge' &&
+      challenge !== undefined
+    ) {
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      res.end(challenge);
       return;
     }
     if (

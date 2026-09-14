@@ -13,6 +13,9 @@ const app = await createHttpServer({
   publicUrl: required('ARMATURE_PUBLIC_URL'),
   issuer: required('ARMATURE_OAUTH_ISSUER'),
   jwksUrl: required('ARMATURE_OAUTH_JWKS_URL'),
+  ...(process.env['ARMATURE_OPENAI_CHALLENGE_TOKEN'] !== undefined
+    ? { openaiChallengeToken: process.env['ARMATURE_OPENAI_CHALLENGE_TOKEN'] }
+    : {}),
 });
 app.server.listen(port, '0.0.0.0', () =>
   process.stderr.write(`Armature MCP HTTP listening on port ${port}\n`),

@@ -130,6 +130,46 @@ async function call(accessToken: string, session: string, name: string, args: un
 }
 
 describe('authenticated HTTP MCP', () => {
+  it('serves only the configured public domain proof on the exact guarded route', async () => {
+    const path = '/.well-known/openai-apps-challenge';
+    const headers = { host: 'armature.example.test' };
+    expect((await localFetch(`${base}${path}`, { headers })).status).toBe(404);
+    await app.close();
+    const proof = 'test-domain-proof-0123456789';
+    app = await createHttpServer({
+      dataRoot: root,
+      publicUrl: resource,
+      issuer,
+      jwksUrl: `${issuer}jwks`,
+      openaiChallengeToken: proof,
+    });
+    await new Promise<void>((resolve) => app.server.listen(0, '127.0.0.1', resolve));
+    const address = app.server.address();
+    if (!address || typeof address === 'string') throw new Error('No listening address');
+    const url = `http://127.0.0.1:${address.port}${path}`;
+    const response = await localFetch(url, { headers });
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toBe('text/plain; charset=utf-8');
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    expect(await response.text()).toBe(proof);
+    expect((await localFetch(url, { method: 'POST', headers })).status).toBe(404);
+    expect((await localFetch(`${url}/`, { headers })).status).toBe(404);
+    expect((await localFetch(url, { headers: { host: 'attacker.test' } })).status).toBe(403);
+    expect(
+      (await localFetch(url, { headers: { ...headers, origin: 'https://attacker.test' } })).status,
+    ).toBe(403);
+  });
+  it('rejects malformed domain proof configuration before starting a server', async () => {
+    await expect(
+      createHttpServer({
+        dataRoot: root,
+        publicUrl: resource,
+        issuer,
+        jwksUrl: `${issuer}jwks`,
+        openaiChallengeToken: 'proof\nwith-control-character',
+      }),
+    ).rejects.toThrow('Invalid OpenAI domain challenge token');
+  });
   it('advertises OAuth metadata and challenges missing credentials', async () => {
     const response = await initialize('');
     expect(response.status).toBe(401);
@@ -230,6 +270,32 @@ describe('authenticated HTTP MCP', () => {
     const session = (await initialize(alice)).headers.get('mcp-session-id')!;
     const catalog = await rpc(alice, session, 'tools/list');
     expect(catalog.tools).toHaveLength(208);
+    for (const tool of catalog.tools) {
+      expect(tool.annotations).toEqual({
+        readOnlyHint: expect.any(Boolean),
+        destructiveHint: expect.any(Boolean),
+        openWorldHint: false,
+      });
+    }
+    // These are permission decisions a real client makes from the wire catalog.
+    const annotations = (name: string) =>
+      catalog.tools.find((tool: { name: string }) => tool.name === name).annotations;
+    expect(annotations('render_frame').readOnlyHint).toBe(true);
+    expect(annotations('document.export').readOnlyHint).toBe(true);
+    expect(annotations('document.open')).toMatchObject({
+      readOnlyHint: false,
+      destructiveHint: false,
+    });
+    expect(annotations('bone.create').destructiveHint).toBe(false);
+    for (const name of [
+      'bone.move',
+      'bone.delete',
+      'document.save',
+      'document.close',
+      'atlas.pack',
+    ]) {
+      expect(annotations(name)).toMatchObject({ readOnlyHint: false, destructiveHint: true });
+    }
     const { documentId } = await call(alice, session, 'document.new', { name: 'HTTP rig' });
     const { boneId } = await call(alice, session, 'bone.create', {
       documentId,

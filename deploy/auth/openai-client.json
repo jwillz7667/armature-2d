@@ -1,0 +1,28 @@
+{
+  "clients": [
+    {
+      "clientId": "armature-openai",
+      "name": "Armature for OpenAI",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "consentRequired": true,
+      "redirectUris": ["https://chatgpt.com/connector_platform_oauth_redirect"],
+      "webOrigins": [],
+      "defaultClientScopes": ["armature:edit"],
+      "optionalClientScopes": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "oidc.ciba.grant.enabled": "false",
+        "post.logout.redirect.uris": "",
+        "exclude.issuer.from.auth.response": "false"
+      }
+    }
+  ]
+}

@@ -72,6 +72,11 @@ try {
   const catalog = await request('tools/list', {});
   assert.equal(catalog.tools.length, 208);
   assert.equal(new Set(catalog.tools.map((tool) => tool.name)).size, catalog.tools.length);
+  for (const tool of catalog.tools) {
+    assert.equal(typeof tool.annotations?.readOnlyHint, 'boolean', tool.name);
+    assert.equal(typeof tool.annotations?.destructiveHint, 'boolean', tool.name);
+    assert.equal(tool.annotations?.openWorldHint, false, tool.name);
+  }
   // Prove the process handles a second request rather than only emitting a startup response.
   const repeated = await request('tools/list', {});
   assert.deepEqual(repeated, catalog);

@@ -83,7 +83,7 @@ animation, render a preview, validate it, and save it as puppet.json."
 | Preview | CPU PNG frames, including supported effect overlays; not GPU/editor pixel parity |
 | Live editor | Separate sessions; no control of the currently open editor document/window |
 | Media export | This bundle does not expose every editor video/sequence export workflow |
-| Remote connector | Not implemented; needs authenticated hosting and isolated project storage |
+| Remote connector | Railway staging endpoint deployed and smoke-tested; user OAuth and public store review remain separate launch gates |
 
 The isolated smoke checks catalog discovery, create/edit, undo/redo, validation, deterministic
 PNG output, skeleton save/reopen, and traversal denial. Real Codex/Claude client installation,

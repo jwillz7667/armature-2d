@@ -26,6 +26,7 @@ export function buildMcpServer(
         title: tool.title,
         description: tool.description,
         inputSchema: tool.inputSchema.shape,
+        annotations: tool.annotations,
       },
       async (args: unknown) => {
         try {

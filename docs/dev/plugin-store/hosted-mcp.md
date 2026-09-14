@@ -1,7 +1,8 @@
 # Hosted MCP resource server
 
-This implementation is a staging backend, not a deployed service or an approved store
-listing. It shares all 208 existing tools and command/history behavior with stdio.
+The staging backend is deployed on Railway and has passed authenticated workflow and
+restart-persistence checks. It is not an approved public store listing. It shares all
+208 existing tools and command/history behavior with stdio.
 The desktop application and its project format are unchanged.
 
 ## Run and deploy
@@ -33,6 +34,11 @@ the non-root `node` user. Never make the data volume public.
 See [Railway volume permissions](https://docs.railway.com/volumes#permissions).
 The container contains the self-contained server bundle and license, not repository
 source or build dependencies. It runs one replica because editing sessions are in memory.
+
+The optional `ARMATURE_OPENAI_CHALLENGE_TOKEN` serves the portal-issued public domain
+proof as plain text at `/.well-known/openai-apps-challenge`. It is disabled when
+unset, accepts only a bounded URL-safe token, and retains host/origin checks. The
+proof is not an authentication credential and grants no tool access.
 
 ## Authentication and isolation
 
@@ -66,36 +72,77 @@ or document contents.
 
 ## Remaining public-launch gates
 
-- Provision and verify the actual OAuth provider, HTTPS host, volume and proxy.
-  Check token revocation policy and the complete ChatGPT sign-in flow.
+- Complete the interactive OpenAI authorization-code/PKCE flow with real user and
+  reviewer accounts. The deployed service-to-service token test does not prove user
+  sign-in. Registration remains disabled; configure deliberate account onboarding
+  and recovery. Review token revocation policy (JWTs remain valid until expiry).
 - Add and exercise per-user storage quotas, upload/download workflows, account
   deletion and retention controls, plus infrastructure request/rate/concurrency
   limits. The present session/body/heap bounds do not provide a full public-service
   resource budget. CPU-heavy tool calls still share the process.
-- Review accurate annotations for every tool before the store tool scan.
-- Verify container build/start, mounted-volume permissions, restart persistence,
-  and two real accounts against the deployed URL. Local JWT fixtures do not prove
-  identity-provider interoperability. Add operational monitoring and backup/restore.
+- Run the portal tool scan after user OAuth succeeds. All 208 tools now have explicit
+  read-only, destructive and closed-world annotations; metadata is also included in
+  the generated JSON catalog. Read tools: 41; additive operations: 28; operations
+  replacing or removing state: 139. Undoable changes still count as destructive.
+- Exercise isolation with two real human accounts against the deployed URL. Local
+  signed-JWT tests cover tenant isolation; deployed smoke uses one dedicated service
+  account. Add operational monitoring and test backup/restore; persistent volumes
+  alone are not backups.
 - Publish factual support/privacy/terms pages, verify the portal's domain challenge,
   supply reviewer data, record the demo, and complete review and publication.
 
-The Railway connection was marked installed on 2026-09-13, but this working session
-exposed no Railway deployment tools. No infrastructure has been provisioned here.
-Do not interpret the configuration files as a deployment result.
+## Verified deployment (2026-09-14)
 
-## Local verification (2026-09-13)
+Project `bfe501cf-b27d-45e3-9c79-837fc8edf14d`, production environment:
 
-MCP package: 108 tests passed, including 11 authenticated HTTP tests. Tests exercise
-real signed JWT verification with a fixture JWKS response, ownership isolation,
-expiry, capacity, invalid signatures/claims, scope, host/origin checks, request
-bounds, editing, undo/redo, save/reopen, and persistence across transport deletion.
-The first persistence fixture was rejected because it had no root bone; adding a
-valid root made that test pass without changing format validation.
+| Service | Source | Persistence / endpoint |
+|---|---|---|
+| armature-mcp | `jwillz7667/armature-2d`, `feat/hosted-mcp`, `deploy/mcp/Dockerfile` | 500 MB at `/data`; https://armature-mcp-production.up.railway.app/mcp |
+| armature-auth | `quay.io/keycloak/keycloak:26.7.3` | Uses the private database; https://armature-auth-production.up.railway.app/realms/armature |
+| armature-auth-db | `postgres:18-bookworm` | 500 MB at `/var/lib/postgresql`; private network only |
 
-All eight MCP dependency builds succeeded (seven cached); the bundled HTTP server
-started and answered its health check. Existing stdio smoke passed all 208-tool,
-editing, deterministic PNG, save/reopen and traversal checks. Targeted lint and
-format checks passed. Local Node is 24.19.0; CI uses the repository's 24.20.0 pin.
-Docker is unavailable locally. The required CI container job builds the image,
-checks non-root volume access, and verifies a sentinel survives container restart.
-Its result must be checked on the PR; configuration alone is not a passing result.
+The MCP deployment at commit `a28a4a0` succeeded. Runtime logs confirm UID/GID 1000
+and startup on port 8080. The auth realm and service client issued a real signed JWT.
+Authenticated MCP requests returned 200; deliberate unauthenticated probes returned
+401. Reviewed current logs showed no MCP 5xx responses. Auth readiness warnings and
+PostgreSQL missing-table errors were confined to initial setup; migrations completed.
+Keycloak's default deprecated-feature warnings remain non-blocking.
+
+Actual live results: **17 workflow checks passed**, covering discovery, issuer and
+trusted token endpoint, token issuance, unauthorized denial, initialization, all 208
+tools, edits, undo/redo, validation, deterministic PNG, save/reopen, traversal denial,
+and session cleanup. **9 checks passed after an actual MCP service restart**, including
+reopening and comparing the saved document. PNG verification used an atlas-free
+fixture with an explicit viewport; it does not establish textured remote rendering.
+The local stdio smoke separately verifies a real texture fixture.
+
+`deploy/auth/openai-client.json` defines the separate `armature-openai` public client
+for the exact callback displayed in this portal draft. It requests user consent,
+requires PKCE S256, disables implicit/password/service-account grants, and receives
+only the existing `armature:edit` scope/audience. It contains no shared secret.
+`deploy/auth/railway-start.sh` adds it with Keycloak's `SKIP` partial-import policy,
+using the existing admin credential only inside the auth container. Its temporary
+credential files are private and removed on exit. Existing realms, users, signing
+keys and the machine test credential are preserved. See the auth deployment recipe
+for the difference between import success and verification of existing client settings.
+Auth deployment `1fc547ba-9c9c-4cd2-8ef2-d35c0693b736` succeeded; its logs explicitly
+verified the exact callback, public client, PKCE S256, consent and code-only grants.
+
+## Test evidence
+
+- Current local MCP suite: **110 tests passed in 5 files**, including 13 HTTP tests.
+  These cover signatures/claims, scope, ownership, expiry, session/body limits,
+  host/origin checks, traversal/symlinks, editing, history and persistence. The HTTP
+  workflow also verifies that permission annotations reach the actual wire catalog.
+- Type checking, targeted lint, all eight dependency builds (seven cached), generated
+  catalog validation, and stdio smoke passed. Local Node is 24.19.0, below the
+  repository's 24.20.0 pin; CI runs the pinned version.
+- At `a28a4a0`, [CI run 34799625363](https://github.com/jwillz7667/armature-2d/actions/runs/34799625363)
+  passed all 14 jobs, including the container test that initializes a root-owned
+  volume, verifies UID/GID 1000 and cleared supplementary groups, checks write access,
+  and proves a sentinel survives restart. Root without explicit initialization fails.
+  [Native conformance run 34799625380](https://github.com/jwillz7667/armature-2d/actions/runs/34799625380)
+  also passed. These run IDs apply to that commit, not automatically to later changes.
+
+No real Codex/ChatGPT user OAuth session, completed portal tool scan, verified public
+policy pages, store approval, or public publication is claimed by these results.
