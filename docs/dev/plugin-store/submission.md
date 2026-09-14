@@ -9,7 +9,10 @@ scan passed. The hosted MCP URL and predefined OAuth client settings have been
 entered; interactive sign-in and the tool scan are not yet verified. Public policy
 URLs remain unset. Starting the tool scan generated the domain challenge and
 opened an Authorize MCP dialog. The exact issued proof is configured in Railway;
-the server implements the well-known proof route. Portal verification is pending.
+the server implements the well-known proof route. The portal confirmed **Domain
+verified** on 2026-09-14. After continuing from Authorize MCP, browser tab discovery
+timed out; a fresh-tab recovery also timed out. User sign-in and tool-scan status
+remain unknown, and neither is claimed as successful.
 See [hosted MCP status](hosted-mcp.md) for backend implementation and launch gates.
 
 ## Listing draft

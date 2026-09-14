@@ -144,5 +144,15 @@ verified the exact callback, public client, PKCE S256, consent and code-only gra
   [Native conformance run 34799625380](https://github.com/jwillz7667/armature-2d/actions/runs/34799625380)
   also passed. These run IDs apply to that commit, not automatically to later changes.
 
+At `a17eed3`, [CI run 34801456829](https://github.com/jwillz7667/armature-2d/actions/runs/34801456829)
+and [native conformance run 34801456844](https://github.com/jwillz7667/armature-2d/actions/runs/34801456844)
+both passed. Railway MCP deployment `4388e034-e133-4733-8acf-38664e434c39` succeeded
+with UID/GID 1000. A further **11 live checks passed** after that deployment: real
+token issuance, authentication denial, session initialization, all 208 permission
+annotations and representative classifications, saved-document equality, and cleanup.
+The OpenAI portal confirmed **Domain verified**. Continuing to user OAuth then
+encountered a browser connection timeout, including the prescribed fresh-tab recovery;
+that flow has no verified outcome.
+
 No real Codex/ChatGPT user OAuth session, completed portal tool scan, verified public
 policy pages, store approval, or public publication is claimed by these results.
