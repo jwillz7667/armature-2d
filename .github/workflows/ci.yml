@@ -231,6 +231,50 @@ jobs:
               catch (error) { if (i >= 50) throw error; await new Promise(r => setTimeout(r, 100)); }
             }'
 
+      - name: Verify root-owned Railway mount and privilege drop
+        shell: bash
+        run: |
+          set -euo pipefail
+          if docker run --rm --user 0 armature-mcp:test; then
+            echo 'Root startup without explicit volume initialization unexpectedly succeeded'
+            exit 1
+          fi
+          mount_dir="$RUNNER_TEMP/armature-root-volume"
+          mkdir "$mount_dir"
+          sudo chown 0:0 "$mount_dir"
+          sudo chmod 700 "$mount_dir"
+          trap 'docker rm -f armature-root-test >/dev/null 2>&1 || true; sudo rm -rf "$mount_dir"' EXIT
+          docker run -d --name armature-root-test --user 0 -v "$mount_dir:/data" \
+            -e ARMATURE_INIT_VOLUME=1 \
+            -e ARMATURE_PUBLIC_URL=https://armature.example.test/mcp \
+            -e ARMATURE_OAUTH_ISSUER=https://identity.example.test/ \
+            -e ARMATURE_OAUTH_JWKS_URL=https://identity.example.test/jwks armature-mcp:test
+          docker exec --user 1000:1000 armature-root-test node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import { readFile, stat, writeFile } from "node:fs/promises";
+            for (let i = 0; ; i++) {
+              try { assert.equal((await fetch("http://127.0.0.1:8080/healthz")).status, 200); break; }
+              catch (error) { if (i >= 50) throw error; await new Promise(r => setTimeout(r, 100)); }
+            }
+            const status = await readFile("/proc/1/status", "utf8");
+            assert.match(status, /^Uid:\s+1000\s+1000\s+1000\s+1000$/m);
+            assert.match(status, /^Gid:\s+1000\s+1000\s+1000\s+1000$/m);
+            assert.match(status, /^Groups:[\t ]*$/m);
+            const mount = await stat("/data");
+            assert.equal(mount.uid, 1000);
+            assert.equal(mount.mode & 0o777, 0o700);
+            await writeFile("/data/restart-check", "non-root persisted");'
+          docker restart armature-root-test
+          docker exec --user 1000:1000 armature-root-test node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import { readFile } from "node:fs/promises";
+            for (let i = 0; ; i++) {
+              try { assert.equal((await fetch("http://127.0.0.1:8080/healthz")).status, 200); break; }
+              catch (error) { if (i >= 50) throw error; await new Promise(r => setTimeout(r, 100)); }
+            }
+            assert.equal(await readFile("/data/restart-check", "utf8"), "non-root persisted");
+            assert.match(await readFile("/proc/1/status", "utf8"), /^Uid:\s+1000\s+1000\s+1000\s+1000$/m);'
+
   ci-pass:
     runs-on: ubuntu-latest
     if: always()

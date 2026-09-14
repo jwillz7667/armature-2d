@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { lstat, mkdir, realpath } from 'node:fs/promises';
+import { constants } from 'node:fs';
+import { access, lstat, mkdir, realpath } from 'node:fs/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 import { join } from 'node:path';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
@@ -47,6 +48,8 @@ export async function createHttpServer(options: HttpOptions) {
   }
   await mkdir(options.dataRoot, { recursive: true, mode: 0o700 });
   const dataRoot = await realpath(options.dataRoot);
+  // Fail startup before advertising a healthy server if a mounted volume is unusable.
+  await access(dataRoot, constants.W_OK | constants.X_OK);
   const metadataUrl = `${resource.origin}/.well-known/oauth-protected-resource/mcp`;
   const metadata = {
     resource: resource.href,

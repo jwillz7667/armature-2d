@@ -21,9 +21,16 @@ The public reverse proxy terminates TLS and must preserve the public Host header
 The application does not trust forwarded host headers. Health checks use `/healthz`.
 Build the container from repository root with
 `docker build -f deploy/mcp/Dockerfile -t armature-mcp .`.
-For Railway, select `deploy/mcp/railway.json` as the config file, attach a private
-persistent volume at `/data`, and ensure its permissions allow the container's
-non-root `node` user (UID 1000) to create directories. Never make that volume public.
+For Railway, set the Dockerfile path to `deploy/mcp/Dockerfile`, health check to
+`/healthz`, and one replica using service settings. Do not select the legacy
+`deploy/mcp/railway.json` file: Railway rejected that configuration path as deprecated.
+Attach a private persistent volume at `/data`. Railway mounts volumes as root;
+set `RAILWAY_RUN_UID=0` and `ARMATURE_INIT_VOLUME=1` for this container's entrypoint.
+It changes ownership and mode of only `/data`, clears supplementary groups, and
+permanently drops to UID/GID 1000 before importing the server. Root startup without
+explicit volume initialization fails. Normal Docker deployments still default to
+the non-root `node` user. Never make the data volume public.
+See [Railway volume permissions](https://docs.railway.com/volumes#permissions).
 The container contains the self-contained server bundle and license, not repository
 source or build dependencies. It runs one replica because editing sessions are in memory.
 

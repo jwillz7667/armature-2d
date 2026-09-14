@@ -11,6 +11,7 @@ WORKDIR /app
 RUN mkdir /data && chown node:node /data
 COPY --from=build --chown=node:node /app/packages/mcp-server/dist/http.js /app/http.mjs
 COPY --from=build --chown=node:node /app/LICENSE /app/LICENSE
+COPY --chown=node:node deploy/mcp/entrypoint.mjs /app/entrypoint.mjs
 USER node
 EXPOSE 8080
-CMD ["node", "--max-old-space-size=512", "/app/http.mjs"]
+CMD ["node", "--max-old-space-size=512", "/app/entrypoint.mjs"]
