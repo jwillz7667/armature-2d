@@ -55,12 +55,17 @@ describe('Stripe subscriptions', () => {
         'line_items[0][price]': plan === 'monthly' ? config.monthlyPrice : config.yearlyPrice,
         'line_items[0][quantity]': '1',
         payment_method_collection: 'always',
-        'payment_method_types[0]': 'card',
         'subscription_data[trial_period_days]': '3',
         'subscription_data[trial_settings][end_behavior][missing_payment_method]': 'cancel',
       });
       expect(request.body.get('success_url')).toBe(`${config.origin}/billing?checkout=complete`);
       expect(request.key).toMatch(/^armature-checkout-/);
+      expect(request.body.get('integration_identifier')).toMatch(
+        /^armature_hosted_subscription_[a-z]{8}$/,
+      );
+      expect([...request.body.keys()].some((key) => key.startsWith('payment_method_types'))).toBe(
+        false,
+      );
       expect(request.body.has('allow_promotion_codes')).toBe(false);
     },
   );
@@ -82,6 +87,7 @@ describe('Stripe subscriptions', () => {
     const f = make();
     f.failCheckoutResponse();
     await expect(f.service.checkout('alice', 'monthly')).rejects.toThrow();
+    f.advance(60);
     const restarted = new BillingService(f.store, f.stripe, config, f.now);
     await restarted.checkout('alice', 'monthly');
     const requests = f.calls.filter(
@@ -89,6 +95,7 @@ describe('Stripe subscriptions', () => {
     );
     expect(requests).toHaveLength(2);
     expect(requests[0]!.key).toBe(requests[1]!.key);
+    expect(requests[0]!.body.toString()).toBe(requests[1]!.body.toString());
     expect(f.sessions.size).toBe(1);
   });
   it('expires the previous open checkout before changing plans', async () => {

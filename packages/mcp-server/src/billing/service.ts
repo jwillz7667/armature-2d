@@ -19,6 +19,8 @@ export interface BillingConfig {
   webhookSecret: string;
 }
 const terminal = new Set(['canceled', 'incomplete_expired']);
+// Keep this flow label stable so retries have identical Stripe request parameters.
+const integrationIdentifier = 'armature_hosted_subscription_zgwmtkcv';
 const idOf = (value: string | { id: string } | null) =>
   typeof value === 'string' ? value : value?.id;
 export class BillingService {
@@ -264,10 +266,10 @@ export class BillingService {
       const session = await this.stripe.checkout.sessions.create(
         {
           mode: 'subscription',
+          integration_identifier: integrationIdentifier,
           customer: account.customer!,
           client_reference_id: owner,
           line_items: [{ price: attempt.price, quantity: 1 }],
-          payment_method_types: ['card'],
           payment_method_collection: 'always',
           expires_at: attempt.started + 86400,
           success_url: `${this.config.origin}/billing?checkout=complete`,

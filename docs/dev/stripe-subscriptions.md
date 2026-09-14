@@ -16,6 +16,12 @@ Existing subscriptions must be managed through the portal; a second subscription
 cannot be created through this application. Changing monthly/yearly on an existing
 subscription is deliberately disabled until a proration policy is defined.
 
+Checkout uses Stripe's dynamic payment methods while requiring payment details before
+the trial starts. The stable `integration_identifier` labels this hosted subscription
+flow. Keep it unchanged when retrying an existing checkout: Stripe requires the same
+parameters with the same idempotency key. The test transport rejects mismatched
+idempotent requests, and the lost-response regression checks the full request body.
+
 Billing enforcement currently covers the **hosted MCP authoring service**. The
 desktop editor and local stdio distribution have no account activation or license
 verification integration. This change does not make those offline applications
@@ -84,6 +90,12 @@ the billing environment stops startup; it does not silently reopen free authorin
    CLI workflow, supply secrets through a private environment/secret manager, not
    chat, command arguments, repository files or printed command output. Use a
    sandbox first. Live provisioning also verifies merchant activation.
+   If `charges_enabled` or `details_submitted` is false, complete the merchant's
+   outstanding requirements in the Stripe Dashboard before retrying. Do not bypass
+   this check by provisioning through another tool. Account support details, payout
+   bank details and acceptance of Stripe's terms must come from the merchant.
+   On a shared merchant account, use Armature's dedicated product, portal and webhook;
+   review the impact before changing account-wide branding, recovery or tax settings.
 2. Build from repository root:
 
    ```sh

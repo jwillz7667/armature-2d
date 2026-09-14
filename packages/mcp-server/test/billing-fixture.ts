@@ -56,7 +56,10 @@ export function billingFixture(path = ':memory:') {
       subscription: string | null;
     }
   >();
-  const responses = new Map<string, unknown>();
+  const responses = new Map<
+    string,
+    { value: unknown; body: string; method: string; path: string }
+  >();
   let failSubscriptions = false,
     failCheckoutResponse = false;
   let monthlyAmount = 3000,
@@ -73,7 +76,22 @@ export function billingFixture(path = ':memory:') {
         status,
         headers: { 'Content-Type': 'application/json', 'Request-Id': 'req_fixture' },
       });
-    if (key && responses.has(key)) return json(responses.get(key));
+    const cached = key ? responses.get(key) : undefined;
+    if (cached) {
+      if (
+        cached.body !== body.toString() ||
+        cached.method !== method ||
+        cached.path !== url.pathname
+      )
+        return json(
+          { error: { type: 'idempotency_error', message: 'Idempotent request changed' } },
+          400,
+        );
+      return json(cached.value);
+    }
+    const remember = (value: unknown) => {
+      if (key) responses.set(key, { value, body: body.toString(), method, path: url.pathname });
+    };
     let value: unknown;
     if (url.pathname.startsWith('/v1/prices/')) {
       const yearly = url.pathname.endsWith('price_yearly');
@@ -136,7 +154,7 @@ export function billingFixture(path = ':memory:') {
         subscription: null,
       };
       sessions.set(id, value as NonNullable<ReturnType<typeof sessions.get>>);
-      if (key) responses.set(key, value);
+      remember(value);
       if (failCheckoutResponse) {
         failCheckoutResponse = false;
         throw new Error('Connection lost after Stripe accepted checkout');
@@ -155,7 +173,7 @@ export function billingFixture(path = ':memory:') {
         url: 'https://billing.stripe.com/p/session/fixture',
       };
     } else throw new Error(`Unexpected Stripe operation: ${method} ${url.pathname}`);
-    if (key) responses.set(key, value);
+    remember(value);
     return json(value);
   };
   const stripe = new Stripe('sk_test_fixture', {

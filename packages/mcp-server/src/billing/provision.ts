@@ -47,8 +47,9 @@ export async function provisionStripe(
     product = await stripe.products.create(
       {
         id: productId,
-        name: 'Armature',
-        description: 'Armature subscription with monthly or yearly billing.',
+        name: 'Armature 2D hosted authoring',
+        description:
+          'Account-linked access to Armature 2D hosted MCP authoring, billed monthly or yearly.',
         metadata: { application: 'armature', billing_version: '1' },
       },
       { idempotencyKey: 'armature-product-v1' },
