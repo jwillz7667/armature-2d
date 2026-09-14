@@ -5,6 +5,10 @@ restart-persistence checks. It is not an approved public store listing. It share
 208 existing tools and command/history behavior with stdio.
 The desktop application and its project format are unchanged.
 
+The optional [Stripe subscription integration](../stripe-subscriptions.md) adds a
+separate billing sign-in flow and hosted tool entitlement checks. Keep billing
+unconfigured until its account, sandbox verification and activation steps are complete.
+
 ## Run and deploy
 
 Build with `pnpm exec turbo run build --filter=@marionette/mcp-server...`, then run

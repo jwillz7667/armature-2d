@@ -9,8 +9,14 @@ for a custom image that copies it into the container. The checked-in file and JS
 contain no credentials; `ARMATURE_REALM_JSON` and `KC_BOOTSTRAP_ADMIN_*` already exist
 only in the service environment. Do not copy their values into this repository.
 
+For subscription accounts, also set `ARMATURE_BILLING_CLIENT_JSON` from
+`billing-client.json`. The updated script imports and verifies both public clients
+independently. The billing callback is exact and separate from the OpenAI callback.
+See [subscription deployment](../../docs/dev/stripe-subscriptions.md) for Stripe
+configuration, lifecycle verification and launch requirements.
+
 The script starts a bounded, background configuration task and then replaces PID 1
-with Keycloak. The task authenticates locally, imports only the public OpenAI client
+with Keycloak. The task authenticates locally, imports the configured public clients
 with `ifResourceExists=SKIP`, verifies the resulting settings, and removes its private
 temporary token/config files. It never replaces the realm or changes users. A failed
 configuration task logs failure while the existing auth service continues to run;

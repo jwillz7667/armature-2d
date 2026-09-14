@@ -852,6 +852,18 @@ export default tseslint.config(
     },
   },
 
+  // The Node billing HTTP adapter performs OIDC discovery and code exchange. Permit Node's
+  // fetch here only; the MCP tool core and every other browser-global restriction stay intact.
+  {
+    files: ['packages/mcp-server/src/billing/http.ts'],
+    rules: {
+      'no-restricted-globals': [
+        'error',
+        ...PURE_CORE_RESTRICTED_GLOBALS.filter(({ name }) => name !== 'fetch'),
+      ],
+    },
+  },
+
   // Tooling scripts and config files: allow Node built-ins and console.
   {
     files: ['tools/**/*.{mjs,cjs,js,ts}', '*.{mjs,cjs,js}', '**/*.config.{mjs,cjs,js,ts}'],

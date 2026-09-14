@@ -10,6 +10,8 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { buildMcpServer } from './server';
 import { createNodeFileStore } from './node-files';
 import { SessionRegistry } from './session';
+import type { BillingHttp } from './billing/http';
+import { billingHtml, billingCss, billingJs } from './billing/web';
 
 export interface HttpOptions {
   readonly dataRoot: string;
@@ -20,6 +22,7 @@ export interface HttpOptions {
   readonly maxSessions?: number;
   readonly idleMs?: number;
   readonly openaiChallengeToken?: string;
+  readonly createBilling?: (dataRoot: string) => Promise<BillingHttp>;
 }
 
 function httpsUrl(value: string): URL {
@@ -55,6 +58,18 @@ export async function createHttpServer(options: HttpOptions) {
   const dataRoot = await realpath(options.dataRoot);
   // Fail startup before advertising a healthy server if a mounted volume is unusable.
   await access(dataRoot, constants.W_OK | constants.X_OK);
+  if (!options.createBilling) {
+    try {
+      await lstat(join(dataRoot, '.armature-billing.sqlite'));
+      throw new Error(
+        'Billing is initialized on this volume. Configure billing before serving requests.',
+      );
+    } catch (error) {
+      if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 'ENOENT')
+        throw error;
+    }
+  }
+  const billing = await options.createBilling?.(dataRoot);
   const metadataUrl = `${resource.origin}/.well-known/oauth-protected-resource/mcp`;
   const metadata = {
     resource: resource.href,
@@ -115,6 +130,35 @@ export async function createHttpServer(options: HttpOptions) {
     ) {
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       res.end(challenge);
+      return;
+    }
+    if (req.url?.startsWith('/billing')) {
+      const path = new URL(req.url, resource.origin).pathname;
+      res.setHeader('Referrer-Policy', 'no-referrer');
+      res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+      );
+      if (
+        req.method === 'GET' &&
+        ['/billing', '/billing/style.css', '/billing/app.js'].includes(path)
+      ) {
+        res.setHeader(
+          'Content-Type',
+          path === '/billing'
+            ? 'text/html; charset=utf-8'
+            : path.endsWith('.css')
+              ? 'text/css; charset=utf-8'
+              : 'text/javascript; charset=utf-8',
+        );
+        res.end(path === '/billing' ? billingHtml : path.endsWith('.css') ? billingCss : billingJs);
+        return;
+      }
+      if (billing) await billing.handle(req, res);
+      else if (req.method === 'GET' && path === '/billing/account') {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ enabled: false, signedIn: false }));
+      } else send(res, 503, 'Billing is not configured');
       return;
     }
     if (
@@ -197,6 +241,28 @@ export async function createHttpServer(options: HttpOptions) {
       if (Array.isArray(body)) {
         send(res, 400, 'Batch requests are not supported');
         return;
+      }
+      if (
+        billing &&
+        body &&
+        typeof body === 'object' &&
+        'method' in body &&
+        body.method === 'tools/call' &&
+        'params' in body &&
+        body.params &&
+        typeof body.params === 'object' &&
+        'name' in body.params &&
+        typeof body.params.name === 'string'
+      ) {
+        try {
+          if (!(await billing.authorizeTool(owner, body.params.name))) {
+            send(res, 402, `Subscription required. Manage billing at ${resource.origin}/billing`);
+            return;
+          }
+        } catch {
+          send(res, 503, 'Subscription verification is temporarily unavailable; retry shortly');
+          return;
+        }
       }
     }
     const id = req.headers['mcp-session-id'];
@@ -294,6 +360,7 @@ export async function createHttpServer(options: HttpOptions) {
       clearInterval(timer);
       await Promise.all([...sessions.entries()].map(([id, entry]) => dispose(id, entry)));
       server.closeAllConnections();
+      await billing?.close();
       if (server.listening)
         await new Promise<void>((resolve, reject) =>
           server.close((error) => (error ? reject(error) : resolve())),

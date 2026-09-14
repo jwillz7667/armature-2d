@@ -6,7 +6,11 @@ import { build } from 'esbuild';
 // the MCP SDK, and zod, leaving only node: builtins external. The result is a portable cross-platform
 // executable (macOS + Windows) that an AI host can launch directly.
 await build({
-  entryPoints: { cli: 'src/bin.ts', http: 'src/http-bin.ts' },
+  entryPoints: {
+    cli: 'src/bin.ts',
+    http: 'src/http-bin.ts',
+    'billing-setup': 'src/billing/setup-bin.ts',
+  },
   outdir: 'dist',
   bundle: true,
   platform: 'node',
