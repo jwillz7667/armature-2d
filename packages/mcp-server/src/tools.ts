@@ -273,6 +273,8 @@ import {
 import { PNG } from 'pngjs';
 import { z } from 'zod';
 import { McpToolError } from './errors';
+import { toolOutputSchemas } from './output-schemas';
+import { exportSessionProject, projectFiles } from './project-files';
 import { sampleQueryPose, sampleQueryMesh } from './solved-query';
 import type { FileStore } from './files';
 import type { Session, SessionRegistry } from './session';
@@ -287,6 +289,7 @@ export interface ToolDefinition {
   readonly title: string;
   readonly description: string;
   readonly inputSchema: z.AnyZodObject;
+  readonly outputSchema: z.AnyZodObject;
   readonly annotations: {
     readonly readOnlyHint: boolean;
     readonly destructiveHint: boolean;
@@ -308,11 +311,14 @@ function defineTool<S extends z.AnyZodObject>(
   },
   handler: (deps: ToolDeps, input: z.infer<S>) => Promise<unknown> | unknown,
 ): ToolDefinition {
+  const outputSchema = toolOutputSchemas[spec.name];
+  if (!outputSchema) throw new Error(`Missing output schema for ${spec.name}`);
   return {
     name: spec.name,
     title: spec.title,
     description: spec.description,
     inputSchema: spec.input,
+    outputSchema,
     annotations: {
       readOnlyHint: spec.access === 'read',
       destructiveHint: spec.access === 'write',
@@ -330,7 +336,10 @@ function defineTool<S extends z.AnyZodObject>(
             .join('; '),
         );
       }
-      return handler(deps, parsed.data);
+      const result: unknown = JSON.parse(JSON.stringify(await handler(deps, parsed.data)));
+      if (!outputSchema.safeParse(result).success)
+        throw new McpToolError('INVALID_OUTPUT', 'Tool returned an invalid result');
+      return result;
     },
   };
 }
@@ -743,7 +752,7 @@ function exportOrThrow(model: DocumentReadModel): SkeletonDocument {
   }
 }
 
-function boneView(bone: BoneEntity): Record<string, unknown> {
+function boneView(bone: BoneEntity) {
   return {
     id: bone.id,
     name: bone.name,
@@ -760,7 +769,7 @@ function boneView(bone: BoneEntity): Record<string, unknown> {
   };
 }
 
-function slotView(slot: SlotEntity): Record<string, unknown> {
+function slotView(slot: SlotEntity) {
   return {
     id: slot.id,
     name: slot.name,
@@ -772,14 +781,14 @@ function slotView(slot: SlotEntity): Record<string, unknown> {
   };
 }
 
-function keyframeView(kf: KeyframeEntity): Record<string, unknown> {
+function keyframeView(kf: KeyframeEntity) {
   return { id: kf.id, time: kf.time, value: kf.value, curve: kf.curve };
 }
 
 // Project an IK constraint for `ik.list` / `ik.get` (bones/target are internal BoneId references). The Stage
 // F2 depth fields (ADR-0009) are projected so a client can read what ik.setDepth wrote; `order` is emitted
 // only when the constraint carries an explicit solve order.
-function ikConstraintView(c: IkConstraintEntity): Record<string, unknown> {
+function ikConstraintView(c: IkConstraintEntity) {
   return {
     id: c.id,
     name: c.name,
@@ -797,7 +806,7 @@ function ikConstraintView(c: IkConstraintEntity): Record<string, unknown> {
 
 // Project a transform constraint for `transform.list` / `transform.get` (all six mix and six offset
 // channels; bones/target are internal BoneId references).
-function transformConstraintView(c: TransformConstraintEntity): Record<string, unknown> {
+function transformConstraintView(c: TransformConstraintEntity) {
   return {
     id: c.id,
     name: c.name,
@@ -826,7 +835,7 @@ function transformConstraintView(c: TransformConstraintEntity): Record<string, u
 // Project a path constraint for `path.listConstraints` / `path.getConstraint` (Stage F3, PP-D11). `target`
 // is the SLOT id whose active attachment is the path; `bones` are the constrained bone ids. `order` is
 // emitted only when the constraint carries an explicit cross-array solve order.
-function pathConstraintView(c: PathConstraintEntity): Record<string, unknown> {
+function pathConstraintView(c: PathConstraintEntity) {
   return {
     id: c.id,
     name: c.name,
@@ -846,7 +855,7 @@ function pathConstraintView(c: PathConstraintEntity): Record<string, unknown> {
 }
 
 // Project a physics constraint for `physics.listConstraints` / `physics.getConstraint` (Stage F4, PP-D12).
-function physicsConstraintView(c: PhysicsConstraintEntity): Record<string, unknown> {
+function physicsConstraintView(c: PhysicsConstraintEntity) {
   return {
     id: c.id,
     name: c.name,
@@ -866,7 +875,7 @@ function physicsConstraintView(c: PhysicsConstraintEntity): Record<string, unkno
 
 // Project a named skin for `skin.list` / `skin.get`: its attachments as a flat list of (slotId, name, kind)
 // addresses (the geometry detail lives on the slot's default-skin attachment query, mirroring slot.get).
-function skinView(skin: SkinEntity): Record<string, unknown> {
+function skinView(skin: SkinEntity) {
   const attachments: Array<{ slotId: string; name: string; kind: string }> = [];
   for (const [slotIdKey, byName] of skin.attachments) {
     for (const att of byName.values()) {
@@ -885,7 +894,7 @@ function skinView(skin: SkinEntity): Record<string, unknown> {
 
 // Project a document-level event definition for `event.list` / `event.get` (its payload defaults and the
 // optional audio hint; identity is the id, `name` is the mutable on-disk label the timeline references).
-function eventDefView(def: EventDefEntity): Record<string, unknown> {
+function eventDefView(def: EventDefEntity) {
   return {
     id: def.id,
     name: def.name,
@@ -898,7 +907,7 @@ function eventDefView(def: EventDefEntity): Record<string, unknown> {
 
 // A summary of an animation (ids, name, duration, and per-bone/slot track + event/draw-order key counts);
 // the keyframe detail lives in animationView for `anim.get`.
-function animationSummary(animation: AnimationEntity): Record<string, unknown> {
+function animationSummary(animation: AnimationEntity) {
   return {
     id: animation.id,
     name: animation.name,
@@ -911,7 +920,7 @@ function animationSummary(animation: AnimationEntity): Record<string, unknown> {
 }
 
 // The full animation projection (every track and keyframe) for `anim.get`, keyed by branded bone/slot id.
-function animationView(animation: AnimationEntity): Record<string, unknown> {
+function animationView(animation: AnimationEntity) {
   return {
     id: animation.id,
     name: animation.name,
@@ -1600,7 +1609,7 @@ const bundleItemInitSchema = z
   .strict();
 
 // Project an effect entity to a list summary (the layer detail lives in `effect.get`).
-function effectSummary(effect: EffectEntity): Record<string, unknown> {
+function effectSummary(effect: EffectEntity) {
   return {
     id: effect.id,
     name: effect.name,
@@ -1612,7 +1621,7 @@ function effectSummary(effect: EffectEntity): Record<string, unknown> {
   };
 }
 
-function bundleSummary(bundle: BundleEntity): Record<string, unknown> {
+function bundleSummary(bundle: BundleEntity) {
   return { name: bundle.name, itemCount: bundle.itemOrder.length };
 }
 
@@ -3508,7 +3517,8 @@ export const TOOLS: readonly ToolDefinition[] = [
       name: 'document.getSnapshot',
       access: 'read',
       title: 'Get document snapshot',
-      description: 'Return the internal snapshot (bones, order) of an open document.',
+      description:
+        'Return the full skeleton snapshot, including bones, slots, skins, animations and constraints, of an open document.',
       input: z.object({ documentId }).strict(),
     },
     (deps, input) => ({ snapshot: deps.sessions.get(input.documentId).document.model.snapshot() }),
@@ -6913,7 +6923,10 @@ export const TOOLS: readonly ToolDefinition[] = [
       const session = deps.sessions.get(input.documentId);
       const document = exportOrThrow(session.document.model);
 
-      const pages = await loadAtlasPages(deps.files, document.atlas);
+      const pages = await loadAtlasPages(
+        projectFiles(session, deps.files, 'skeleton'),
+        document.atlas,
+      );
       const placeholders = document.atlas.pages.length === 0;
 
       let result: RenderFrameResult;
@@ -6936,7 +6949,10 @@ export const TOOLS: readonly ToolDefinition[] = [
         // export and page reads run BEFORE the render try so their typed McpToolErrors surface directly.
         const spec = input.effect;
         const effectsDocument = exportEffectsOrThrow(session.document.effects);
-        const effectPages = await loadAtlasPages(deps.files, effectsDocument.atlas);
+        const effectPages = await loadAtlasPages(
+          projectFiles(session, deps.files, 'effects'),
+          effectsDocument.atlas,
+        );
 
         const anchors: Record<string, EffectAnchorInput> = {};
         if (spec.anchors !== undefined) {
@@ -7575,6 +7591,165 @@ export const TOOLS: readonly ToolDefinition[] = [
         throw error;
       }
       return { revision: session.document.model.revision };
+    },
+  ),
+
+  defineTool(
+    {
+      name: 'project.export',
+      title: 'Export complete project',
+      description:
+        'Export a validated Armature project containing the skeleton, effects, slot scene and referenced textures; fails if a required texture is unavailable.',
+      input: z.object({ documentId }).strict(),
+      access: 'read',
+    },
+    async (deps, input) => ({
+      project: await exportSessionProject(deps.sessions.get(input.documentId), deps.files),
+    }),
+  ),
+  defineTool(
+    {
+      name: 'project.save',
+      title: 'Save complete project',
+      description:
+        'Save a validated Armature project with skeleton, effects, slot scene and embedded textures in the private workspace; overwrites the destination file.',
+      input: z.object({ documentId, path: z.string().min(1).max(512) }).strict(),
+      access: 'write',
+    },
+    async (deps, input) => {
+      const project = await exportSessionProject(deps.sessions.get(input.documentId), deps.files);
+      await deps.files.write(input.path, JSON.stringify(project));
+      return { path: input.path, hash: project.hash };
+    },
+  ),
+  defineTool(
+    {
+      name: 'project.open',
+      title: 'Open complete project',
+      description:
+        'Open an Armature project from the private workspace after validating its structure and content hashes, restoring skeleton, effects, slot scene and embedded textures into a new session.',
+      input: z.object({ path: z.string().min(1).max(512) }).strict(),
+      access: 'append',
+    },
+    async (deps, input) => {
+      const raw = await deps.files.read(input.path);
+      let json: unknown;
+      try {
+        json = JSON.parse(raw);
+      } catch {
+        throw new McpToolError('INVALID_JSON', 'Project is not valid JSON');
+      }
+      try {
+        const session = deps.sessions.openProject(json);
+        return { documentId: session.id, name: session.document.model.name };
+      } catch (error) {
+        if (error instanceof McpToolError) throw error;
+        throw new McpToolError(
+          'INVALID_PROJECT',
+          'Project structure, hashes or embedded assets are invalid',
+        );
+      }
+    },
+  ),
+  defineTool(
+    {
+      name: 'workspace.list',
+      title: 'List project files',
+      description: 'List file names in a private project directory without reading file contents.',
+      input: z.object({ directory: z.string().max(512).default('.') }),
+      access: 'read',
+    },
+    async (deps, input) => ({ files: await deps.files.listDir(input.directory) }),
+  ),
+  defineTool(
+    {
+      name: 'workspace.upload',
+      title: 'Upload project asset',
+      description:
+        'Upload a JSON or PNG asset as base64 into the private project root (maximum 512 KiB); overwrites the selected file and cannot be undone with document history.',
+      input: z.object({
+        filename: z
+          .string()
+          .max(128)
+          .regex(/^[A-Za-z0-9][A-Za-z0-9._-]*\.(json|png)$/),
+        base64: z
+          .string()
+          .min(4)
+          .max(699052)
+          .regex(/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/),
+      }),
+      access: 'write',
+    },
+    async (deps, input) => {
+      const bytes = Buffer.from(input.base64, 'base64');
+      if (bytes.length > 512 * 1024 || bytes.toString('base64') !== input.base64)
+        throw new McpToolError(
+          'INVALID_INPUT',
+          'Upload must be canonical base64 of at most 512 KiB',
+        );
+      if (input.filename.endsWith('.json')) {
+        try {
+          JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+        } catch {
+          throw new McpToolError('INVALID_INPUT', 'Upload must contain valid UTF-8 JSON');
+        }
+      } else {
+        if (
+          bytes.length < 33 ||
+          bytes.subarray(0, 8).toString('hex') !== '89504e470d0a1a0a' ||
+          bytes.readUInt32BE(8) !== 13 ||
+          bytes.subarray(12, 16).toString('ascii') !== 'IHDR' ||
+          bytes.readUInt32BE(16) < 1 ||
+          bytes.readUInt32BE(20) < 1 ||
+          bytes.readUInt32BE(16) > 2048 ||
+          bytes.readUInt32BE(20) > 2048
+        )
+          throw new McpToolError(
+            'INVALID_INPUT',
+            'Upload must be a PNG of at most 2048 by 2048 pixels',
+          );
+        try {
+          PNG.sync.read(bytes, { checkCRC: true });
+        } catch {
+          throw new McpToolError('INVALID_INPUT', 'Upload contains an invalid PNG');
+        }
+      }
+      await deps.files.writeBinary(input.filename, bytes);
+      return { filename: input.filename, bytes: bytes.length };
+    },
+  ),
+  defineTool(
+    {
+      name: 'workspace.download',
+      title: 'Download project file',
+      description:
+        'Read a private project file as base64 for download; hosted files are limited to 8 MiB.',
+      input: z.object({ path: z.string().min(1).max(512) }),
+      access: 'read',
+    },
+    async (deps, input) => {
+      const bytes = await deps.files.readBinary(input.path);
+      return {
+        path: input.path,
+        base64: Buffer.from(bytes).toString('base64'),
+        bytes: bytes.length,
+      };
+    },
+  ),
+  defineTool(
+    {
+      name: 'workspace.deleteFile',
+      title: 'Delete project file',
+      description:
+        'Permanently delete one private project file; requires confirmDelete=true and cannot be undone with document history.',
+      input: z.object({ path: z.string().min(1).max(512), confirmDelete: z.literal(true) }),
+      access: 'write',
+    },
+    async (deps, input) => {
+      if (!deps.files.remove)
+        throw new McpToolError('UNSUPPORTED', 'Host does not support file deletion');
+      await deps.files.remove(input.path);
+      return { deleted: true, path: input.path };
     },
   ),
 

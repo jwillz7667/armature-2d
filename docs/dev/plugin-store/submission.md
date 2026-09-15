@@ -2,12 +2,21 @@
 
 Status: saved OpenAI Platform draft, not submitted or published.
 
+The repository-root `chatgpt-app-submission.json` is now generated and validated
+against the current official schema, covering all 215 tools and eight review cases.
+See [the submission review](submission-review-2026-09-15.md) for source provenance,
+verification scope and outstanding launch requirements. Portal import is not yet
+verified.
+
 Draft app ID: `asdk_app_6aa6cb80da2c8191a768d23d0411bc39`.
 Draft version: `0.1.0`. The portal rejected the prerelease version string.
 The listing, prompts, skill upload and review scenarios were entered. The skill
 scan passed. The hosted MCP URL and predefined OAuth client settings have been
 entered; interactive sign-in and the tool scan are not yet verified. Public policy
-URLs remain unset. Starting the tool scan generated the domain challenge and
+URLs were unset in the portal when last checked. The privacy policy was published
+with Armature 2D coverage on 2026-09-15 at
+`https://www.viral-ventures-llc.com/privacy#armature-2d`; entering it in the portal
+remains unverified. Starting the tool scan generated the domain challenge and
 opened an Authorize MCP dialog. The exact issued proof is configured in Railway;
 the server implements the well-known proof route. The portal confirmed **Domain
 verified** on 2026-09-14. After continuing from Authorize MCP, browser tab discovery
@@ -21,9 +30,11 @@ Name: Armature 2D
 Draft publisher: JUSTIN THOMAS WILLIAMS (verified individual selected in the portal; business identity has not been verified)
 Category: Productivity
 Short description: Rig, animate and render 2D skeletons with Armature.
-Long description: Create and edit skeletal rigs through Armature's command and undo system. Author bones, slots, attachments, animation and constraints; inspect the document, render PNG previews, and validate and save skeleton JSON. The current engine operates in independent headless sessions. It does not control a running editor window or persist a complete effects/slot editor project.
+Long description: Create and edit skeletal rigs through Armature's command and undo system. Author bones, slots, attachments, animation and constraints; inspect the document, render PNG previews, and validate and save skeleton JSON. The current engine operates in independent headless sessions. It does not control a running editor window. Complete project tools preserve effects, slot scenes and embedded textures; the legacy skeleton save remains available separately.
 Logo: plugins/armature/assets/icon.png
 Source: https://github.com/jwillz7667/armature-2d
+Privacy policy: https://www.viral-ventures-llc.com/privacy#armature-2d
+Privacy contact: privacy@viral-ventures-llc.com
 
 Starter prompts:
 - Create a two-bone puppet, render a preview, and save the skeleton.
@@ -51,7 +62,7 @@ they are not a claim that the hosted plugin has been tested.
 ## Blocking requirements
 
 1. Remote MCP is deployed at `https://armature-mcp-production.up.railway.app/mcp`.
-   Authenticated machine-client workflows and restart persistence passed. All 208
+   Authenticated machine-client workflows and restart persistence passed. All 215
    tool annotations are implemented and tested. Complete user OAuth and the portal
    tool scan, two-account live isolation, and public-service resource/storage controls.
    The local portable bundle remains available independently of public store approval.
@@ -59,8 +70,13 @@ they are not a claim that the hosted plugin has been tested.
    The verified individual identity was selected and confirmed saved. Confirm the
    final listing and policy publisher match before submitting; do not claim the
    business identity has been verified.
-3. Public product website, support, privacy and terms URLs must match the publisher.
-   Do not invent these URLs or claim a draft policy is approved. Domain verification
+3. The Viral Ventures LLC privacy policy now explicitly covers Armature 2D,
+   hosted project storage, AI-client exchanges, Railway hosting, Stripe billing,
+   session cookies, retention, and verified deletion requests. Its production page
+   returned HTTP 200 with the new section on 2026-09-15. Use the privacy URL above.
+   Public product website, support and terms URLs still need review, and the
+   listing's publisher identity must be reconciled with Viral Ventures LLC.
+   Do not claim a draft policy is approved. Domain verification
    requires the exact challenge issued by the portal.
 4. Supply working reviewer credentials if authentication is used and test the actual
    remote workflows. The local cross-platform tests do not substitute for these checks.

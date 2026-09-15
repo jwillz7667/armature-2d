@@ -68,6 +68,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
+      - name: Verify MCP output contracts and generated catalog
+        run: pnpm --filter @marionette/mcp-server reference:check
       - name: Verify built worker startup and media exports
         run: |
           node tools/smoke-video-worker.mjs

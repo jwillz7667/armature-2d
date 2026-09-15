@@ -279,6 +279,9 @@ importers:
       pngjs:
         specifier: ^7.0.0
         version: 7.0.0
+      stripe:
+        specifier: 22.6.2
+        version: 22.6.2(@types/node@22.20.0)
       zod:
         specifier: 3.25.76
         version: 3.25.76
@@ -3060,6 +3063,15 @@ packages:
   strip-ansi@6.0.1:
     resolution: {integrity: sha512-Y38VPSHcqkFrCpFnQ9vuSXmquuv5oXOKpGeT6aGrr3o3Gc9AlVa6JBfUSOCnbxGGZF+/0ooI7KrPuUSztUdU5A==}
     engines: {node: '>=8'}
+
+  stripe@22.6.2:
+    resolution: {integrity: sha512-PwRE2scocvXqDKPiskMa5vRJEAEkq46W69XyUYmAwrNSLr675lQnfqLwnsndAWizwgihOWw/irLmoFRo3ez7ew==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      '@types/node': '>=18'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
 
   sumchecker@3.0.1:
     resolution: {integrity: sha512-MvjXzkz/BOfyVDkG0oFOtBxHX2u3gKbMHIF/dXblZsgD3BWOFLmHovIpZY7BykJdAjcqRCBi1WYBNdEC9yI7vg==}
@@ -6235,6 +6247,10 @@ snapshots:
   strip-ansi@6.0.1:
     dependencies:
       ansi-regex: 5.0.1
+
+  stripe@22.6.2(@types/node@22.20.0):
+    optionalDependencies:
+      '@types/node': 22.20.0
 
   sumchecker@3.0.1(supports-color@7.2.0):
     dependencies:

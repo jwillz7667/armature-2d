@@ -26,12 +26,16 @@ export function buildMcpServer(
         title: tool.title,
         description: tool.description,
         inputSchema: tool.inputSchema.shape,
+        outputSchema: tool.outputSchema,
         annotations: tool.annotations,
       },
       async (args: unknown) => {
         try {
           const result = await tool.handler(deps, args);
-          return { content: [{ type: 'text' as const, text: JSON.stringify(result) }] };
+          return {
+            content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+            structuredContent: result as Record<string, unknown>,
+          };
         } catch (error) {
           const body =
             error instanceof McpToolError

@@ -1,0 +1,2660 @@
+{
+  "$schema": "https://developers.openai.com/plugins/schemas/chatgpt-app-submission.v1.json",
+  "schema_version": 1,
+  "app_info": {
+    "display_name": "Armature 2D",
+    "subtitle": "Rig, animate and render 2D",
+    "description": "Armature 2D helps you create and edit skeletal rigs through ChatGPT. Build bones, slots and attachments; author animation keyframes and constraints; inspect solved poses and meshes; and render PNG previews. Create effects and slot scenes, then save and reopen complete Armature projects with embedded textures. Upload bounded JSON and PNG assets, list and download private project files, or explicitly delete files you no longer need. Document editing uses the application command system with undo and redo; file overwrites and deletions are separate from document history. Legacy skeleton export remains available for runtime use. The app operates in independent headless sessions and does not control a running desktop editor. Spine JSON imports may be lossy and include a report; real Spine binary imports are not supported. Rendering without usable textures can return a placeholder preview.",
+    "category": "PRODUCTIVITY"
+  },
+  "tools": {
+    "anim.create": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The create animation operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The create animation operation does not delete or overwrite existing project data."
+      }
+    },
+    "anim.delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete animation operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete animation operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "anim.duplicate": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The duplicate animation operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The duplicate animation operation does not delete or overwrite existing project data."
+      }
+    },
+    "anim.duration": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set animation duration operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set animation duration operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "anim.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get animation operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get animation operation does not delete or overwrite existing project data."
+      }
+    },
+    "anim.list": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The list animations operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The list animations operation does not delete or overwrite existing project data."
+      }
+    },
+    "anim.rename": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The rename animation operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The rename animation operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "anim.sequence.delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete sequence keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete sequence keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "anim.sequence.move": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The move sequence keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The move sequence keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "anim.sequence.set": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set sequence keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set sequence keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "atlas.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get atlas operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get atlas operation does not delete or overwrite existing project data."
+      }
+    },
+    "atlas.pack": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Reads project images, writes atlas pages and a manifest, and replaces the session atlas.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "Can overwrite generated atlas files and the session atlas, and undoing the atlas edit does not undo file writes."
+      }
+    },
+    "atlas.set": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set atlas operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set atlas operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "attach.linkedmesh.create": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The create linked mesh operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The create linked mesh operation does not delete or overwrite existing project data."
+      }
+    },
+    "attach.linkedmesh.unlink": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The unlink mesh operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The unlink mesh operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "attach.path.add": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The add path attachment operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The add path attachment operation does not delete or overwrite existing project data."
+      }
+    },
+    "attach.region.add": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The add region attachment operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The add region attachment operation does not delete or overwrite existing project data."
+      }
+    },
+    "attach.region.transform": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set region attachment transform operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set region attachment transform operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "attach.remove": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The remove attachment operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The remove attachment operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "attach.sequence.set": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set attachment sequence operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set attachment sequence operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "bone.create": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The create bone operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The create bone operation does not delete or overwrite existing project data."
+      }
+    },
+    "bone.delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete bone operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete bone operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "bone.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get bone operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get bone operation does not delete or overwrite existing project data."
+      }
+    },
+    "bone.list": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The list bones operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The list bones operation does not delete or overwrite existing project data."
+      }
+    },
+    "bone.move": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The move bone operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The move bone operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "bone.rename": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The rename bone operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The rename bone operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "bone.reparent": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The reparent bone operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The reparent bone operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "bone.rotate": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The rotate bone operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The rotate bone operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "bone.scale": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The scale bone operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The scale bone operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "bone.setLength": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set bone length operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set bone length operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "bone.shear": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The shear bone operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The shear bone operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "bone.transformMode": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set bone transform mode operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set bone transform mode operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "bundle.create": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The create bundle operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The create bundle operation does not delete or overwrite existing project data."
+      }
+    },
+    "bundle.delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete bundle operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete bundle operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "bundle.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get bundle operation only retrieves or computes private effect and bundle data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get bundle operation does not delete or overwrite existing project data."
+      }
+    },
+    "bundle.item.add": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The add bundle item operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The add bundle item operation does not delete or overwrite existing project data."
+      }
+    },
+    "bundle.item.remove": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The remove bundle item operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The remove bundle item operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "bundle.item.reorder": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The reorder bundle items operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The reorder bundle items operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "bundle.item.set": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set bundle item operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set bundle item operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "bundle.list": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The list bundles operation only retrieves or computes private effect and bundle data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The list bundles operation does not delete or overwrite existing project data."
+      }
+    },
+    "constraints.reorder": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The reorder constraints operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The reorder constraints operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "deform.clearAttachment": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The clear attachment deform operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The clear attachment deform operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "deform.deleteKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete deform keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete deform keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "deform.moveKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The move deform keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The move deform keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "deform.setCurve": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set deform keyframe curve operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set deform keyframe curve operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "deform.setKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set deform keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set deform keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "document.close": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The close document operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "Closes the selected session and discards its unsaved changes."
+      }
+    },
+    "document.export": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The export document operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The export document operation does not delete or overwrite existing project data."
+      }
+    },
+    "document.getSnapshot": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get document snapshot operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get document snapshot operation does not delete or overwrite existing project data."
+      }
+    },
+    "document.getWorldTransforms": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get solved world transforms operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get solved world transforms operation does not delete or overwrite existing project data."
+      }
+    },
+    "document.new": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The new document operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The new document operation does not delete or overwrite existing project data."
+      }
+    },
+    "document.open": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The open document operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The open document operation does not delete or overwrite existing project data."
+      }
+    },
+    "document.save": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Serializes the skeleton and writes it into the user's private project workspace.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "Can overwrite a skeleton file at the selected destination, with writes confined to the configured private project root."
+      }
+    },
+    "document.setMetadata": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set document metadata operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set document metadata operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "document.validate": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The validate document operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The validate document operation does not delete or overwrite existing project data."
+      }
+    },
+    "draworder.key.delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete draw-order key operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete draw-order key operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "draworder.key.move": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The move draw-order key operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The move draw-order key operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "draworder.key.set": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set draw-order key operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set draw-order key operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "effect.create": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The create effect operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The create effect operation does not delete or overwrite existing project data."
+      }
+    },
+    "effect.delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete effect operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete effect operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "effect.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get effect operation only retrieves or computes private effect and bundle data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get effect operation does not delete or overwrite existing project data."
+      }
+    },
+    "effect.getAtlas": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get effects atlas operation only retrieves or computes private effect and bundle data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get effects atlas operation does not delete or overwrite existing project data."
+      }
+    },
+    "effect.getSnapshot": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get effects snapshot operation only retrieves or computes private effect and bundle data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get effects snapshot operation does not delete or overwrite existing project data."
+      }
+    },
+    "effect.layer.add": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The add effect layer operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The add effect layer operation does not delete or overwrite existing project data."
+      }
+    },
+    "effect.layer.remove": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The remove effect layer operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The remove effect layer operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "effect.layer.reorder": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The reorder effect layers operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The reorder effect layers operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "effect.layer.setBlendMode": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set effect layer blend mode operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set effect layer blend mode operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "effect.layer.setField": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set effect layer field operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set effect layer field operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "effect.layer.setTrail": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set emitter particle trail operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set emitter particle trail operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "effect.lifeStop.add": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The add life-curve stop operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The add life-curve stop operation does not delete or overwrite existing project data."
+      }
+    },
+    "effect.lifeStop.move": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The move life-curve stop operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The move life-curve stop operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "effect.lifeStop.remove": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The remove life-curve stop operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The remove life-curve stop operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "effect.lifeStop.setCurve": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set life-curve stop easing operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set life-curve stop easing operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "effect.lifeStop.setValue": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set life-curve stop value operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set life-curve stop value operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "effect.list": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The list effects operation only retrieves or computes private effect and bundle data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The list effects operation does not delete or overwrite existing project data."
+      }
+    },
+    "effect.rename": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The rename effect operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The rename effect operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "effect.setAtlas": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set effects atlas operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set effects atlas operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "effect.setMeta": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set effect meta operation changes private effect and bundle session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set effect meta operation can remove or overwrite existing effect and bundle data even when the change can be undone."
+      }
+    },
+    "event.define": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The define event operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The define event operation does not delete or overwrite existing project data."
+      }
+    },
+    "event.delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete event operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete event operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "event.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get event operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get event operation does not delete or overwrite existing project data."
+      }
+    },
+    "event.key.delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete event key operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete event key operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "event.key.move": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The move event key operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The move event key operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "event.key.set": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set event key operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set event key operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "event.list": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The list events operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The list events operation does not delete or overwrite existing project data."
+      }
+    },
+    "event.rename": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The rename event operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The rename event operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "event.setAudio": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set event audio operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set event audio operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "event.setDefaults": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set event defaults operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set event defaults operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "history.beginInteraction": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Changes undo-history interaction grouping in the private document session.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "Changes history grouping without deleting or overwriting project content."
+      }
+    },
+    "history.endInteraction": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Changes undo-history interaction grouping in the private document session.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "Changes history grouping without deleting or overwriting project content."
+      }
+    },
+    "history.getState": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get history state operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get history state operation does not delete or overwrite existing project data."
+      }
+    },
+    "history.redo": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The redo operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "Reapplies a reverted edit and can remove or overwrite the current document state."
+      }
+    },
+    "history.undo": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The undo operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "Reverts the most recent undoable edit and can remove or overwrite the current document state."
+      }
+    },
+    "ik.createConstraint": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The create ik constraint operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The create ik constraint operation does not delete or overwrite existing project data."
+      }
+    },
+    "ik.deleteConstraint": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete ik constraint operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete ik constraint operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "ik.deleteKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete ik keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete ik keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "ik.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get ik constraint operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get ik constraint operation does not delete or overwrite existing project data."
+      }
+    },
+    "ik.list": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The list ik constraints operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The list ik constraints operation does not delete or overwrite existing project data."
+      }
+    },
+    "ik.moveKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The move ik keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The move ik keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "ik.setBendPositive": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set ik bend direction operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set ik bend direction operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "ik.setDepth": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set ik depth operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set ik depth operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "ik.setKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set ik keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set ik keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "ik.setMix": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set ik mix operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set ik mix operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "import.spineProject": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The import spine project operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The import spine project operation does not delete or overwrite existing project data."
+      }
+    },
+    "kf.attachment.delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete attachment keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete attachment keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "kf.attachment.move": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The move attachment keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The move attachment keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "kf.attachment.set": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set attachment keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set attachment keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "kf.curve": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set keyframe curve operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set keyframe curve operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "kf.delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "kf.move": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The move keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The move keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "kf.paste": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The paste keyframes operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The paste keyframes operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "kf.set": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "mesh.addBoneBinding": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The add bone to mesh binding operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The add bone to mesh binding operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "mesh.addVertex": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The add mesh vertex operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The add mesh vertex operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "mesh.autoGridFill": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The auto grid-fill mesh operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The auto grid-fill mesh operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "mesh.autoPerimeterTrace": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The auto perimeter-trace mesh operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The auto perimeter-trace mesh operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "mesh.autoWeight": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The auto-weight mesh from proximity operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The auto-weight mesh from proximity operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "mesh.bindToBones": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The bind mesh to bones operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The bind mesh to bones operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "mesh.deleteVertex": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete mesh vertex operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete mesh vertex operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "mesh.generateFromRegion": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The generate mesh from region operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The generate mesh from region operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "mesh.moveVertex": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The move mesh vertex operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The move mesh vertex operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "mesh.normalizeWeights": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The normalize mesh weights operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The normalize mesh weights operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "mesh.paintWeight": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The paint mesh weights operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The paint mesh weights operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "mesh.removeBoneBinding": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The remove bone from mesh binding operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The remove bone from mesh binding operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "mesh.sample": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The sample solved mesh vertices operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The sample solved mesh vertices operation does not delete or overwrite existing project data."
+      }
+    },
+    "mesh.setEdges": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set mesh edges operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set mesh edges operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "mesh.unbind": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The unbind mesh operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The unbind mesh operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "path.addCurve": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The add path curve operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The add path curve operation does not delete or overwrite existing project data."
+      }
+    },
+    "path.createConstraint": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The create path constraint operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The create path constraint operation does not delete or overwrite existing project data."
+      }
+    },
+    "path.deleteConstraint": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete path constraint operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete path constraint operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "path.deleteControlPoint": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete path control point operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete path control point operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "path.deleteKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete path keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete path keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "path.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get path attachment operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get path attachment operation does not delete or overwrite existing project data."
+      }
+    },
+    "path.getConstraint": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get path constraint operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get path constraint operation does not delete or overwrite existing project data."
+      }
+    },
+    "path.listConstraints": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The list path constraints operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The list path constraints operation does not delete or overwrite existing project data."
+      }
+    },
+    "path.moveControlPoint": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The move path control point operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The move path control point operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "path.moveKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The move path keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The move path keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "path.removeCurve": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The remove path curve operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The remove path curve operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "path.setClosed": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set path closed operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set path closed operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "path.setConstantSpeed": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set path constant speed operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set path constant speed operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "path.setKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set path keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set path keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "path.setParams": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set path constraint params operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set path constraint params operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "physics.createConstraint": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The create physics constraint operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The create physics constraint operation does not delete or overwrite existing project data."
+      }
+    },
+    "physics.deleteConstraint": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete physics constraint operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete physics constraint operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "physics.deleteKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete physics keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete physics keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "physics.getConstraint": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get physics constraint operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get physics constraint operation does not delete or overwrite existing project data."
+      }
+    },
+    "physics.getSettings": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get physics settings operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get physics settings operation does not delete or overwrite existing project data."
+      }
+    },
+    "physics.listConstraints": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The list physics constraints operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The list physics constraints operation does not delete or overwrite existing project data."
+      }
+    },
+    "physics.moveKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The move physics keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The move physics keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "physics.renameConstraint": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The rename physics constraint operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The rename physics constraint operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "physics.setChannels": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set physics channels operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set physics channels operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "physics.setKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set physics keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set physics keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "physics.setParams": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set physics constraint params operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set physics constraint params operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "physics.setSettings": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set physics settings operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set physics settings operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "physics.setTargetBone": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set physics target bone operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set physics target bone operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "project.export": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Reads the skeleton, effects, slot scene and referenced textures to compute a validated complete project without changing stored data.",
+        "open_world_justification": "Operates only within the user's private project workspace and session, without publishing data or modifying third-party systems.",
+        "destructive_justification": "Only computes an export and does not delete or overwrite files or session content."
+      }
+    },
+    "project.open": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Reads and validates a complete project and its embedded assets, then creates a new private editing session.",
+        "open_world_justification": "Operates only within the user's private project workspace and session, without publishing data or modifying third-party systems.",
+        "destructive_justification": "Creates a separate session without deleting or overwriting existing files or sessions."
+      }
+    },
+    "project.save": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Writes a validated complete project containing the skeleton, effects, slot scene and embedded textures into the private workspace.",
+        "open_world_justification": "Operates only within the user's private project workspace and session, without publishing data or modifying third-party systems.",
+        "destructive_justification": "Can overwrite the selected project file, with hosted file and storage limits and path confinement enforced."
+      }
+    },
+    "render_frame": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Computes a PNG preview from the skeleton, project textures and optional effects without writing files or changing session content.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The render frame operation does not delete or overwrite existing project data."
+      }
+    },
+    "skin.create": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The create skin operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The create skin operation does not delete or overwrite existing project data."
+      }
+    },
+    "skin.delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete skin operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete skin operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "skin.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get skin operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get skin operation does not delete or overwrite existing project data."
+      }
+    },
+    "skin.list": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The list skins operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The list skins operation does not delete or overwrite existing project data."
+      }
+    },
+    "skin.removeAttachment": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The remove skin attachment operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The remove skin attachment operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "skin.rename": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The rename skin operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The rename skin operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "skin.scope.add": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The add skin scope operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The add skin scope operation does not delete or overwrite existing project data."
+      }
+    },
+    "skin.scope.remove": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The remove skin scope operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The remove skin scope operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "skin.setAttachment": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set skin attachment operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set skin attachment operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "slot.activeAttachment": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set active attachment operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set active attachment operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "slot.blend": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set slot blend mode operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set slot blend mode operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "slot.color": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set slot color operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set slot color operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "slot.create": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The create slot operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The create slot operation does not delete or overwrite existing project data."
+      }
+    },
+    "slot.darkColor": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set slot dark color operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set slot dark color operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "slot.delete": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete slot operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete slot operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "slot.flow.addTransition": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The add feature flow transition operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The add feature flow transition operation does not delete or overwrite existing project data."
+      }
+    },
+    "slot.flow.createState": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The create feature flow state operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The create feature flow state operation does not delete or overwrite existing project data."
+      }
+    },
+    "slot.flow.deleteState": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete feature flow state operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete feature flow state operation can remove or overwrite existing slot scene data even when the change can be undone."
+      }
+    },
+    "slot.flow.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get feature flow graph operation only retrieves or computes private slot scene data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get feature flow graph operation does not delete or overwrite existing project data."
+      }
+    },
+    "slot.flow.removeTransition": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The remove feature flow transition operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The remove feature flow transition operation can remove or overwrite existing slot scene data even when the change can be undone."
+      }
+    },
+    "slot.flow.renameState": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The rename feature flow state operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The rename feature flow state operation can remove or overwrite existing slot scene data even when the change can be undone."
+      }
+    },
+    "slot.flow.setGraph": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set complete feature flow operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set complete feature flow operation can remove or overwrite existing slot scene data even when the change can be undone."
+      }
+    },
+    "slot.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get slot operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get slot operation does not delete or overwrite existing project data."
+      }
+    },
+    "slot.grid.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get slot grid operation only retrieves or computes private slot scene data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get slot grid operation does not delete or overwrite existing project data."
+      }
+    },
+    "slot.grid.preset": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The apply slot grid preset operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The apply slot grid preset operation can remove or overwrite existing slot scene data even when the change can be undone."
+      }
+    },
+    "slot.grid.set": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set slot grid operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set slot grid operation can remove or overwrite existing slot scene data even when the change can be undone."
+      }
+    },
+    "slot.list": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The list slots operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The list slots operation does not delete or overwrite existing project data."
+      }
+    },
+    "slot.rename": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The rename slot operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The rename slot operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "slot.reorder": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The reorder slot operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The reorder slot operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "slot.scene.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get slot scene operation only retrieves or computes private slot scene data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get slot scene operation does not delete or overwrite existing project data."
+      }
+    },
+    "slot.scene.setRefs": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set scene artifact references operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set scene artifact references operation can remove or overwrite existing slot scene data even when the change can be undone."
+      }
+    },
+    "slot.symbol.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get mapped symbol operation only retrieves or computes private slot scene data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get mapped symbol operation does not delete or overwrite existing project data."
+      }
+    },
+    "slot.symbol.list": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The list mapped symbols operation only retrieves or computes private slot scene data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The list mapped symbols operation does not delete or overwrite existing project data."
+      }
+    },
+    "slot.symbol.map": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The map symbol anim set operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The map symbol anim set operation can remove or overwrite existing slot scene data even when the change can be undone."
+      }
+    },
+    "slot.symbol.unmap": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The unmap symbol operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The unmap symbol operation can remove or overwrite existing slot scene data even when the change can be undone."
+      }
+    },
+    "slot.tumble.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get tumble choreography operation only retrieves or computes private slot scene data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get tumble choreography operation does not delete or overwrite existing project data."
+      }
+    },
+    "slot.tumble.set": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set tumble choreography operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set tumble choreography operation can remove or overwrite existing slot scene data even when the change can be undone."
+      }
+    },
+    "slot.winseq.create": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The create win sequence operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The create win sequence operation does not delete or overwrite existing project data."
+      }
+    },
+    "slot.winseq.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get win sequencer operation only retrieves or computes private slot scene data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get win sequencer operation does not delete or overwrite existing project data."
+      }
+    },
+    "slot.winseq.reorderSteps": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The reorder win sequence steps operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The reorder win sequence steps operation can remove or overwrite existing slot scene data even when the change can be undone."
+      }
+    },
+    "slot.winseq.setConfig": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set complete win sequencer operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set complete win sequencer operation can remove or overwrite existing slot scene data even when the change can be undone."
+      }
+    },
+    "slot.winseq.setStep": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set win sequence step operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set win sequence step operation can remove or overwrite existing slot scene data even when the change can be undone."
+      }
+    },
+    "slot.winseq.setThresholds": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set escalation thresholds operation changes private slot scene session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set escalation thresholds operation can remove or overwrite existing slot scene data even when the change can be undone."
+      }
+    },
+    "transform.createConstraint": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The create transform constraint operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The create transform constraint operation does not delete or overwrite existing project data."
+      }
+    },
+    "transform.deleteConstraint": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete transform constraint operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete transform constraint operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "transform.deleteKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The delete transform keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The delete transform keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "transform.get": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The get transform constraint operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The get transform constraint operation does not delete or overwrite existing project data."
+      }
+    },
+    "transform.list": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "The list transform constraints operation only retrieves or computes private skeleton data without modifying project state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The list transform constraints operation does not delete or overwrite existing project data."
+      }
+    },
+    "transform.moveKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The move transform keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The move transform keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "transform.setKeyframe": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set transform keyframe operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set transform keyframe operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "transform.setParams": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set transform constraint params operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set transform constraint params operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "transform.setVariants": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "The set transform constraint variants operation changes private skeleton session state.",
+        "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
+        "destructive_justification": "The set transform constraint variants operation can remove or overwrite existing skeleton data even when the change can be undone."
+      }
+    },
+    "workspace.deleteFile": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Deletes the selected file from the private project workspace.",
+        "open_world_justification": "Operates only within the user's private project workspace and session, without publishing data or modifying third-party systems.",
+        "destructive_justification": "Permanently removes one file after explicit confirmation input, with path confinement enforced and no document-history undo."
+      }
+    },
+    "workspace.download": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Reads a private project file and returns its bytes encoded as base64 without modifying it.",
+        "open_world_justification": "Operates only within the user's private project workspace and session, without publishing data or modifying third-party systems.",
+        "destructive_justification": "Only returns file data and does not delete or overwrite files."
+      }
+    },
+    "workspace.list": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Reads file names from a private project directory without changing files or session state.",
+        "open_world_justification": "Operates only within the user's private project workspace and session, without publishing data or modifying third-party systems.",
+        "destructive_justification": "Only lists files and does not delete or overwrite data."
+      }
+    },
+    "workspace.upload": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Validates and writes an uploaded JSON or PNG asset into the private project workspace.",
+        "open_world_justification": "Operates only within the user's private project workspace and session, without publishing data or modifying third-party systems.",
+        "destructive_justification": "Can overwrite the named project asset, with filename, file-size, content-validation and hosted storage limits enforced."
+      }
+    }
+  },
+  "test_cases": [
+    {
+      "description": "Create and validate a minimal bone hierarchy.",
+      "user_prompt": "Create a new Armature skeleton with a root bone and one child, then list the bones and validate it.",
+      "file_attachment_urls": null,
+      "tools_triggered": "document.new, bone.create, bone.list, document.validate",
+      "expected_output": "Returns document and bone identifiers, shows the child parent relationship, and reports validation results.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Verify reversible edits on a newly created skeleton.",
+      "user_prompt": "Create a new Armature skeleton with one root bone, move the root 20 units to the right, undo that move, then redo it and inspect the root after each step.",
+      "file_attachment_urls": null,
+      "tools_triggered": "document.new, bone.create, bone.move, bone.get, history.undo, history.redo",
+      "expected_output": "The inspected root position returns to its initial value after undo and to the edited value after redo.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Author and inspect an animated pose.",
+      "user_prompt": "Create a new Armature skeleton with a root bone and a one-second animation that rotates the root from zero to 90 degrees, then sample its world transform halfway through.",
+      "file_attachment_urls": null,
+      "tools_triggered": "document.new, bone.create, anim.create, kf.set, document.getWorldTransforms",
+      "expected_output": "Creates rotation keyframes and returns the solved transform at the requested animation time without changing the setup pose.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Render a rig without texture assets and explain the preview limitation.",
+      "user_prompt": "Create a new Armature skeleton with a root, a slot and a rectangular region attachment, then render a PNG preview without adding a texture atlas. Tell me whether placeholders were used.",
+      "file_attachment_urls": null,
+      "tools_triggered": "document.new, bone.create, slot.create, attach.region.add, render_frame",
+      "expected_output": "Returns a PNG preview and reports placeholder use instead of claiming the attachment is textured.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Save and reopen a complete project including effects and a slot scene.",
+      "user_prompt": "Create a new Armature project with a root bone, an empty sparkle effect and a seven-by-seven cluster grid. Save the complete project, reopen it, and compare the exported project content.",
+      "file_attachment_urls": null,
+      "tools_triggered": "document.new, bone.create, effect.create, slot.grid.preset, project.export, project.save, project.open",
+      "expected_output": "Restores the skeleton, effects and slot grid in a fresh session with matching exported content and cleared undo history.",
+      "expected_output_url": null
+    }
+  ],
+  "negative_test_cases": [
+    {
+      "description": "Do not invoke tools for desktop window control.",
+      "user_prompt": "Click the animation timeline in my running desktop editor and drag its window to my other monitor.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Explains that Armature tools operate in headless sessions and cannot control desktop windows.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Do not invoke tools for unrelated public publishing.",
+      "user_prompt": "Publish a marketing announcement to my social media accounts.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Does not invoke Armature because the app has no social publishing tools.",
+      "expected_output_url": null
+    },
+    {
+      "description": "Do not invoke project tools to modify billing.",
+      "user_prompt": "Change my Armature subscription and charge a different credit card.",
+      "file_attachment_urls": null,
+      "tools_triggered": null,
+      "expected_output": "Does not invoke Armature project tools because subscription and payment management are outside their capabilities.",
+      "expected_output_url": null
+    }
+  ]
+}

@@ -70,7 +70,7 @@ try {
   assert.ok(initialized.serverInfo.name);
   send({ method: 'notifications/initialized' });
   const catalog = await request('tools/list', {});
-  assert.equal(catalog.tools.length, 208);
+  assert.equal(catalog.tools.length, 215);
   assert.equal(new Set(catalog.tools.map((tool) => tool.name)).size, catalog.tools.length);
   for (const tool of catalog.tools) {
     assert.equal(typeof tool.annotations?.readOnlyHint, 'boolean', tool.name);

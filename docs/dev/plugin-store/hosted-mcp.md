@@ -2,8 +2,12 @@
 
 The staging backend is deployed on Railway and has passed authenticated workflow and
 restart-persistence checks. It is not an approved public store listing. It shares all
-208 existing tools and command/history behavior with stdio.
+215 tools and command/history behavior with stdio.
 The desktop application and its project format are unchanged.
+
+The optional [Stripe subscription integration](../stripe-subscriptions.md) adds a
+separate billing sign-in flow and hosted tool entitlement checks. Keep billing
+unconfigured until its account, sandbox verification and activation steps are complete.
 
 ## Run and deploy
 
@@ -65,8 +69,8 @@ No standalone server-event stream or batch JSON-RPC is supported. Session IDs ar
 random, checked against ownership, and are not authentication credentials.
 
 `document.save` persists skeleton JSON within the private volume. Unsaved edits and
-undo history are lost on expiry/restart. Complete effects/slot editor projects are
-not persisted by that tool. Existing tool failures retain their error codes, but
+undo history are lost on expiry/restart. Complete projects, including effects, slot scenes and textures, are saved with
+`project.save` and restored with `project.open`; `document.save` remains skeleton-only. Existing tool failures retain their error codes, but
 hosted responses redact internal paths and details. The server does not log tokens
 or document contents.
 
@@ -76,10 +80,10 @@ or document contents.
   reviewer accounts. The deployed service-to-service token test does not prove user
   sign-in. Registration remains disabled; configure deliberate account onboarding
   and recovery. Review token revocation policy (JWTs remain valid until expiry).
-- Add and exercise per-user storage quotas, upload/download workflows, account
-  deletion and retention controls, plus infrastructure request/rate/concurrency
-  limits. The present session/body/heap bounds do not provide a full public-service
-  resource budget. CPU-heavy tool calls still share the process.
+- Storage quotas, private asset upload/download/delete and request/connection bounds
+  are implemented and tested (see the 2026-09-15 launch update). Complete identity
+  deletion and retention operations remain to be verified with the identity provider.
+  CPU-heavy tool calls still share the process; isolated workers remain a scaling gap.
 - Run the portal tool scan after user OAuth succeeds. All 208 tools now have explicit
   read-only, destructive and closed-world annotations; metadata is also included in
   the generated JSON catalog. Read tools: 41; additive operations: 28; operations
@@ -156,3 +160,33 @@ that flow has no verified outcome.
 
 No real Codex/ChatGPT user OAuth session, completed portal tool scan, verified public
 policy pages, store approval, or public publication is claimed by these results.
+
+
+## Launch implementation update (2026-09-15)
+
+All 215 tools now declare output schemas generated from handler return types and
+validate their serialized results. MCP supplies matching structured content and
+legacy JSON text. The generated-catalog CI step checks both schema and catalog drift.
+The `project.export`, `project.save`, and `project.open` tools use the existing
+complete-project format without changing its version or bypassing commands. They
+preserve skeletons, effects, slot scenes and referenced textures. Embedded assets
+are hash-validated and never automatically extracted into arbitrary files.
+
+`workspace.upload` accepts canonical base64 JSON/PNG assets up to 512 KiB, PNGs at
+most 2048 pixels per side, and simple file names. Listing, download and explicitly
+confirmed permanent file deletion are available. Recovery and full-project export
+remain available after subscription expiry. Uploading new assets remains paid.
+
+Hosted defaults are 8 MiB per file, 32 MiB and 256 files per tenant, 256 MiB and
+4096 files across the data root, and a 64 MiB free-space reserve. Accounting is
+recomputed from persisted files under a shared write lock; restarts cannot reset
+it and concurrent tenant writes cannot overbook the volume. There is a 120-request
+per minute authenticated-user budget and 1200-request global budget with Retry-After,
+128 TCP connections and 100 requests per socket. Health checks bypass rate limits.
+These are single-process limits and do not claim distributed or CPU-worker isolation.
+
+Public registration and email recovery remain disabled. Railway's connected tools
+could inspect configuration but could not enable native backup schedules. Stripe's
+additional CLI tools could not initialize their required local socket, so restricted
+key replacement was not performed. No store approval, reviewer login, real Checkout
+completion or actual deployed webhook delivery is implied by the implementation tests.

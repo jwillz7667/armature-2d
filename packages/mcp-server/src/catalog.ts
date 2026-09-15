@@ -11,6 +11,10 @@ export function toolCatalog() {
       description: tool.description,
       annotations: tool.annotations,
       inputSchema: toJsonSchemaCompat(tool.inputSchema),
+      outputSchema: toJsonSchemaCompat(tool.outputSchema, {
+        strictUnions: true,
+        pipeStrategy: 'output',
+      }),
     }));
 }
 

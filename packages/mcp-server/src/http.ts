@@ -10,6 +10,10 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { buildMcpServer } from './server';
 import { createNodeFileStore } from './node-files';
 import { SessionRegistry } from './session';
+import { createStorageBudget, type StorageLimits } from './storage-budget';
+import { createRequestBudget } from './request-budget';
+import type { BillingHttp } from './billing/http';
+import { billingHtml, billingCss, billingJs } from './billing/web';
 
 export interface HttpOptions {
   readonly dataRoot: string;
@@ -20,6 +24,10 @@ export interface HttpOptions {
   readonly maxSessions?: number;
   readonly idleMs?: number;
   readonly openaiChallengeToken?: string;
+  readonly storageLimits?: StorageLimits;
+  readonly requestsPerMinute?: number;
+  readonly globalRequestsPerMinute?: number;
+  readonly createBilling?: (dataRoot: string) => Promise<BillingHttp>;
 }
 
 function httpsUrl(value: string): URL {
@@ -55,6 +63,21 @@ export async function createHttpServer(options: HttpOptions) {
   const dataRoot = await realpath(options.dataRoot);
   // Fail startup before advertising a healthy server if a mounted volume is unusable.
   await access(dataRoot, constants.W_OK | constants.X_OK);
+  if (!options.createBilling) {
+    try {
+      await lstat(join(dataRoot, '.armature-billing.sqlite'));
+      throw new Error(
+        'Billing is initialized on this volume. Configure billing before serving requests.',
+      );
+    } catch (error) {
+      if (!error || typeof error !== 'object' || !('code' in error) || error.code !== 'ENOENT')
+        throw error;
+    }
+  }
+  const storageBudget = createStorageBudget(dataRoot, options.storageLimits);
+  const globalBudget = createRequestBudget(options.globalRequestsPerMinute ?? 1200, 60_000, 1);
+  const userBudget = createRequestBudget(options.requestsPerMinute ?? 120, 60_000, 4096);
+  const billing = await options.createBilling?.(dataRoot);
   const metadataUrl = `${resource.origin}/.well-known/oauth-protected-resource/mcp`;
   const metadata = {
     resource: resource.href,
@@ -108,6 +131,12 @@ export async function createHttpServer(options: HttpOptions) {
       send(res, 403, 'Forbidden host or origin');
       return;
     }
+    const globalRetry = globalBudget('global');
+    if (globalRetry) {
+      res.setHeader('Retry-After', globalRetry);
+      send(res, 429, 'Request limit reached; retry shortly');
+      return;
+    }
     if (
       req.method === 'GET' &&
       req.url === '/.well-known/openai-apps-challenge' &&
@@ -115,6 +144,35 @@ export async function createHttpServer(options: HttpOptions) {
     ) {
       res.setHeader('Content-Type', 'text/plain; charset=utf-8');
       res.end(challenge);
+      return;
+    }
+    if (req.url?.startsWith('/billing')) {
+      const path = new URL(req.url, resource.origin).pathname;
+      res.setHeader('Referrer-Policy', 'no-referrer');
+      res.setHeader(
+        'Content-Security-Policy',
+        "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",
+      );
+      if (
+        req.method === 'GET' &&
+        ['/billing', '/billing/style.css', '/billing/app.js'].includes(path)
+      ) {
+        res.setHeader(
+          'Content-Type',
+          path === '/billing'
+            ? 'text/html; charset=utf-8'
+            : path.endsWith('.css')
+              ? 'text/css; charset=utf-8'
+              : 'text/javascript; charset=utf-8',
+        );
+        res.end(path === '/billing' ? billingHtml : path.endsWith('.css') ? billingCss : billingJs);
+        return;
+      }
+      if (billing) await billing.handle(req, res);
+      else if (req.method === 'GET' && path === '/billing/account') {
+        res.setHeader('Content-Type', 'application/json');
+        res.end(JSON.stringify({ enabled: false, signedIn: false }));
+      } else send(res, 503, 'Billing is not configured');
       return;
     }
     if (
@@ -165,6 +223,12 @@ export async function createHttpServer(options: HttpOptions) {
       send(res, 401, 'Authentication required');
       return;
     }
+    const userRetry = userBudget(owner);
+    if (userRetry) {
+      res.setHeader('Retry-After', userRetry);
+      send(res, 429, 'Account request limit reached; retry shortly');
+      return;
+    }
     // There are no server-initiated notifications, so standalone SSE is intentionally unsupported.
     if (req.method !== 'POST' && req.method !== 'DELETE') {
       res.setHeader('Allow', 'POST, DELETE');
@@ -197,6 +261,28 @@ export async function createHttpServer(options: HttpOptions) {
       if (Array.isArray(body)) {
         send(res, 400, 'Batch requests are not supported');
         return;
+      }
+      if (
+        billing &&
+        body &&
+        typeof body === 'object' &&
+        'method' in body &&
+        body.method === 'tools/call' &&
+        'params' in body &&
+        body.params &&
+        typeof body.params === 'object' &&
+        'name' in body.params &&
+        typeof body.params.name === 'string'
+      ) {
+        try {
+          if (!(await billing.authorizeTool(owner, body.params.name))) {
+            send(res, 402, `Subscription required. Manage billing at ${resource.origin}/billing`);
+            return;
+          }
+        } catch {
+          send(res, 503, 'Subscription verification is temporarily unavailable; retry shortly');
+          return;
+        }
       }
     }
     const id = req.headers['mcp-session-id'];
@@ -244,7 +330,10 @@ export async function createHttpServer(options: HttpOptions) {
           return;
         }
         const server = buildMcpServer(
-          { sessions: new SessionRegistry(4), files: createNodeFileStore(root) },
+          {
+            sessions: new SessionRegistry(4),
+            files: createNodeFileStore(root, { maxFileBytes: 8 * 1024 * 1024, storageBudget }),
+          },
           undefined,
           { redactErrors: true },
         );
@@ -285,6 +374,9 @@ export async function createHttpServer(options: HttpOptions) {
   const server = createServer((req, res) => {
     void handler(req, res).catch(() => send(res, 500, 'Internal server error'));
   });
+  server.maxConnections = 128;
+  server.maxRequestsPerSocket = 100;
+  server.keepAliveTimeout = 5000;
   server.requestTimeout = 30_000;
   server.headersTimeout = 15_000;
   return {
@@ -294,6 +386,7 @@ export async function createHttpServer(options: HttpOptions) {
       clearInterval(timer);
       await Promise.all([...sessions.entries()].map(([id, entry]) => dispose(id, entry)));
       server.closeAllConnections();
+      await billing?.close();
       if (server.listening)
         await new Promise<void>((resolve, reject) =>
           server.close((error) => (error ? reject(error) : resolve())),
