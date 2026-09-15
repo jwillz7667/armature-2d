@@ -56,6 +56,8 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
+      - name: Verify secure account email bootstrap and launch gates
+        run: node --test tools/test-auth-startup.mjs
 
   build:
     runs-on: ubuntu-latest
