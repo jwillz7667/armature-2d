@@ -2,6 +2,12 @@
 
 Status: saved OpenAI Platform draft, not submitted or published.
 
+The repository-root `chatgpt-app-submission.json` is now generated and validated
+against the current official schema, covering all 208 tools and eight review cases.
+See [the submission review](submission-review-2026-09-15.md) for source provenance,
+verification scope and outstanding launch requirements. Portal import is not yet
+verified.
+
 Draft app ID: `asdk_app_6aa6cb80da2c8191a768d23d0411bc39`.
 Draft version: `0.1.0`. The portal rejected the prerelease version string.
 The listing, prompts, skill upload and review scenarios were entered. The skill
