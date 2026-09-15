@@ -4,7 +4,7 @@
   "app_info": {
     "display_name": "Armature 2D",
     "subtitle": "Rig, animate and render 2D",
-    "description": "Armature 2D helps you create and edit skeletal rigs through ChatGPT. Build bones, slots and attachments; author animation keyframes and constraints; inspect solved poses and meshes; render PNG previews; and validate, save and reopen skeleton JSON in your private project workspace. Editing tools use the application command system with undo and redo. Additional tools author effects and slot scenes in independent headless sessions. The app does not control a running desktop editor, and skeleton save and export do not persist a complete effects or slot editor project. Imported Spine projects may require conversion and include an import loss report. Rendering without usable textures can return a placeholder preview.",
+    "description": "Armature 2D helps you create and edit skeletal rigs through ChatGPT. Build bones, slots and attachments; author animation keyframes and constraints; inspect solved poses and meshes; and render PNG previews. Create effects and slot scenes, then save and reopen complete Armature projects with embedded textures. Upload bounded JSON and PNG assets, list and download private project files, or explicitly delete files you no longer need. Document editing uses the application command system with undo and redo; file overwrites and deletions are separate from document history. Legacy skeleton export remains available for runtime use. The app operates in independent headless sessions and does not control a running desktop editor. Spine JSON imports may be lossy and include a report; real Spine binary imports are not supported. Rendering without usable textures can return a placeholder preview.",
     "category": "PRODUCTIVITY"
   },
   "tools": {
@@ -1868,6 +1868,42 @@
         "destructive_justification": "The set physics target bone operation can remove or overwrite existing skeleton data even when the change can be undone."
       }
     },
+    "project.export": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Reads the skeleton, effects, slot scene and referenced textures to compute a validated complete project without changing stored data.",
+        "open_world_justification": "Operates only within the user's private project workspace and session, without publishing data or modifying third-party systems.",
+        "destructive_justification": "Only computes an export and does not delete or overwrite files or session content."
+      }
+    },
+    "project.open": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Reads and validates a complete project and its embedded assets, then creates a new private editing session.",
+        "open_world_justification": "Operates only within the user's private project workspace and session, without publishing data or modifying third-party systems.",
+        "destructive_justification": "Creates a separate session without deleting or overwriting existing files or sessions."
+      }
+    },
+    "project.save": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Writes a validated complete project containing the skeleton, effects, slot scene and embedded textures into the private workspace.",
+        "open_world_justification": "Operates only within the user's private project workspace and session, without publishing data or modifying third-party systems.",
+        "destructive_justification": "Can overwrite the selected project file, with hosted file and storage limits and path confinement enforced."
+      }
+    },
     "render_frame": {
       "annotations": {
         "readOnlyHint": true,
@@ -2503,6 +2539,54 @@
         "open_world_justification": "Operates only on the user's private project workspace and session, without publishing content or changing third-party systems.",
         "destructive_justification": "The set transform constraint variants operation can remove or overwrite existing skeleton data even when the change can be undone."
       }
+    },
+    "workspace.deleteFile": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Deletes the selected file from the private project workspace.",
+        "open_world_justification": "Operates only within the user's private project workspace and session, without publishing data or modifying third-party systems.",
+        "destructive_justification": "Permanently removes one file after explicit confirmation input, with path confinement enforced and no document-history undo."
+      }
+    },
+    "workspace.download": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Reads a private project file and returns its bytes encoded as base64 without modifying it.",
+        "open_world_justification": "Operates only within the user's private project workspace and session, without publishing data or modifying third-party systems.",
+        "destructive_justification": "Only returns file data and does not delete or overwrite files."
+      }
+    },
+    "workspace.list": {
+      "annotations": {
+        "readOnlyHint": true,
+        "openWorldHint": false,
+        "destructiveHint": false
+      },
+      "justifications": {
+        "read_only_justification": "Reads file names from a private project directory without changing files or session state.",
+        "open_world_justification": "Operates only within the user's private project workspace and session, without publishing data or modifying third-party systems.",
+        "destructive_justification": "Only lists files and does not delete or overwrite data."
+      }
+    },
+    "workspace.upload": {
+      "annotations": {
+        "readOnlyHint": false,
+        "openWorldHint": false,
+        "destructiveHint": true
+      },
+      "justifications": {
+        "read_only_justification": "Validates and writes an uploaded JSON or PNG asset into the private project workspace.",
+        "open_world_justification": "Operates only within the user's private project workspace and session, without publishing data or modifying third-party systems.",
+        "destructive_justification": "Can overwrite the named project asset, with filename, file-size, content-validation and hosted storage limits enforced."
+      }
     }
   },
   "test_cases": [
@@ -2539,11 +2623,11 @@
       "expected_output_url": null
     },
     {
-      "description": "Save and reopen a skeleton in the private project workspace.",
-      "user_prompt": "Create a new Armature skeleton with a root and child bone, save it in my project, reopen the saved skeleton, and compare its exported hierarchy with the original.",
+      "description": "Save and reopen a complete project including effects and a slot scene.",
+      "user_prompt": "Create a new Armature project with a root bone, an empty sparkle effect and a seven-by-seven cluster grid. Save the complete project, reopen it, and compare the exported project content.",
       "file_attachment_urls": null,
-      "tools_triggered": "document.new, bone.create, document.save, document.open, document.export",
-      "expected_output": "Saves and reopens valid skeleton JSON within the private workspace and preserves the bone hierarchy; does not claim to save a complete effects or slot scene project.",
+      "tools_triggered": "document.new, bone.create, effect.create, slot.grid.preset, project.export, project.save, project.open",
+      "expected_output": "Restores the skeleton, effects and slot grid in a fresh session with matching exported content and cleared undo history.",
       "expected_output_url": null
     }
   ],

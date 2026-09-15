@@ -19,7 +19,8 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "reference": "node generate-reference.mjs",
-    "reference:check": "node generate-reference.mjs --check"
+    "reference:check": "node generate-output-schemas.mjs --check && node generate-reference.mjs --check",
+    "outputs": "node generate-output-schemas.mjs"
   },
   "dependencies": {
     "@marionette/atlas-pack": "workspace:*",

@@ -3,7 +3,7 @@
 Status: saved OpenAI Platform draft, not submitted or published.
 
 The repository-root `chatgpt-app-submission.json` is now generated and validated
-against the current official schema, covering all 208 tools and eight review cases.
+against the current official schema, covering all 215 tools and eight review cases.
 See [the submission review](submission-review-2026-09-15.md) for source provenance,
 verification scope and outstanding launch requirements. Portal import is not yet
 verified.
@@ -30,7 +30,7 @@ Name: Armature 2D
 Draft publisher: JUSTIN THOMAS WILLIAMS (verified individual selected in the portal; business identity has not been verified)
 Category: Productivity
 Short description: Rig, animate and render 2D skeletons with Armature.
-Long description: Create and edit skeletal rigs through Armature's command and undo system. Author bones, slots, attachments, animation and constraints; inspect the document, render PNG previews, and validate and save skeleton JSON. The current engine operates in independent headless sessions. It does not control a running editor window or persist a complete effects/slot editor project.
+Long description: Create and edit skeletal rigs through Armature's command and undo system. Author bones, slots, attachments, animation and constraints; inspect the document, render PNG previews, and validate and save skeleton JSON. The current engine operates in independent headless sessions. It does not control a running editor window. Complete project tools preserve effects, slot scenes and embedded textures; the legacy skeleton save remains available separately.
 Logo: plugins/armature/assets/icon.png
 Source: https://github.com/jwillz7667/armature-2d
 Privacy policy: https://www.viral-ventures-llc.com/privacy#armature-2d
@@ -62,7 +62,7 @@ they are not a claim that the hosted plugin has been tested.
 ## Blocking requirements
 
 1. Remote MCP is deployed at `https://armature-mcp-production.up.railway.app/mcp`.
-   Authenticated machine-client workflows and restart persistence passed. All 208
+   Authenticated machine-client workflows and restart persistence passed. All 215
    tool annotations are implemented and tested. Complete user OAuth and the portal
    tool scan, two-account live isolation, and public-service resource/storage controls.
    The local portable bundle remains available independently of public store approval.

@@ -1,7 +1,7 @@
 # Armature 2D for AI agents
 
 Run the Armature headless engine inside an environment that supports Node and local
-stdio MCP. The bundle includes the server and its dependencies, 208 discoverable
+stdio MCP. The bundle includes the server and its dependencies, 215 discoverable
 tools, schemas, reference documentation, a portable Codex manifest, an authoring skill,
 and Codex/Claude Code compatibility manifests.
 No Electron installation, npm download at startup, API key, or hosted service is required.
@@ -94,3 +94,7 @@ and [Claude Code plugins](https://code.claude.com/docs/en/plugins-reference).
 
 Public store submission is tracked in `docs/dev/plugin-store/submission.md` in the repository.
 The current local MCP package has not been submitted to or published in the public store.
+
+Private workspace tools support bounded JSON/PNG uploads, file listing, base64 downloads,
+and explicitly confirmed file deletion. All tools publish validated structured outputs
+and output schemas while retaining their JSON text results for older clients.

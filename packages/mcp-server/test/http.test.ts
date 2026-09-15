@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { generateKeyPair, exportJWK, SignJWT } from 'jose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHttpServer } from '../src/http';
+import { toolCatalog } from '../src/catalog';
 
 const issuer = 'https://identity.example.test/';
 const resource = 'https://armature.example.test/mcp';
@@ -126,7 +127,9 @@ async function rpc(accessToken: string, session: string, method: string, params:
 async function call(accessToken: string, session: string, name: string, args: unknown) {
   const result = await rpc(accessToken, session, 'tools/call', { name, arguments: args });
   expect(result.isError, JSON.stringify(result)).not.toBe(true);
-  return JSON.parse(result.content[0].text);
+  const parsed = JSON.parse(result.content[0].text);
+  expect(result.structuredContent).toEqual(parsed);
+  return parsed;
 }
 
 describe('authenticated HTTP MCP', () => {
@@ -169,6 +172,28 @@ describe('authenticated HTTP MCP', () => {
         openaiChallengeToken: 'proof\nwith-control-character',
       }),
     ).rejects.toThrow('Invalid OpenAI domain challenge token');
+  });
+  it('enforces authenticated request limits without letting one user consume another user bucket', async () => {
+    await app.close();
+    app = await createHttpServer({
+      dataRoot: root,
+      publicUrl: resource,
+      issuer,
+      jwksUrl: `${issuer}jwks`,
+      requestsPerMinute: 2,
+    });
+    await new Promise<void>((resolve) => app.server.listen(0, '127.0.0.1', resolve));
+    const address = app.server.address();
+    if (!address || typeof address === 'string') throw new Error('No listening address');
+    base = `http://127.0.0.1:${address.port}`;
+    const alice = await token('alice');
+    const first = await initialize(alice);
+    expect(first.status).toBe(200);
+    await rpc(alice, first.headers.get('mcp-session-id')!, 'tools/list');
+    const blocked = await initialize(alice);
+    expect(blocked.status).toBe(429);
+    expect(Number(blocked.headers.get('retry-after'))).toBeGreaterThan(0);
+    expect((await initialize(await token('bob'))).status).toBe(200);
   });
   it('advertises OAuth metadata and challenges missing credentials', async () => {
     const response = await initialize('');
@@ -269,7 +294,13 @@ describe('authenticated HTTP MCP', () => {
     const alice = await token();
     const session = (await initialize(alice)).headers.get('mcp-session-id')!;
     const catalog = await rpc(alice, session, 'tools/list');
-    expect(catalog.tools).toHaveLength(208);
+    expect(catalog.tools).toHaveLength(215);
+    const expectedOutputs = new Map(toolCatalog().map((tool) => [tool.name, tool.outputSchema]));
+    for (const tool of catalog.tools) {
+      expect(tool.outputSchema).toEqual(expectedOutputs.get(tool.name));
+      expect(tool.outputSchema.type).toBe('object');
+      expect(Object.keys(tool.outputSchema.properties).length).toBeGreaterThan(0);
+    }
     for (const tool of catalog.tools) {
       expect(tool.annotations).toEqual({
         readOnlyHint: expect.any(Boolean),
@@ -320,6 +351,7 @@ describe('authenticated HTTP MCP', () => {
       arguments: { documentId, path: '../escape.json' },
     });
     expect(denied.isError).toBe(true);
+    expect(denied.structuredContent).toBeUndefined();
     expect(JSON.parse(denied.content[0].text)).toEqual({
       code: 'PATH_FORBIDDEN',
       message: 'Tool operation failed',

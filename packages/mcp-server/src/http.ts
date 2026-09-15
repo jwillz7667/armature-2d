@@ -10,6 +10,8 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { buildMcpServer } from './server';
 import { createNodeFileStore } from './node-files';
 import { SessionRegistry } from './session';
+import { createStorageBudget, type StorageLimits } from './storage-budget';
+import { createRequestBudget } from './request-budget';
 import type { BillingHttp } from './billing/http';
 import { billingHtml, billingCss, billingJs } from './billing/web';
 
@@ -22,6 +24,9 @@ export interface HttpOptions {
   readonly maxSessions?: number;
   readonly idleMs?: number;
   readonly openaiChallengeToken?: string;
+  readonly storageLimits?: StorageLimits;
+  readonly requestsPerMinute?: number;
+  readonly globalRequestsPerMinute?: number;
   readonly createBilling?: (dataRoot: string) => Promise<BillingHttp>;
 }
 
@@ -69,6 +74,9 @@ export async function createHttpServer(options: HttpOptions) {
         throw error;
     }
   }
+  const storageBudget = createStorageBudget(dataRoot, options.storageLimits);
+  const globalBudget = createRequestBudget(options.globalRequestsPerMinute ?? 1200, 60_000, 1);
+  const userBudget = createRequestBudget(options.requestsPerMinute ?? 120, 60_000, 4096);
   const billing = await options.createBilling?.(dataRoot);
   const metadataUrl = `${resource.origin}/.well-known/oauth-protected-resource/mcp`;
   const metadata = {
@@ -121,6 +129,12 @@ export async function createHttpServer(options: HttpOptions) {
         ![resource.origin, ...(options.allowedOrigins ?? [])].includes(req.headers.origin))
     ) {
       send(res, 403, 'Forbidden host or origin');
+      return;
+    }
+    const globalRetry = globalBudget('global');
+    if (globalRetry) {
+      res.setHeader('Retry-After', globalRetry);
+      send(res, 429, 'Request limit reached; retry shortly');
       return;
     }
     if (
@@ -207,6 +221,12 @@ export async function createHttpServer(options: HttpOptions) {
     } catch {
       res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${metadataUrl}"`);
       send(res, 401, 'Authentication required');
+      return;
+    }
+    const userRetry = userBudget(owner);
+    if (userRetry) {
+      res.setHeader('Retry-After', userRetry);
+      send(res, 429, 'Account request limit reached; retry shortly');
       return;
     }
     // There are no server-initiated notifications, so standalone SSE is intentionally unsupported.
@@ -310,7 +330,10 @@ export async function createHttpServer(options: HttpOptions) {
           return;
         }
         const server = buildMcpServer(
-          { sessions: new SessionRegistry(4), files: createNodeFileStore(root) },
+          {
+            sessions: new SessionRegistry(4),
+            files: createNodeFileStore(root, { maxFileBytes: 8 * 1024 * 1024, storageBudget }),
+          },
           undefined,
           { redactErrors: true },
         );
@@ -351,6 +374,9 @@ export async function createHttpServer(options: HttpOptions) {
   const server = createServer((req, res) => {
     void handler(req, res).catch(() => send(res, 500, 'Internal server error'));
   });
+  server.maxConnections = 128;
+  server.maxRequestsPerSocket = 100;
+  server.keepAliveTimeout = 5000;
   server.requestTimeout = 30_000;
   server.headersTimeout = 15_000;
   return {

@@ -4,6 +4,7 @@ import { lstat, open, readdir, realpath, rename, unlink, type FileHandle } from 
 import { isAbsolute, relative, resolve, sep, join, dirname } from 'node:path';
 import { McpToolError } from './errors';
 import type { FileStore } from './files';
+import type { StorageBudget } from './storage-budget';
 
 const MAX_FILE_BYTES = 256 * 1024 * 1024;
 const noFollow = constants.O_NOFOLLOW ?? 0;
@@ -13,7 +14,13 @@ const noFollow = constants.O_NOFOLLOW ?? 0;
 // so replacing an ancestor with a symlink cannot redirect a read or create operation. Other platforms
 // validate components and the opened file identity; the host must prevent concurrent directory
 // replacement by hostile processes. This application policy is not a replacement for an OS sandbox.
-export function createNodeFileStore(projectRoot: string): FileStore {
+export function createNodeFileStore(
+  projectRoot: string,
+  options: { readonly maxFileBytes?: number; readonly storageBudget?: StorageBudget } = {},
+): FileStore {
+  const maxFileBytes = options.maxFileBytes ?? MAX_FILE_BYTES;
+  if (!Number.isSafeInteger(maxFileBytes) || maxFileBytes < 1)
+    throw new Error('File limit must be a positive integer');
   const root = resolve(projectRoot);
   const forbidden = (path: string): McpToolError =>
     new McpToolError(
@@ -105,8 +112,8 @@ export function createNodeFileStore(projectRoot: string): FileStore {
           (expected && (actual.dev !== expected.dev || actual.ino !== expected.ino))
         )
           throw forbidden(path);
-        if (!writing && actual.size > MAX_FILE_BYTES)
-          throw new McpToolError('FILE_TOO_LARGE', `file exceeds ${MAX_FILE_BYTES} bytes`);
+        if (!writing && actual.size > maxFileBytes)
+          throw new McpToolError('FILE_TOO_LARGE', `file exceeds ${maxFileBytes} bytes`);
         return await action(handle);
       } finally {
         await handle.close();
@@ -116,8 +123,8 @@ export function createNodeFileStore(projectRoot: string): FileStore {
   const readBinary = (path: string): Promise<Uint8Array> =>
     withFile(path, false, (handle) => handle.readFile());
   const writeBinary = async (path: string, data: Uint8Array): Promise<void> => {
-    if (data.byteLength > MAX_FILE_BYTES)
-      throw new McpToolError('FILE_TOO_LARGE', `file exceeds ${MAX_FILE_BYTES} bytes`);
+    if (data.byteLength > maxFileBytes)
+      throw new McpToolError('FILE_TOO_LARGE', `file exceeds ${maxFileBytes} bytes`);
     await withPath(path, false, async (file) => {
       try {
         const target = await lstat(file);
@@ -125,28 +132,40 @@ export function createNodeFileStore(projectRoot: string): FileStore {
       } catch (error) {
         if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
       }
-      const temporary = join(dirname(file), `.marionette-${randomUUID()}.tmp`);
-      const handle = await open(
-        temporary,
-        constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | noFollow,
-        0o600,
-      );
-      let closed = false;
-      try {
-        await handle.writeFile(data);
-        await handle.sync();
-        await handle.close();
-        closed = true;
-        await rename(temporary, file);
-      } finally {
-        if (!closed) await handle.close();
-        await unlink(temporary).catch((error: unknown) => {
-          if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
-        });
-      }
+      const commit = async () => {
+        const temporary = join(dirname(file), `.marionette-${randomUUID()}.tmp`);
+        const handle = await open(
+          temporary,
+          constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | noFollow,
+          0o600,
+        );
+        let closed = false;
+        try {
+          await handle.writeFile(data);
+          await handle.sync();
+          await handle.close();
+          closed = true;
+          await rename(temporary, file);
+        } finally {
+          if (!closed) await handle.close();
+          await unlink(temporary).catch((error: unknown) => {
+            if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT'))
+              throw error;
+          });
+        }
+      };
+      if (options.storageBudget)
+        await options.storageBudget.write(root, file, data.byteLength, commit);
+      else await commit();
     });
   };
   return {
+    remove: async (path) =>
+      withPath(path, false, async (file) => {
+        const stat = await lstat(file);
+        if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink > 1) throw forbidden(path);
+        await unlink(file);
+      }),
     read: async (path) => new TextDecoder().decode(await readBinary(path)),
     write: async (path, content) => writeBinary(path, new TextEncoder().encode(content)),
     readBinary,

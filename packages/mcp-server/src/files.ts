@@ -2,6 +2,8 @@
 // (resolution against a project root, traversal rejection). The headless entry provides a node:fs
 // implementation that confines reads/writes to a configured project root.
 export interface FileStore {
+  // Optional for embedded hosts; Node implements confined, permanent file deletion.
+  remove?(path: string): Promise<void>;
   read(path: string): Promise<string>;
   write(path: string, content: string): Promise<void>;
   // Read a file as raw bytes (atlas page PNGs for the render_frame tool). Path policy is identical to

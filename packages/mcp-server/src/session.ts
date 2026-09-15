@@ -1,17 +1,20 @@
 import {
   createDocument,
   loadDocument,
+  loadProjectDocument,
   makeIdFactory,
   newDocState,
   type Document,
   type DocumentEnvironment,
 } from '@marionette/document-core';
 import { McpToolError } from './errors';
+import { parseProjectDocument, type ProjectAsset } from '@marionette/format';
 
 // One headless document the MCP client is editing.
 export interface Session {
   readonly id: string;
   readonly document: Document;
+  readonly assets: readonly ProjectAsset[];
 }
 
 // A monotonic clock that advances past the coalescing window on every call, so consecutive MCP tool
@@ -48,6 +51,11 @@ export class SessionRegistry {
     return this.register(loadDocument(json, makeEnvironment()));
   }
 
+  openProject(json: unknown): Session {
+    const project = parseProjectDocument(json, { requireAssets: true });
+    return this.register(loadProjectDocument(project, makeEnvironment()), project.assets);
+  }
+
   get(id: string): Session {
     const session = this.sessions.get(id);
     if (session === undefined) {
@@ -66,13 +74,13 @@ export class SessionRegistry {
     return this.sessions.size;
   }
 
-  private register(document: Document): Session {
+  private register(document: Document, assets: readonly ProjectAsset[] = []): Session {
     if (this.sessions.size >= this.capacity) {
       throw new McpToolError('SESSION_LIMIT', `too many open documents (max ${this.capacity})`);
     }
     this.counter += 1;
     const id = `doc_${this.counter}`;
-    const session: Session = { id, document };
+    const session: Session = { id, document, assets };
     this.sessions.set(id, session);
     return session;
   }

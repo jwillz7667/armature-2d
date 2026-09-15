@@ -376,6 +376,21 @@ describe('paid MCP access', () => {
       (await rpc('tools/call', { name: 'document.open', arguments: { path: 'recovery.json' } }))
         .status,
     ).toBe(200);
+    const downloaded = await rpc('tools/call', {
+      name: 'workspace.download',
+      arguments: { path: 'recovery.json' },
+    });
+    expect(downloaded.status).toBe(200);
+    expect((await downloaded.json()).result.isError).not.toBe(true);
+    expect((await rpc('tools/call', { name: 'workspace.list', arguments: {} })).status).toBe(200);
+    expect(
+      (
+        await rpc('tools/call', {
+          name: 'workspace.upload',
+          arguments: { filename: 'new.json', base64: 'e30=' },
+        })
+      ).status,
+    ).toBe(402);
     f.failSubscriptions();
     expect(
       (await rpc('tools/call', { name: 'bone.create', arguments: { documentId } })).status,

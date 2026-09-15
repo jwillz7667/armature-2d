@@ -9,6 +9,12 @@ import { BillingStore, accountOwner, digest, randomToken } from './store';
 
 const cookieName = '__Host-armature-billing';
 const recoveryTools = new Set([
+  'project.open',
+  'project.export',
+  'project.save',
+  'workspace.list',
+  'workspace.download',
+  'workspace.deleteFile',
   'document.open',
   'document.export',
   'document.save',
