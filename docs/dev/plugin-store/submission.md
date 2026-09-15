@@ -7,7 +7,10 @@ Draft version: `0.1.0`. The portal rejected the prerelease version string.
 The listing, prompts, skill upload and review scenarios were entered. The skill
 scan passed. The hosted MCP URL and predefined OAuth client settings have been
 entered; interactive sign-in and the tool scan are not yet verified. Public policy
-URLs remain unset. Starting the tool scan generated the domain challenge and
+URLs were unset in the portal when last checked. The privacy policy was published
+with Armature 2D coverage on 2026-09-15 at
+`https://www.viral-ventures-llc.com/privacy#armature-2d`; entering it in the portal
+remains unverified. Starting the tool scan generated the domain challenge and
 opened an Authorize MCP dialog. The exact issued proof is configured in Railway;
 the server implements the well-known proof route. The portal confirmed **Domain
 verified** on 2026-09-14. After continuing from Authorize MCP, browser tab discovery
@@ -24,6 +27,8 @@ Short description: Rig, animate and render 2D skeletons with Armature.
 Long description: Create and edit skeletal rigs through Armature's command and undo system. Author bones, slots, attachments, animation and constraints; inspect the document, render PNG previews, and validate and save skeleton JSON. The current engine operates in independent headless sessions. It does not control a running editor window or persist a complete effects/slot editor project.
 Logo: plugins/armature/assets/icon.png
 Source: https://github.com/jwillz7667/armature-2d
+Privacy policy: https://www.viral-ventures-llc.com/privacy#armature-2d
+Privacy contact: privacy@viral-ventures-llc.com
 
 Starter prompts:
 - Create a two-bone puppet, render a preview, and save the skeleton.
@@ -59,8 +64,13 @@ they are not a claim that the hosted plugin has been tested.
    The verified individual identity was selected and confirmed saved. Confirm the
    final listing and policy publisher match before submitting; do not claim the
    business identity has been verified.
-3. Public product website, support, privacy and terms URLs must match the publisher.
-   Do not invent these URLs or claim a draft policy is approved. Domain verification
+3. The Viral Ventures LLC privacy policy now explicitly covers Armature 2D,
+   hosted project storage, AI-client exchanges, Railway hosting, Stripe billing,
+   session cookies, retention, and verified deletion requests. Its production page
+   returned HTTP 200 with the new section on 2026-09-15. Use the privacy URL above.
+   Public product website, support and terms URLs still need review, and the
+   listing's publisher identity must be reconciled with Viral Ventures LLC.
+   Do not claim a draft policy is approved. Domain verification
    requires the exact challenge issued by the portal.
 4. Supply working reviewer credentials if authentication is used and test the actual
    remote workflows. The local cross-platform tests do not substitute for these checks.
