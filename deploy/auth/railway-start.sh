@@ -7,7 +7,23 @@ umask 077
 mkdir -p /opt/keycloak/data/import
 printf '%s' "$ARMATURE_REALM_JSON" > /opt/keycloak/data/import/armature-realm.json
 
-if [[ -n "${ARMATURE_OPENAI_CLIENT_JSON:-}${ARMATURE_BILLING_CLIENT_JSON:-}" ]]; then
+# Preparing SMTP does not turn on account emails before DNS/delivery verification.
+# Neither mode enables public registration or changes existing users/clients.
+email_mode=${ARMATURE_EMAIL_MODE:-off}
+case "$email_mode" in
+  off|prepared|enabled) ;;
+  *) printf '%s\n' 'Armature email setup failed: invalid mode.' >&2; exit 1 ;;
+esac
+if [[ "$email_mode" != off ]]; then
+  # Resend keys have a constrained alphabet. Validate before inserting into JSON;
+  # never interpolate arbitrary environment content or pass secrets in argv.
+  if [[ ! "${ARMATURE_RESEND_API_KEY:-}" =~ ^re_[A-Za-z0-9_]+$ ]]; then
+    printf '%s\n' 'Armature email setup failed: missing or malformed sending key.' >&2
+    exit 1
+  fi
+fi
+
+if [[ -n "${ARMATURE_OPENAI_CLIENT_JSON:-}${ARMATURE_BILLING_CLIENT_JSON:-}" || "$email_mode" != off ]]; then
   (
     task_dir=$(mktemp -d /tmp/armature-oauth.XXXXXX)
     trap 'rm -rf -- "$task_dir"' EXIT
@@ -77,7 +93,61 @@ if [[ -n "${ARMATURE_OPENAI_CLIENT_JSON:-}${ARMATURE_BILLING_CLIENT_JSON:-}" ]];
       unset client_config
       printf '%s\n' "Armature OAuth verified: armature-$client_kind, exact callback, PKCE S256, consent, code flow only."
     done
+
+    if [[ "$email_mode" != off ]]; then
+      # kcadm reads this private file; the key never enters its command arguments.
+      # Omit registrationAllowed entirely, preserving the separate launch gate.
+      email_settings=''
+      if [[ "$email_mode" == enabled ]]; then
+        email_settings=',"verifyEmail":true,"resetPasswordAllowed":true'
+      fi
+      printf '{"smtpServer":{"host":"smtp.resend.com","port":"465","from":"no-reply@auth.viral-ventures-llc.com","fromDisplayName":"Armature 2D","user":"resend","password":"%s","auth":"true","ssl":"true","starttls":"false"}%s}' \
+        "$ARMATURE_RESEND_API_KEY" "$email_settings" > "$task_dir/email.json"
+      unset ARMATURE_RESEND_API_KEY
+      if ! /opt/keycloak/bin/kcadm.sh update realms/armature \
+        --config "$task_dir/admin.config" -f "$task_dir/email.json" \
+        > "$task_dir/email-update.log" 2>&1; then
+        printf '%s\n' 'Armature email setup failed: realm update rejected.' >&2
+        exit 1
+      fi
+      rm -f -- "$task_dir/email.json"
+      if ! /opt/keycloak/bin/kcadm.sh get realms/armature \
+        --config "$task_dir/admin.config" \
+        --fields smtpServer,verifyEmail,resetPasswordAllowed,registrationAllowed \
+        > "$task_dir/email-check.json" 2> "$task_dir/email-check.log"; then
+        printf '%s\n' 'Armature email verification failed: realm read unavailable.' >&2
+        exit 1
+      fi
+      email_config=$(< "$task_dir/email-check.json")
+      email_config=${email_config//[[:space:]]/}
+      for required in \
+        '"host":"smtp.resend.com"' \
+        '"port":"465"' \
+        '"from":"no-reply@auth.viral-ventures-llc.com"' \
+        '"user":"resend"' \
+        '"auth":"true"' \
+        '"ssl":"true"' \
+        '"starttls":"false"'; do
+        if [[ "$email_config" != *"$required"* ]]; then
+          printf '%s\n' 'Armature email verification failed: configuration drift.' >&2
+          exit 1
+        fi
+      done
+      if [[ "$email_mode" == enabled ]]; then
+        for required in '"verifyEmail":true' '"resetPasswordAllowed":true'; do
+          if [[ "$email_config" != *"$required"* ]]; then
+            printf '%s\n' 'Armature email verification failed: account flow drift.' >&2
+            exit 1
+          fi
+        done
+      fi
+      unset email_config
+      printf '%s\n' "Armature email configuration verified: mode=$email_mode, Resend SMTP with TLS. Delivery requires a separate test."
+    fi
   ) &
 fi
 
+# The bootstrap subshell already inherited the sending credential. Keycloak only
+# needs the stored realm setting, so do not pass the extra secret to its process.
+unset ARMATURE_RESEND_API_KEY
 exec /opt/keycloak/bin/kc.sh start --import-realm
