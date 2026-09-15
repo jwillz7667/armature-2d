@@ -9,6 +9,7 @@ export function toolCatalog() {
       name: tool.name,
       title: tool.title,
       description: tool.description,
+      annotations: tool.annotations,
       inputSchema: toJsonSchemaCompat(tool.inputSchema),
     }));
 }

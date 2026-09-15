@@ -287,13 +287,25 @@ export interface ToolDefinition {
   readonly title: string;
   readonly description: string;
   readonly inputSchema: z.AnyZodObject;
+  readonly annotations: {
+    readonly readOnlyHint: boolean;
+    readonly destructiveHint: boolean;
+    readonly openWorldHint: false;
+  };
   readonly handler: (deps: ToolDeps, rawInput: unknown) => Promise<unknown>;
 }
 
 // Define a tool with a typed input schema. The handler receives the validated, defaults-applied input;
 // invalid input becomes a typed McpToolError before the handler runs (validate-at-the-boundary).
 function defineTool<S extends z.AnyZodObject>(
-  spec: { name: string; title: string; description: string; input: S },
+  spec: {
+    name: string;
+    title: string;
+    description: string;
+    input: S;
+    // Explicit per-tool review: write includes replacing existing values, even when undoable.
+    access: 'read' | 'append' | 'write';
+  },
   handler: (deps: ToolDeps, input: z.infer<S>) => Promise<unknown> | unknown,
 ): ToolDefinition {
   return {
@@ -301,6 +313,13 @@ function defineTool<S extends z.AnyZodObject>(
     title: spec.title,
     description: spec.description,
     inputSchema: spec.input,
+    annotations: {
+      readOnlyHint: spec.access === 'read',
+      destructiveHint: spec.access === 'write',
+      // File access is confined to the selected project / authenticated user's private root.
+      // No tool sends messages, publishes content, or reaches arbitrary external services.
+      openWorldHint: false,
+    },
     handler: async (deps, rawInput) => {
       const parsed = spec.input.safeParse(rawInput);
       if (!parsed.success) {
@@ -1739,6 +1758,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.create',
+      access: 'append',
       title: 'Create effect',
       description:
         'Create a new, layer-less effect in the VFX library and return its id. Add layers with ' +
@@ -1774,6 +1794,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.delete',
+      access: 'write',
       title: 'Delete effect',
       description:
         'Delete an effect and cascade-remove every bundle item that references it (one undo step).',
@@ -1790,6 +1811,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.rename',
+      access: 'write',
       title: 'Rename effect',
       description:
         'Rename an effect (identity is the id, so bundle-item references are unaffected).',
@@ -1809,6 +1831,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.setMeta',
+      access: 'write',
       title: 'Set effect meta',
       description:
         'Set an effect duration (null = endless), deterministic flag, and/or simulationDt (must be > 0). ' +
@@ -1844,6 +1867,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.setAtlas',
+      access: 'write',
       title: 'Set effects atlas',
       description:
         'Replace the VFX atlas. Rejects (EFFECTS_ATLAS_DANGLING_REGION) any swap that drops a region a ' +
@@ -1860,6 +1884,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.layer.add',
+      access: 'append',
       title: 'Add effect layer',
       description:
         'Append a default layer (emitter / spriteAnimator / ribbonTrail) to an effect and return its id. ' +
@@ -1890,6 +1915,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.layer.remove',
+      access: 'write',
       title: 'Remove effect layer',
       description:
         'Remove a layer from an effect (one undo step restores it at its prior z position).',
@@ -1909,6 +1935,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.layer.reorder',
+      access: 'write',
       title: 'Reorder effect layers',
       description:
         'Reorder an effect layers by an explicit ordered layer-id list (a permutation of the current ' +
@@ -1929,6 +1956,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.layer.setField',
+      access: 'write',
       title: 'Set effect layer field',
       description:
         'Replace a layer body with a full rebuilt body (the caller patches one field and passes the whole ' +
@@ -1980,6 +2008,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.layer.setTrail',
+      access: 'write',
       title: 'Set emitter particle trail',
       description:
         'Enable, edit, or disable an emitter particle trail and its width/alpha curves atomically. Existing stop identities are preserved; null disables the trail.',
@@ -2010,6 +2039,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.layer.setBlendMode',
+      access: 'write',
       title: 'Set effect layer blend mode',
       description: 'Set a layer per-layer blend mode.',
       input: z
@@ -2036,6 +2066,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.lifeStop.add',
+      access: 'append',
       title: 'Add life-curve stop',
       description:
         'Insert an interior stop (t in (0,1)) into a layer life curve, keeping t strictly ascending. ' +
@@ -2073,6 +2104,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.lifeStop.remove',
+      access: 'write',
       title: 'Remove life-curve stop',
       description:
         'Remove an interior stop from a layer life curve. The t=0 / t=1 anchors and the two-stop floor ' +
@@ -2099,6 +2131,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.lifeStop.move',
+      access: 'write',
       title: 'Move life-curve stop',
       description:
         'Move a stop to a new t, keeping strict-ascending order and the t=0 / t=1 anchor positions.',
@@ -2131,6 +2164,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.lifeStop.setValue',
+      access: 'write',
       title: 'Set life-curve stop value',
       description: 'Set a stop value (a scalar or an {r,g,b} matching the curve field shape).',
       input: z
@@ -2162,6 +2196,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.lifeStop.setCurve',
+      access: 'write',
       title: 'Set life-curve stop easing',
       description: 'Set a stop outgoing easing (linear / stepped / a cubic bezier).',
       input: z
@@ -2195,6 +2230,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bundle.create',
+      access: 'append',
       title: 'Create bundle',
       description: 'Create a new, empty, named effect bundle.',
       input: z.object({ documentId, name: bundleName }).strict(),
@@ -2208,6 +2244,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bundle.delete',
+      access: 'write',
       title: 'Delete bundle',
       description: 'Delete a named bundle and all its items (one undo step).',
       input: z.object({ documentId, name: bundleName }).strict(),
@@ -2221,6 +2258,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bundle.item.add',
+      access: 'append',
       title: 'Add bundle item',
       description:
         'Append an item (a referenced effect + startOffset + anchorRole + seedSalt) to a bundle. The ' +
@@ -2242,6 +2280,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bundle.item.remove',
+      access: 'write',
       title: 'Remove bundle item',
       description: 'Remove an item from a bundle by its item id.',
       input: z.object({ documentId, name: bundleName, itemId: bundleItemId }).strict(),
@@ -2260,6 +2299,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bundle.item.reorder',
+      access: 'write',
       title: 'Reorder bundle items',
       description: 'Reorder a bundle items by an explicit ordered item-id list (a permutation).',
       input: z
@@ -2280,6 +2320,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bundle.item.set',
+      access: 'write',
       title: 'Set bundle item',
       description:
         'Patch a bundle item fields (effect / startOffset / anchorRole / seedSalt). Only the provided ' +
@@ -2318,6 +2359,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.getSnapshot',
+      access: 'read',
       title: 'Get effects snapshot',
       description:
         'Return the deterministic snapshot of the whole effects library (effects, atlas, bundles).',
@@ -2330,6 +2372,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.list',
+      access: 'read',
       title: 'List effects',
       description: 'List the effects (id, name, meta, layer count) in library order.',
       input: z.object({ documentId }).strict(),
@@ -2341,6 +2384,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.get',
+      access: 'read',
       title: 'Get effect',
       description: 'Get one effect with all its layers, bodies, and life curves by id.',
       input: z.object({ documentId, effectId }).strict(),
@@ -2356,6 +2400,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'effect.getAtlas',
+      access: 'read',
       title: 'Get effects atlas',
       description: 'Return the current VFX atlas (pages and regions).',
       input: z.object({ documentId }).strict(),
@@ -2365,6 +2410,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bundle.list',
+      access: 'read',
       title: 'List bundles',
       description: 'List the effect bundles (name, item count) in bundle order.',
       input: z.object({ documentId }).strict(),
@@ -2376,6 +2422,7 @@ const effectsTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bundle.get',
+      access: 'read',
       title: 'Get bundle',
       description: 'Get one bundle with all its items by name.',
       input: z.object({ documentId, name: bundleName }).strict(),
@@ -2393,6 +2440,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.winseq.setConfig',
+      access: 'write',
       title: 'Set complete win sequencer',
       description:
         'Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.',
@@ -2408,6 +2456,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.flow.setGraph',
+      access: 'write',
       title: 'Set complete feature flow',
       description:
         'Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.',
@@ -2423,6 +2472,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.scene.setRefs',
+      access: 'write',
       title: 'Set scene artifact references',
       description:
         'Replace validated presentation configuration in one undoable edit. Invalid local references leave the document unchanged.',
@@ -2438,6 +2488,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.grid.set',
+      access: 'write',
       title: 'Set slot grid',
       description:
         'Set the slot grid config (topology + dimensions + gravity, optional anticipation). Rejects an ' +
@@ -2452,6 +2503,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.grid.preset',
+      access: 'write',
       title: 'Apply slot grid preset',
       description:
         'Apply a canonical grid preset in one call: reelStrip5x3, scatterPay6x5, or cluster7x7.',
@@ -2478,6 +2530,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.symbol.map',
+      access: 'write',
       title: 'Map symbol anim set',
       description:
         'Map a SymbolId to a skeleton + idle/land/win(/anticipation) animation set, adding the skeletonRef ' +
@@ -2512,6 +2565,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.symbol.unmap',
+      access: 'write',
       title: 'Unmap symbol',
       description:
         'Remove a SymbolId mapping, pruning its skeletonRef when no remaining symbol references it. ' +
@@ -2533,6 +2587,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.winseq.create',
+      access: 'append',
       title: 'Create win sequence',
       description: 'Create a new, empty, named win sequence. Rejects a duplicate name (SLOT_EDIT).',
       input: z.object({ documentId, name: z.string().min(1) }).strict(),
@@ -2545,6 +2600,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.winseq.setStep',
+      access: 'write',
       title: 'Set win sequence step',
       description:
         'Set or append a step (atMs + target + action) at an index in a named sequence. An index equal to ' +
@@ -2571,6 +2627,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.winseq.reorderSteps',
+      access: 'write',
       title: 'Reorder win sequence steps',
       description:
         'Reorder a sequence steps by an explicit new-order array of current step indices (a permutation).',
@@ -2595,6 +2652,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.winseq.setThresholds',
+      access: 'write',
       title: 'Set escalation thresholds',
       description:
         'Set the big/mega/epic win escalation thresholds (finite, non-negative). Coalesces on the session.',
@@ -2612,6 +2670,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.flow.createState',
+      access: 'append',
       title: 'Create feature flow state',
       description:
         'Add a named feature-flow state (optional cinematic node). Rejects a duplicate or empty name (SLOT_EDIT).',
@@ -2631,6 +2690,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.flow.deleteState',
+      access: 'write',
       title: 'Delete feature flow state',
       description:
         'Delete a named state and every transition incident to it (one undo step). The mandatory "base" ' +
@@ -2645,6 +2705,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.flow.renameState',
+      access: 'write',
       title: 'Rename feature flow state',
       description:
         'Rename a state and rewrite every transition that references it. "base" cannot be renamed and the ' +
@@ -2661,6 +2722,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.flow.addTransition',
+      access: 'append',
       title: 'Add feature flow transition',
       description:
         'Append a transition (from + on match + to) to the feature-flow graph. The shape is validated at ' +
@@ -2677,6 +2739,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.flow.removeTransition',
+      access: 'write',
       title: 'Remove feature flow transition',
       description: 'Remove one transition by its index in the graph transition list.',
       input: z.object({ documentId, index: z.number().int().nonnegative() }).strict(),
@@ -2693,6 +2756,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.tumble.set',
+      access: 'write',
       title: 'Set tumble choreography',
       description:
         'Set the tumble/cascade timing (explode/drop/refill/settle/step ms as non-negative integers) plus ' +
@@ -2709,6 +2773,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.scene.get',
+      access: 'read',
       title: 'Get slot scene',
       description:
         'Return the whole slot-scene snapshot (grid, symbol library, win sequencer, feature flows, tumble, refs).',
@@ -2721,6 +2786,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.grid.get',
+      access: 'read',
       title: 'Get slot grid',
       description: 'Return the current slot grid config.',
       input: z.object({ documentId }).strict(),
@@ -2730,6 +2796,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.symbol.list',
+      access: 'read',
       title: 'List mapped symbols',
       description: 'List the mapped symbols (SymbolId + anim set) in id order.',
       input: z.object({ documentId }).strict(),
@@ -2741,6 +2808,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.symbol.get',
+      access: 'read',
       title: 'Get mapped symbol',
       description:
         'Return the anim set mapped to one SymbolId, or null when the symbol is unmapped.',
@@ -2756,6 +2824,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.winseq.get',
+      access: 'read',
       title: 'Get win sequencer',
       description: 'Return the win-sequencer config (sequences, thresholds, default sequence).',
       input: z.object({ documentId }).strict(),
@@ -2767,6 +2836,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.flow.get',
+      access: 'read',
       title: 'Get feature flow graph',
       description: 'Return the feature-flow graph (states, transitions, entry).',
       input: z.object({ documentId }).strict(),
@@ -2778,6 +2848,7 @@ const slotSceneTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.tumble.get',
+      access: 'read',
       title: 'Get tumble choreography',
       description: 'Return the tumble/cascade choreography.',
       input: z.object({ documentId }).strict(),
@@ -2819,6 +2890,7 @@ const eventTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'event.define',
+      access: 'append',
       title: 'Define event',
       description:
         'Create a document-level event definition (its int/float/string payload defaults and an optional ' +
@@ -2850,6 +2922,7 @@ const eventTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'event.rename',
+      access: 'write',
       title: 'Rename event',
       description:
         'Rename an event definition (identity is the id, so an animation event key never re-binds). The ' +
@@ -2870,6 +2943,7 @@ const eventTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'event.delete',
+      access: 'write',
       title: 'Delete event',
       description:
         'Delete an event definition and cascade-remove every animation event key that fires it (one undo ' +
@@ -2887,6 +2961,7 @@ const eventTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'event.setDefaults',
+      access: 'write',
       title: 'Set event defaults',
       description:
         'Replace an event definition int/float/string payload defaults wholesale (an absent field clears ' +
@@ -2920,6 +2995,7 @@ const eventTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'event.setAudio',
+      access: 'write',
       title: 'Set event audio',
       description:
         'Set (or, when audio is absent, clear) an event definition audio hint. `volume` must be in [0, 1] ' +
@@ -2941,6 +3017,7 @@ const eventTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'event.list',
+      access: 'read',
       title: 'List events',
       description:
         'List the document-level event definitions (id, name, payload defaults, audio hint).',
@@ -2953,6 +3030,7 @@ const eventTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'event.get',
+      access: 'read',
       title: 'Get event',
       description: 'Get one document-level event definition by id.',
       input: z.object({ documentId, eventId }).strict(),
@@ -2966,6 +3044,7 @@ const eventTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'event.key.set',
+      access: 'write',
       title: 'Set event key',
       description:
         'Insert or update an event-timeline key that fires an event definition at a time, optionally ' +
@@ -3008,6 +3087,7 @@ const eventTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'event.key.move',
+      access: 'write',
       title: 'Move event key',
       description:
         'Move an event-timeline key (by id) to a new time, keeping the timeline non-decreasing in time ' +
@@ -3047,6 +3127,7 @@ const eventTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'event.key.delete',
+      access: 'write',
       title: 'Delete event key',
       description:
         'Delete an event-timeline key (by id) from an animation. A missing key is a typed ' +
@@ -3080,6 +3161,7 @@ const eventTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'draworder.key.set',
+      access: 'write',
       title: 'Set draw-order key',
       description:
         'Insert or update a draw-order key at a time: a compact list of per-slot signed offsets from the ' +
@@ -3113,6 +3195,7 @@ const eventTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'draworder.key.move',
+      access: 'write',
       title: 'Move draw-order key',
       description:
         'Move a draw-order key (by id) to a new time (draw-order times are strictly ascending). Landing ' +
@@ -3155,6 +3238,7 @@ const eventTools: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'draworder.key.delete',
+      access: 'write',
       title: 'Delete draw-order key',
       description:
         'Delete a draw-order key (by id) from an animation. A missing key is a typed KEYFRAME_NOT_FOUND.',
@@ -3412,6 +3496,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'document.new',
+      access: 'append',
       title: 'New document',
       description: 'Create a new, empty skeleton document and return its id.',
       input: z.object({ name: z.string().min(1) }).strict(),
@@ -3421,6 +3506,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'document.getSnapshot',
+      access: 'read',
       title: 'Get document snapshot',
       description: 'Return the internal snapshot (bones, order) of an open document.',
       input: z.object({ documentId }).strict(),
@@ -3430,6 +3516,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'document.validate',
+      access: 'read',
       title: 'Validate document',
       description: 'Validate the current document against the format. Returns ok plus any errors.',
       input: z.object({ documentId }).strict(),
@@ -3452,6 +3539,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'document.export',
+      access: 'read',
       title: 'Export document',
       description: 'Project the document to the portable format JSON (validated and hashed).',
       input: z.object({ documentId }).strict(),
@@ -3463,6 +3551,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'document.save',
+      access: 'write',
       title: 'Save document',
       description: 'Export the document and write it to a path through the host file store.',
       input: z.object({ documentId, path: z.string().min(1) }).strict(),
@@ -3476,6 +3565,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'document.open',
+      access: 'append',
       title: 'Open document',
       description: 'Read and validate a document from a path, returning a new document id.',
       input: z.object({ path: z.string().min(1) }).strict(),
@@ -3511,6 +3601,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'document.close',
+      access: 'write',
       title: 'Close document',
       description: 'Discard an open document session.',
       input: z.object({ documentId }).strict(),
@@ -3523,6 +3614,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'import.spineProject',
+      access: 'append',
       title: 'Import Spine project',
       description:
         'Import a user-owned Spine JSON export through the clean-room importer. Real .skel binary ' +
@@ -3607,6 +3699,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'document.setMetadata',
+      access: 'write',
       title: 'Set document metadata',
       description:
         'Set the optional skeleton metadata block (authoring fps and the project-relative imagesPath / ' +
@@ -3641,6 +3734,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bone.create',
+      access: 'append',
       title: 'Create bone',
       description: 'Create a bone (optionally parented) and return its id.',
       input: z
@@ -3684,6 +3778,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bone.move',
+      access: 'write',
       title: 'Move bone',
       description: 'Set a bone local translation (x, y).',
       input: z
@@ -3702,6 +3797,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bone.rotate',
+      access: 'write',
       title: 'Rotate bone',
       description: 'Set a bone local rotation in degrees.',
       input: z.object({ documentId, boneId, rotation: z.number().finite() }).strict(),
@@ -3718,6 +3814,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bone.scale',
+      access: 'write',
       title: 'Scale bone',
       description: 'Set a bone local scale (scaleX, scaleY).',
       input: z
@@ -3739,6 +3836,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bone.shear',
+      access: 'write',
       title: 'Shear bone',
       description: 'Set a bone local shear in degrees (shearX, shearY).',
       input: z
@@ -3760,6 +3858,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bone.setLength',
+      access: 'write',
       title: 'Set bone length',
       description: 'Set a bone length.',
       input: z.object({ documentId, boneId, length: z.number().finite().nonnegative() }).strict(),
@@ -3776,6 +3875,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bone.rename',
+      access: 'write',
       title: 'Rename bone',
       description: 'Rename a bone (identity is the id, so references are unaffected).',
       input: z.object({ documentId, boneId, name: z.string().min(1) }).strict(),
@@ -3790,6 +3890,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bone.delete',
+      access: 'write',
       title: 'Delete bone',
       description: 'Delete a bone and its descendant bones (one undo step).',
       input: z.object({ documentId, boneId }).strict(),
@@ -3804,6 +3905,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bone.reparent',
+      access: 'write',
       title: 'Reparent bone',
       description:
         'Move a bone under a new parent (null for a root), holding its world transform fixed. ' +
@@ -3831,6 +3933,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bone.transformMode',
+      access: 'write',
       title: 'Set bone transform mode',
       description: 'Set how a bone inherits its parent transform (the format TransformMode enum).',
       input: z.object({ documentId, boneId, mode: transformModeSchema }).strict(),
@@ -3847,6 +3950,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bone.list',
+      access: 'read',
       title: 'List bones',
       description: 'List the bones in document order.',
       input: z.object({ documentId }).strict(),
@@ -3858,6 +3962,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'bone.get',
+      access: 'read',
       title: 'Get bone',
       description: 'Get one bone by id.',
       input: z.object({ documentId, boneId }).strict(),
@@ -3871,6 +3976,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.create',
+      access: 'append',
       title: 'Create slot',
       description: 'Create a slot riding a bone and return its id.',
       input: z
@@ -3905,6 +4011,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.delete',
+      access: 'write',
       title: 'Delete slot',
       description: 'Delete a slot and its attachments (one undo step).',
       input: z.object({ documentId, slotId }).strict(),
@@ -3919,6 +4026,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.rename',
+      access: 'write',
       title: 'Rename slot',
       description: 'Rename a slot (identity is the id, so references are unaffected).',
       input: z.object({ documentId, slotId, name: z.string().min(1) }).strict(),
@@ -3933,6 +4041,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.blend',
+      access: 'write',
       title: 'Set slot blend mode',
       description: 'Set a slot blend mode (the format BlendMode enum).',
       input: z.object({ documentId, slotId, blendMode: blendModeSchema }).strict(),
@@ -3949,6 +4058,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.color',
+      access: 'write',
       title: 'Set slot color',
       description: 'Set a slot tint color (RGBA, each channel 0..1).',
       input: z.object({ documentId, slotId, color: rgbaSchema }).strict(),
@@ -3965,6 +4075,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.darkColor',
+      access: 'write',
       title: 'Set slot dark color',
       description:
         'Set or clear a slot setup DARK color (Stage F2 two-color tint, RGBA 0..1). A non-null color enables ' +
@@ -3983,6 +4094,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.reorder',
+      access: 'write',
       title: 'Reorder slot',
       description: 'Move a slot to a new index in the setup-pose draw order.',
       input: z.object({ documentId, slotId, toIndex: z.number().int().nonnegative() }).strict(),
@@ -3999,6 +4111,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.activeAttachment',
+      access: 'write',
       title: 'Set active attachment',
       description: 'Set the slot setup-pose active attachment name (null clears it).',
       input: z.object({ documentId, slotId, attachment: z.string().min(1).nullable() }).strict(),
@@ -4015,6 +4128,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'attach.region.add',
+      access: 'append',
       title: 'Add region attachment',
       description:
         'Add a region attachment to a slot. `path` references an atlas region; ' +
@@ -4059,6 +4173,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'attach.linkedmesh.create',
+      access: 'append',
       title: 'Create linked mesh',
       description:
         'Add a linked mesh (Stage F2) to a slot default skin: it reuses the geometry of a PARENT mesh on the ' +
@@ -4103,6 +4218,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'attach.linkedmesh.unlink',
+      access: 'write',
       title: 'Unlink mesh',
       description:
         'Bake a linked mesh to a plain mesh: it takes the resolved root geometry and keeps its own atlas ' +
@@ -4123,6 +4239,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'attach.sequence.set',
+      access: 'write',
       title: 'Set attachment sequence',
       description:
         'Set or clear the Stage F2 frame-sequence on a region or mesh attachment. Provide `sequence` ' +
@@ -4160,6 +4277,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'attach.remove',
+      access: 'write',
       title: 'Remove attachment',
       description:
         'Remove an attachment from a slot (clears the slot active attachment if it was it).',
@@ -4187,6 +4305,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'attach.path.add',
+      access: 'append',
       title: 'Add path attachment',
       description:
         'Add a path attachment (a cubic Bezier rail) to a slot. Omitting `vertices` lays down the ' +
@@ -4219,6 +4338,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.moveControlPoint',
+      access: 'write',
       title: 'Move path control point',
       description:
         'Move one path control point (anchor or handle). The arc-length table is recomputed. Rejected ' +
@@ -4254,6 +4374,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.deleteControlPoint',
+      access: 'write',
       title: 'Delete path control point',
       description:
         'Delete one ANCHOR control point (pointIndex must be a multiple of 3), collapsing the curve it ' +
@@ -4282,6 +4403,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.addCurve',
+      access: 'append',
       title: 'Add path curve',
       description:
         'Append one cubic curve (three control points) to the end of a path spline; the arc-length ' +
@@ -4302,6 +4424,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.removeCurve',
+      access: 'write',
       title: 'Remove path curve',
       description:
         'Drop the last cubic curve from a path spline (a path keeps at least one curve). Rejected as ' +
@@ -4322,6 +4445,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.setClosed',
+      access: 'write',
       title: 'Set path closed',
       description:
         'Set a path spline open or closed. Closing drops the trailing anchor; opening appends one at the ' +
@@ -4344,6 +4468,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.setConstantSpeed',
+      access: 'write',
       title: 'Set path constant speed',
       description:
         'Set a path spline arc-length (constant-speed) vs naive-t parametrization. A pure flag flip. ' +
@@ -4366,6 +4491,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.get',
+      access: 'read',
       title: 'Get path attachment',
       description:
         'Read a path attachment: its openness, parametrization flag, flat control-point stream, and ' +
@@ -4397,6 +4523,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'attach.region.transform',
+      access: 'write',
       title: 'Set region attachment transform',
       description:
         'Set a region attachment placement/size. Omitted fields keep their current value.',
@@ -4443,6 +4570,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.list',
+      access: 'read',
       title: 'List slots',
       description: 'List the slots in setup-pose draw order.',
       input: z.object({ documentId }).strict(),
@@ -4454,6 +4582,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'slot.get',
+      access: 'read',
       title: 'Get slot',
       description: 'Get one slot (and its attachment names) by id.',
       input: z.object({ documentId, slotId }).strict(),
@@ -4472,6 +4601,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.generateFromRegion',
+      access: 'write',
       title: 'Generate mesh from region',
       description:
         'Replace a region attachment with a mesh under the same name. The editor computes the quad-' +
@@ -4519,6 +4649,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.addVertex',
+      access: 'write',
       title: 'Add mesh vertex',
       description:
         'Add an interior vertex to a mesh. The editor re-triangulates and passes the recomputed ' +
@@ -4555,6 +4686,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.moveVertex',
+      access: 'write',
       title: 'Move mesh vertex',
       description:
         'Move one mesh vertex to (x, y). Never re-triangulates (indices stable); always allowed (not ' +
@@ -4589,6 +4721,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.deleteVertex',
+      access: 'write',
       title: 'Delete mesh vertex',
       description:
         'Delete a mesh vertex. The editor re-triangulates and passes the recomputed uvs/triangles/' +
@@ -4625,6 +4758,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.setEdges',
+      access: 'write',
       title: 'Set mesh edges',
       description:
         'Set or replace a mesh edges (wireframe) array, as vertex-index pairs. Does not change ' +
@@ -4644,6 +4778,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.autoGridFill',
+      access: 'write',
       title: 'Auto grid-fill mesh',
       description:
         'Replace a mesh with an editor-computed regular interior grid (uvs/triangles/hullLength/' +
@@ -4687,6 +4822,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.autoPerimeterTrace',
+      access: 'write',
       title: 'Auto perimeter-trace mesh',
       description:
         'Replace a mesh with an editor-computed silhouette-traced hull plus interior fill (uvs/' +
@@ -4732,6 +4868,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.bindToBones',
+      access: 'write',
       title: 'Bind mesh to bones',
       description:
         'Convert an UNWEIGHTED mesh to the weighted encoding by binding it to a set of bones. ' +
@@ -4765,6 +4902,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.addBoneBinding',
+      access: 'write',
       title: 'Add bone to mesh binding',
       description:
         'Add one bone influence to an already-weighted mesh, seeded by proximity and re-normalized ' +
@@ -4788,6 +4926,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.removeBoneBinding',
+      access: 'write',
       title: 'Remove bone from mesh binding',
       description:
         'Drop one bone influence from a weighted mesh and re-normalize (a vertex left with no ' +
@@ -4811,6 +4950,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.unbind',
+      access: 'write',
       title: 'Unbind mesh',
       description:
         'Clear all weights, returning a mesh to the unweighted flat encoding (re-derived from the ' +
@@ -4833,6 +4973,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.autoWeight',
+      access: 'write',
       title: 'Auto-weight mesh from proximity',
       description:
         'Re-seed a weighted mesh by inverse distance to each bound bone segment (capped to the 4 ' +
@@ -4855,6 +4996,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.paintWeight',
+      access: 'write',
       title: 'Paint mesh weights',
       description:
         'Apply a weight-paint stroke to one active bone across a set of dabs (per-vertex weight ' +
@@ -4895,6 +5037,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.normalizeWeights',
+      access: 'write',
       title: 'Normalize mesh weights',
       description:
         'Re-normalize every vertex of a weighted mesh to sum 1 and cap to 4 influences (idempotent). ' +
@@ -4918,6 +5061,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'ik.createConstraint',
+      access: 'append',
       title: 'Create IK constraint',
       description:
         'Create an IK constraint over a 1 or 2 bone chain reaching toward a target bone, and return its ' +
@@ -4956,6 +5100,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'ik.setMix',
+      access: 'write',
       title: 'Set IK mix',
       description:
         'Set an IK constraint mix blend (0..1) toward the solved pose (absolute target).',
@@ -4973,6 +5118,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'ik.setBendPositive',
+      access: 'write',
       title: 'Set IK bend direction',
       description:
         'Set an IK constraint bend-direction flag (true bends positive, false negative).',
@@ -4990,6 +5136,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'ik.setDepth',
+      access: 'write',
       title: 'Set IK depth',
       description:
         'Patch a Stage F2 IK depth field: `softness` (non-negative world-unit ease-in distance), and the ' +
@@ -5029,6 +5176,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'ik.deleteConstraint',
+      access: 'write',
       title: 'Delete IK constraint',
       description:
         'Delete an IK constraint, cascading every animation IK timeline keyed to it (one undo step).',
@@ -5046,6 +5194,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'ik.setKeyframe',
+      access: 'write',
       title: 'Set IK keyframe',
       description:
         'Insert or update an IK keyframe at a time on a constraint IK channel (mix + bendPositive). ' +
@@ -5093,6 +5242,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'ik.deleteKeyframe',
+      access: 'write',
       title: 'Delete IK keyframe',
       description: 'Delete an IK keyframe (by id) from a constraint IK channel.',
       input: z.object({ documentId, animationId, ikConstraintId, keyframeId }).strict(),
@@ -5114,6 +5264,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'ik.moveKeyframe',
+      access: 'write',
       title: 'Move IK keyframe',
       description:
         'Move an IK keyframe (by id) to a new time on a constraint IK channel (IK times are strictly ' +
@@ -5160,6 +5311,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'ik.list',
+      access: 'read',
       title: 'List IK constraints',
       description: 'List the IK constraints in solve order.',
       input: z.object({ documentId }).strict(),
@@ -5174,6 +5326,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'ik.get',
+      access: 'read',
       title: 'Get IK constraint',
       description: 'Get one IK constraint by id.',
       input: z.object({ documentId, ikConstraintId }).strict(),
@@ -5189,6 +5342,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'transform.createConstraint',
+      access: 'append',
       title: 'Create transform constraint',
       description:
         'Create a transform constraint that drives a set of bones from a target with per-channel mix and ' +
@@ -5227,6 +5381,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'transform.setParams',
+      access: 'write',
       title: 'Set transform constraint params',
       description:
         'Patch a transform constraint mix/offset channels (only the named channels change; the rest keep ' +
@@ -5262,6 +5417,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'transform.setVariants',
+      access: 'write',
       title: 'Set transform constraint variants',
       description:
         'Patch a transform constraint Stage F2 variant flag: `local` (local-space read/write instead of the ' +
@@ -5298,6 +5454,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'transform.deleteConstraint',
+      access: 'write',
       title: 'Delete transform constraint',
       description:
         'Delete a transform constraint, cascading every animation transform timeline keyed to it (one ' +
@@ -5316,6 +5473,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'transform.setKeyframe',
+      access: 'write',
       title: 'Set transform keyframe',
       description:
         'Insert or update a transform keyframe at a time on a constraint channel. `mix` carries the six ' +
@@ -5362,6 +5520,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'transform.deleteKeyframe',
+      access: 'write',
       title: 'Delete transform keyframe',
       description: 'Delete a transform keyframe (by id) from a constraint channel.',
       input: z.object({ documentId, animationId, transformConstraintId, keyframeId }).strict(),
@@ -5383,6 +5542,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'transform.moveKeyframe',
+      access: 'write',
       title: 'Move transform keyframe',
       description:
         'Move a transform keyframe (by id) to a new time on a constraint channel (times are strictly ' +
@@ -5429,6 +5589,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'transform.list',
+      access: 'read',
       title: 'List transform constraints',
       description: 'List the transform constraints in solve order (after all IK).',
       input: z.object({ documentId }).strict(),
@@ -5443,6 +5604,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'transform.get',
+      access: 'read',
       title: 'Get transform constraint',
       description: 'Get one transform constraint by id.',
       input: z.object({ documentId, transformConstraintId }).strict(),
@@ -5459,6 +5621,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'constraints.reorder',
+      access: 'write',
       title: 'Reorder constraints',
       description:
         'Set the explicit cross-array constraint solve order (ADR-0009/ADR-0011): `order` is the combined ' +
@@ -5479,6 +5642,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.createConstraint',
+      access: 'append',
       title: 'Create path constraint',
       description:
         'Create a path constraint that distributes a set of bones along the path attachment carried by a ' +
@@ -5516,6 +5680,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.setParams',
+      access: 'write',
       title: 'Set path constraint params',
       description:
         'Patch a path constraint parameter: the modes (positionMode/spacingMode/rotateMode), the scalars ' +
@@ -5563,6 +5728,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.deleteConstraint',
+      access: 'write',
       title: 'Delete path constraint',
       description:
         'Delete a path constraint, cascading every animation path timeline keyed to it (one undo step).',
@@ -5580,6 +5746,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.listConstraints',
+      access: 'read',
       title: 'List path constraints',
       description: 'List the path constraints in solve order.',
       input: z.object({ documentId }).strict(),
@@ -5594,6 +5761,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.getConstraint',
+      access: 'read',
       title: 'Get path constraint',
       description: 'Get one path constraint by id.',
       input: z.object({ documentId, pathConstraintId }).strict(),
@@ -5607,6 +5775,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.setKeyframe',
+      access: 'write',
       title: 'Set path keyframe',
       description:
         'Insert or update a path-constraint keyframe at a time. Each channel (position/spacing/mixRotate/' +
@@ -5655,6 +5824,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.deleteKeyframe',
+      access: 'write',
       title: 'Delete path keyframe',
       description: 'Delete a path keyframe (by id) from a constraint path channel.',
       input: z.object({ documentId, animationId, pathConstraintId, keyframeId }).strict(),
@@ -5676,6 +5846,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'path.moveKeyframe',
+      access: 'write',
       title: 'Move path keyframe',
       description:
         'Move a path keyframe (by id) to a new time (path times are strictly ascending). Landing on an ' +
@@ -5724,6 +5895,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'physics.createConstraint',
+      access: 'append',
       title: 'Create physics constraint',
       description:
         "Create a physics constraint that simulates a subset of ONE bone's local channels " +
@@ -5761,6 +5933,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'physics.deleteConstraint',
+      access: 'write',
       title: 'Delete physics constraint',
       description:
         'Delete a physics constraint, cascading every animation physics timeline keyed to it (one undo step).',
@@ -5780,6 +5953,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'physics.renameConstraint',
+      access: 'write',
       title: 'Rename physics constraint',
       description:
         'Rename a physics constraint (identity is the id, so its timeline tracks are unaffected). Rejected ' +
@@ -5803,6 +5977,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'physics.setTargetBone',
+      access: 'write',
       title: 'Set physics target bone',
       description:
         'Retarget a physics constraint to a different bone (the single driven/setpoint bone). Rejected as ' +
@@ -5827,6 +6002,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'physics.setChannels',
+      access: 'write',
       title: 'Set physics channels',
       description:
         "Replace a physics constraint's simulated channel set (non-empty, duplicate-free subset of " +
@@ -5853,6 +6029,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'physics.setParams',
+      access: 'write',
       title: 'Set physics constraint params',
       description:
         'Patch a physics constraint scalar parameter: step (>0), inertia/damping/mix ([0,1]), strength (>=0), ' +
@@ -5900,6 +6077,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'physics.listConstraints',
+      access: 'read',
       title: 'List physics constraints',
       description: 'List the physics constraints in solve order.',
       input: z.object({ documentId }).strict(),
@@ -5914,6 +6092,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'physics.getConstraint',
+      access: 'read',
       title: 'Get physics constraint',
       description: 'Get one physics constraint by id.',
       input: z.object({ documentId, physicsConstraintId }).strict(),
@@ -5927,6 +6106,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'physics.getSettings',
+      access: 'read',
       title: 'Get physics settings',
       description:
         'Get the OPTIONAL skeleton physics settings block (global gravity/wind/master mix), or null when ' +
@@ -5940,6 +6120,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'physics.setSettings',
+      access: 'write',
       title: 'Set physics settings',
       description:
         'Set or CLEAR the global physics settings block. Pass { gravity, wind, mix } to set it, or ' +
@@ -5956,6 +6137,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'physics.setKeyframe',
+      access: 'write',
       title: 'Set physics keyframe',
       description:
         'Insert or update a physics-constraint keyframe at a time. Each dynamic channel (mix/inertia/' +
@@ -6012,6 +6194,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'physics.deleteKeyframe',
+      access: 'write',
       title: 'Delete physics keyframe',
       description: 'Delete a physics keyframe (by id) from a constraint physics channel.',
       input: z.object({ documentId, animationId, physicsConstraintId, keyframeId }).strict(),
@@ -6033,6 +6216,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'physics.moveKeyframe',
+      access: 'write',
       title: 'Move physics keyframe',
       description:
         'Move a physics keyframe (by id) to a new time (physics times are strictly ascending). Landing on an ' +
@@ -6081,6 +6265,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'skin.create',
+      access: 'append',
       title: 'Create skin',
       description:
         'Create a NAMED (non-default) skin and return its id. The implicit "default" skin is reserved. ' +
@@ -6097,6 +6282,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'skin.rename',
+      access: 'write',
       title: 'Rename skin',
       description:
         'Rename a NAMED skin (identity is the id, so deform tracks are unaffected). Rejected as SKIN ' +
@@ -6113,6 +6299,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'skin.delete',
+      access: 'write',
       title: 'Delete skin',
       description:
         'Delete a NAMED skin, cascading every animation deform timeline keyed to it (one undo step).',
@@ -6128,6 +6315,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'skin.scope.add',
+      access: 'append',
       title: 'Add skin scope',
       description:
         'Add a bone or constraint NAME to a NAMED skin Stage F2 scoping list (the bones/constraints active ' +
@@ -6150,6 +6338,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'skin.scope.remove',
+      access: 'write',
       title: 'Remove skin scope',
       description:
         'Remove a bone or constraint NAME from a NAMED skin scoping list (clearing the dimension when the ' +
@@ -6171,6 +6360,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'skin.setAttachment',
+      access: 'write',
       title: 'Set skin attachment',
       description:
         'Add or replace a region attachment on a NAMED skin at a (slot, attachment-name) address. The ' +
@@ -6206,6 +6396,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'skin.removeAttachment',
+      access: 'write',
       title: 'Remove skin attachment',
       description:
         'Remove an attachment from a NAMED skin at a (slot, attachment-name) address. Rejected as SKIN ' +
@@ -6226,6 +6417,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'skin.list',
+      access: 'read',
       title: 'List skins',
       description:
         'List the NAMED (non-default) skins in skin order, each with its attachment addresses.',
@@ -6238,6 +6430,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'skin.get',
+      access: 'read',
       title: 'Get skin',
       description: 'Get one NAMED skin (and its attachment addresses) by id.',
       input: z.object({ documentId, skinId }).strict(),
@@ -6251,6 +6444,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'deform.setKeyframe',
+      access: 'write',
       title: 'Set deform keyframe',
       description:
         'Insert or update a deform keyframe at a time on a (skin, slot, attachment) mesh channel. `skin` ' +
@@ -6304,6 +6498,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'deform.setCurve',
+      access: 'write',
       title: 'Set deform keyframe curve',
       description:
         'Set the outgoing interpolation curve (linear / stepped / bezier) of an EXISTING deform ' +
@@ -6350,6 +6545,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'deform.deleteKeyframe',
+      access: 'write',
       title: 'Delete deform keyframe',
       description:
         'Delete a deform keyframe (by id) from a (skin, slot, attachment) mesh channel. `skin` is ' +
@@ -6385,6 +6581,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'deform.moveKeyframe',
+      access: 'write',
       title: 'Move deform keyframe',
       description:
         'Move a deform keyframe (by id) to a new time on its (skin, slot, attachment) channel. `skin` is ' +
@@ -6429,6 +6626,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'deform.clearAttachment',
+      access: 'write',
       title: 'Clear attachment deform',
       description:
         'Remove every deform keyframe for one (slot, attachment) across all animations and all skins (one ' +
@@ -6449,6 +6647,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'history.undo',
+      access: 'write',
       title: 'Undo',
       description: 'Undo the last committed change.',
       input: z.object({ documentId }).strict(),
@@ -6458,6 +6657,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'history.redo',
+      access: 'write',
       title: 'Redo',
       description: 'Redo the last undone change.',
       input: z.object({ documentId }).strict(),
@@ -6467,6 +6667,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'history.getState',
+      access: 'read',
       title: 'Get history state',
       description: 'Report whether undo/redo are available and their labels.',
       input: z.object({ documentId }).strict(),
@@ -6484,6 +6685,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'history.beginInteraction',
+      access: 'append',
       title: 'Begin interaction',
       description: 'Start a coalescing interaction; subsequent edits collapse into one undo step.',
       input: z.object({ documentId }).strict(),
@@ -6496,6 +6698,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'history.endInteraction',
+      access: 'append',
       title: 'End interaction',
       description: 'Commit the interaction as a single undo step with the given label.',
       input: z.object({ documentId, label: z.string().min(1) }).strict(),
@@ -6509,6 +6712,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'document.getWorldTransforms',
+      access: 'read',
       title: 'Get solved world transforms',
       description:
         'Read bone matrices from setup or a fully constrained animated pose. Physics is replayed from rest at 60 Hz; times clamp to the clip duration. Returns revision and resolved context.',
@@ -6541,6 +6745,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'mesh.sample',
+      access: 'read',
       title: 'Sample solved mesh vertices',
       description:
         'Return final world-space vertices, triangles, and bounds after constraints, skinning, and deform. Supports weighted and linked meshes and named-skin default fallback. Physics replays at 60 Hz.',
@@ -6577,6 +6782,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'atlas.pack',
+      access: 'write',
       title: 'Pack atlas',
       description:
         'Pack the source PNGs in a project directory into a deterministic atlas (import -> alpha-trim -> ' +
@@ -6651,6 +6857,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'atlas.set',
+      access: 'write',
       title: 'Set atlas',
       description:
         'Install the document atlas (packed pages + regions) through the command history (LAW 2). The ' +
@@ -6667,6 +6874,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'atlas.get',
+      access: 'read',
       title: 'Get atlas',
       description: 'Return the document current atlas ref (packed pages + regions).',
       input: z.object({ documentId }).strict(),
@@ -6678,6 +6886,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'render_frame',
+      access: 'read',
       title: 'Render frame',
       description:
         'Rasterize the current document to a PNG for headless authoring feedback (ADR-0006) and return ' +
@@ -6782,6 +6991,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'anim.create',
+      access: 'append',
       title: 'Create animation',
       description: 'Create a new, empty animation with a duration and return its id.',
       input: z
@@ -6804,6 +7014,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'anim.delete',
+      access: 'write',
       title: 'Delete animation',
       description: 'Delete an animation and all its timelines (one undo step).',
       input: z.object({ documentId, animationId }).strict(),
@@ -6820,6 +7031,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'anim.rename',
+      access: 'write',
       title: 'Rename animation',
       description: 'Rename an animation (identity is the id, so timelines are unaffected).',
       input: z.object({ documentId, animationId, name: z.string().min(1) }).strict(),
@@ -6836,6 +7048,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'anim.duration',
+      access: 'write',
       title: 'Set animation duration',
       description:
         'Set an animation duration (seconds). Rejects shrinking below the last keyframe time as ' +
@@ -6863,6 +7076,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'anim.duplicate',
+      access: 'append',
       title: 'Duplicate animation',
       description: 'Duplicate an animation under a new name and return the new id (one undo step).',
       input: z.object({ documentId, animationId, name: z.string().min(1) }).strict(),
@@ -6880,6 +7094,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'anim.list',
+      access: 'read',
       title: 'List animations',
       description: 'List the animations (id, name, duration, track counts).',
       input: z.object({ documentId }).strict(),
@@ -6894,6 +7109,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'anim.get',
+      access: 'read',
       title: 'Get animation',
       description: 'Get one animation with all its timelines and keyframes by id.',
       input: z.object({ documentId, animationId }).strict(),
@@ -6909,6 +7125,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'kf.set',
+      access: 'write',
       title: 'Set keyframe',
       description:
         'Insert or update a keyframe at a time on a channel. `channel` is rotate/translate/scale/' +
@@ -6957,6 +7174,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'kf.move',
+      access: 'write',
       title: 'Move keyframe',
       description:
         'Move a keyframe (by id) to a new time on its channel. Rejects landing on an occupied time ' +
@@ -6999,6 +7217,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'kf.delete',
+      access: 'write',
       title: 'Delete keyframe',
       description: 'Delete a keyframe (by id) from its channel.',
       input: z
@@ -7030,6 +7249,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'kf.curve',
+      access: 'write',
       title: 'Set keyframe curve',
       description: 'Set a keyframe outgoing interpolation curve (linear / stepped / bezier).',
       input: z
@@ -7063,6 +7283,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'kf.paste',
+      access: 'write',
       title: 'Paste keyframes',
       description:
         'Insert several keyframes at absolute times in one undo step. Each item names its channel ' +
@@ -7111,6 +7332,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'kf.attachment.set',
+      access: 'write',
       title: 'Set attachment keyframe',
       description:
         'Insert or replace a slot attachment-swap frame at a time on the stepped attachment timeline. ' +
@@ -7153,6 +7375,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'kf.attachment.delete',
+      access: 'write',
       title: 'Delete attachment keyframe',
       description:
         'Delete the slot attachment-swap frame at exactly `time` from the stepped attachment timeline. ' +
@@ -7193,6 +7416,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'kf.attachment.move',
+      access: 'write',
       title: 'Move attachment keyframe',
       description:
         'Move a slot attachment-swap frame (by id) to a new time on the stepped attachment timeline ' +
@@ -7239,6 +7463,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'anim.sequence.set',
+      access: 'write',
       title: 'Set sequence keyframe',
       description:
         'Insert or update a slot frame-sequence keyframe at a time (Stage F2): `mode` playback, starting ' +
@@ -7276,6 +7501,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'anim.sequence.move',
+      access: 'write',
       title: 'Move sequence keyframe',
       description:
         'Move a slot frame-sequence keyframe (by id) to a new time (strict-ascending). Landing on an ' +
@@ -7321,6 +7547,7 @@ export const TOOLS: readonly ToolDefinition[] = [
   defineTool(
     {
       name: 'anim.sequence.delete',
+      access: 'write',
       title: 'Delete sequence keyframe',
       description:
         'Delete a slot frame-sequence keyframe (by id). A missing key is a typed KEYFRAME_NOT_FOUND.',

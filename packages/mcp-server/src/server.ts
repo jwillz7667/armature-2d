@@ -13,7 +13,11 @@ const DEFAULT_INFO: ServerInfo = { name: 'marionette', version: '0.1.0' };
 // Zod schema (the SDK validates from the raw shape, and the handler re-validates for direct callers),
 // and every mutating tool drives the SAME document-core commands the GUI uses (LAW 2). A tool failure
 // is returned as a typed, structured isError result, never an uncaught throw across the transport.
-export function buildMcpServer(deps: ToolDeps, info: ServerInfo = DEFAULT_INFO): McpServer {
+export function buildMcpServer(
+  deps: ToolDeps,
+  info: ServerInfo = DEFAULT_INFO,
+  options: { readonly redactErrors?: boolean } = {},
+): McpServer {
   const server = new McpServer(info);
   for (const tool of TOOLS) {
     server.registerTool(
@@ -22,6 +26,7 @@ export function buildMcpServer(deps: ToolDeps, info: ServerInfo = DEFAULT_INFO):
         title: tool.title,
         description: tool.description,
         inputSchema: tool.inputSchema.shape,
+        annotations: tool.annotations,
       },
       async (args: unknown) => {
         try {
@@ -30,10 +35,18 @@ export function buildMcpServer(deps: ToolDeps, info: ServerInfo = DEFAULT_INFO):
         } catch (error) {
           const body =
             error instanceof McpToolError
-              ? { code: error.code, message: error.message, detail: error.detail }
+              ? {
+                  code: error.code,
+                  message: options.redactErrors ? 'Tool operation failed' : error.message,
+                  ...(options.redactErrors ? {} : { detail: error.detail }),
+                }
               : {
                   code: 'INTERNAL',
-                  message: error instanceof Error ? error.message : 'unknown error',
+                  message: options.redactErrors
+                    ? 'Internal tool error'
+                    : error instanceof Error
+                      ? error.message
+                      : 'unknown error',
                 };
           return {
             content: [{ type: 'text' as const, text: JSON.stringify(body) }],

@@ -1,11 +1,24 @@
 # Armature 2D public plugin submission
 
-Status: preparation only, not submitted or published.
+Status: saved OpenAI Platform draft, not submitted or published.
+
+Draft app ID: `asdk_app_6aa6cb80da2c8191a768d23d0411bc39`.
+Draft version: `0.1.0`. The portal rejected the prerelease version string.
+The listing, prompts, skill upload and review scenarios were entered. The skill
+scan passed. The hosted MCP URL and predefined OAuth client settings have been
+entered; interactive sign-in and the tool scan are not yet verified. Public policy
+URLs remain unset. Starting the tool scan generated the domain challenge and
+opened an Authorize MCP dialog. The exact issued proof is configured in Railway;
+the server implements the well-known proof route. The portal confirmed **Domain
+verified** on 2026-09-14. After continuing from Authorize MCP, browser tab discovery
+timed out; a fresh-tab recovery also timed out. User sign-in and tool-scan status
+remain unknown, and neither is claimed as successful.
+See [hosted MCP status](hosted-mcp.md) for backend implementation and launch gates.
 
 ## Listing draft
 
 Name: Armature 2D
-Publisher: Viral Ventures LLC (identity must be verified in the publishing organization)
+Draft publisher: JUSTIN THOMAS WILLIAMS (verified individual selected in the portal; business identity has not been verified)
 Category: Productivity
 Short description: Rig, animate and render 2D skeletons with Armature.
 Long description: Create and edit skeletal rigs through Armature's command and undo system. Author bones, slots, attachments, animation and constraints; inspect the document, render PNG previews, and validate and save skeleton JSON. The current engine operates in independent headless sessions. It does not control a running editor window or persist a complete effects/slot editor project.
@@ -37,15 +50,15 @@ they are not a claim that the hosted plugin has been tested.
 
 ## Blocking requirements
 
-1. Public remote MCP: the existing distribution uses local stdio. Standard With MCP
-   submissions require a stable public HTTPS endpoint. Build and verify authenticated,
-   tenant-isolated sessions, persistent project storage, resource limits, and accurate
-   annotations on all 208 tools before exposing that endpoint. Never serve all users
-   from a shared unrestricted project directory. Alternatively obtain OpenAI approval
-   for local MCP support; no such approval has been obtained.
-2. Publisher access: sign into the publishing OpenAI organization, confirm Apps
-   Management write access and a verified developer/business identity. The browser
-   reached sign-in; organization identity and permissions have not been checked.
+1. Remote MCP is deployed at `https://armature-mcp-production.up.railway.app/mcp`.
+   Authenticated machine-client workflows and restart persistence passed. All 208
+   tool annotations are implemented and tested. Complete user OAuth and the portal
+   tool scan, two-account live isolation, and public-service resource/storage controls.
+   The local portable bundle remains available independently of public store approval.
+2. Publisher access: sign-in and draft creation succeeded in the Personal organization.
+   The verified individual identity was selected and confirmed saved. Confirm the
+   final listing and policy publisher match before submitting; do not claim the
+   business identity has been verified.
 3. Public product website, support, privacy and terms URLs must match the publisher.
    Do not invent these URLs or claim a draft policy is approved. Domain verification
    requires the exact challenge issued by the portal.
@@ -59,3 +72,15 @@ empty MCP configuration or reclassify this dependency as a working skills-only s
 
 Sources checked: [submission requirements](https://developers.openai.com/plugins/deploy/submission)
 and [portable packaging](https://developers.openai.com/plugins/build/plugins).
+
+## Connection draft
+
+- Registration: pre-defined; client ID `armature-openai`; token auth method `None`.
+- Redirect URI: `https://chatgpt.com/connector_platform_oauth_redirect`, as shown by
+  this portal draft. The client restricts redirects to exactly this address.
+- Requested scopes: `armature:edit openid`; issuer and endpoints are discovered from
+  the hosted Keycloak realm. Do not paste the `armature-service` secret into the portal.
+- OIDC `email` scope / verified-email onboarding are not configured. Enterprise
+  workspace domain restrictions therefore remain unavailable.
+- The interactive scan still requires user OAuth. Do not treat the OAuth client
+  configuration as a successful end-to-end user connection.
