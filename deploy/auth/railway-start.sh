@@ -14,6 +14,7 @@ case "$email_mode" in
   off|prepared|enabled) ;;
   *) printf '%s\n' 'Armature email setup failed: invalid mode.' >&2; exit 1 ;;
 esac
+printf '%s\n' "Armature account email bootstrap: mode=$email_mode."
 if [[ "$email_mode" != off ]]; then
   # Resend keys have a constrained alphabet. Validate before inserting into JSON;
   # never interpolate arbitrary environment content or pass secrets in argv.
