@@ -14,7 +14,7 @@ export const previewHtml = String.raw`<!doctype html>
 :root{font:14px system-ui,sans-serif;color-scheme:light dark}
 body{margin:0;padding:16px;background:Canvas;color:CanvasText}
 header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
-h1{font-size:16px;margin:0}#status{margin:0;font-size:13px;color:GrayText}
+h1{font-size:16px;margin:0}#status{margin:0;font-size:13px;opacity:.8}
 .stage{display:grid;place-items:center;min-height:80px;border:1px solid #8886;border-radius:10px;overflow:hidden;
 background-color:#747474;background-image:linear-gradient(45deg,#999 25%,transparent 25%),linear-gradient(-45deg,#999 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#999 75%),linear-gradient(-45deg,transparent 75%,#999 75%);background-size:24px 24px;background-position:0 0,0 12px,12px -12px,-12px 0}
 img{display:block;max-width:100%;max-height:440px;object-fit:contain}img[hidden]{display:none}
