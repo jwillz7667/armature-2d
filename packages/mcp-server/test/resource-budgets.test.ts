@@ -53,7 +53,11 @@ describe('hosted storage budgets', () => {
   });
   it('rejects links masquerading as volume recovery metadata', async () => {
     const { root, a, alice } = await fixture();
-    await symlink(alice, join(root, 'lost+found'), process.platform === 'win32' ? 'junction' : 'dir');
+    await symlink(
+      alice,
+      join(root, 'lost+found'),
+      process.platform === 'win32' ? 'junction' : 'dir',
+    );
     await expect(a.write('one.json', '1')).rejects.toMatchObject({ code: 'STORAGE_QUOTA' });
     expect(await a.listDir('.')).toEqual([]);
   });
