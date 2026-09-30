@@ -33,7 +33,21 @@ export function buildMcpServer(
         try {
           const result = await tool.handler(deps, args);
           return {
-            content: [{ type: 'text' as const, text: JSON.stringify(result) }],
+            content: [
+              { type: 'text' as const, text: JSON.stringify(result) },
+              // Send the exact encoded pixels to image-capable clients. Reconstructing
+              // base64 from model-generated text can corrupt an otherwise valid PNG.
+              ...(tool.name === 'render_frame' &&
+              typeof (result as Record<string, unknown>).pngBase64 === 'string'
+                ? [
+                    {
+                      type: 'image' as const,
+                      mimeType: 'image/png',
+                      data: (result as { pngBase64: string }).pngBase64,
+                    },
+                  ]
+                : []),
+            ],
             structuredContent: result as Record<string, unknown>,
           };
         } catch (error) {
