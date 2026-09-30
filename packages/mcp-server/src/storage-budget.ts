@@ -28,7 +28,7 @@ export function createStorageBudget(
     throw new Error('Storage limits must be positive integers');
   let tail = Promise.resolve();
   const exhausted = () => new McpToolError('STORAGE_QUOTA', 'Project storage limit reached');
-  async function usage(root: string, maxFiles: number) {
+  async function usage(root: string, maxFiles: number, volumeRoot = false) {
     let bytes = 0;
     let files = 0;
     let visited = 0;
@@ -44,6 +44,12 @@ export function createStorageBudget(
           if (++visited > limits.totalFiles + 1024) throw exhausted();
           const path = join(held, entry.name);
           if (entry.isSymbolicLink()) throw exhausted();
+          // Persistent filesystem mounts can contain an inaccessible, root-owned
+          // recovery directory. It is not project storage. Skip only that real
+          // directory at the volume root; tenant descendants still count, and a
+          // link with this name must still fail the check above.
+          if (volumeRoot && depth === 0 && entry.isDirectory() && entry.name === 'lost+found')
+            continue;
           if (entry.isDirectory()) await walk(path, depth + 1);
           else {
             const stat = await lstat(path);
@@ -82,7 +88,7 @@ export function createStorageBudget(
           if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
         }
         const tenant = await usage(tenantRoot, limits.tenantFiles);
-        const total = await usage(dataRoot, limits.totalFiles);
+        const total = await usage(dataRoot, limits.totalFiles, true);
         const free = await statfs(dataRoot, { bigint: true });
         // Atomic replacement temporarily holds both versions, so reserve the full new file.
         if (
