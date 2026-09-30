@@ -94,6 +94,7 @@ export async function createHttpServer(options: HttpOptions) {
     transport: StreamableHTTPServerTransport;
     server: ReturnType<typeof buildMcpServer>;
     busy: boolean;
+    hasToolCalls: boolean;
     used: number;
   };
   const sessions = new Map<string, Entry>();
@@ -312,10 +313,32 @@ export async function createHttpServer(options: HttpOptions) {
       sessionKey = id as string;
       entry = existing;
       entry.busy = true;
+      if (body && typeof body === 'object' && 'method' in body && body.method === 'tools/call') {
+        entry.hasToolCalls = true;
+      }
     } else {
       if (req.method !== 'POST' || !isInitializeRequest(body)) {
         send(res, 400, 'Initialize a session first');
         return;
+      }
+      // Discovery clients may abandon initialized connections without DELETE.
+      // Reclaim only idle connections that never ran a tool, so documents and
+      // user work remain untouched. Reserve the entry before awaiting its close.
+      if (
+        !pendingOwners.has(owner) &&
+        (sessions.size + pendingOwners.size >= maxSessions ||
+          [...sessions.values()].filter((session) => session.owner === owner).length >=
+            maxSessionsPerOwner)
+      ) {
+        const unused = [...sessions.entries()]
+          .filter(
+            ([, session]) => session.owner === owner && !session.busy && !session.hasToolCalls,
+          )
+          .sort((a, b) => a[1].used - b[1].used)[0];
+        if (unused) {
+          unused[1].busy = true;
+          await dispose(unused[0], unused[1]);
+        }
       }
       if (
         sessions.size + pendingOwners.size >= maxSessions ||
@@ -349,7 +372,7 @@ export async function createHttpServer(options: HttpOptions) {
           sessionIdGenerator: () => sessionKey,
           enableJsonResponse: true,
         });
-        entry = { owner, server, transport, busy: true, used: Date.now() };
+        entry = { owner, server, transport, busy: true, hasToolCalls: false, used: Date.now() };
         // SDK 1.30 declares the same optional callbacks differently on these interfaces.
         await server.connect(transport as Transport);
         sessions.set(sessionKey, entry);
