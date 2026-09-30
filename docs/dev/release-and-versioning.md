@@ -12,7 +12,7 @@ How versions work in this repository, what gates a change, and where the release
 | Shared format primitives | same file | `1.0.0` | frozen; a change here is a MAJOR event |
 | Boundary contract (math engine) | `packages/math-bridge/src/version.ts` | `1.0.0` | additive changes only without a bump |
 | MRNT container version | `packages/format/src/binary/` | `1` | new container features bump it |
-| App version | root and editor `package.json` | `0.2.0-rc.1` | matches the release tag |
+| App version | root and editor `package.json` | `0.2.0-rc.2` | matches the release tag |
 
 The format version is the semver of THE FORMAT, deliberately independent of the app version: a
 document written today must load in every future app version that supports its MAJOR (with

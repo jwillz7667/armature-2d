@@ -1,6 +1,6 @@
 {
   "name": "editor",
-  "version": "0.2.0-rc.1",
+  "version": "0.2.0-rc.2",
   "private": true,
   "license": "SEE LICENSE IN LICENSE",
   "author": "Viral Ventures LLC (Maple Grove, MN) <jwillz7667@gmail.com>",
@@ -15,7 +15,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "package": "electron-vite build && electron-builder --dir",
-    "package:dist": "electron-vite build && electron-builder"
+    "package:dist": "electron-vite build && electron-builder --publish never"
   },
   "dependencies": {
     "@marionette/atlas-pack": "workspace:*",
