@@ -389,7 +389,7 @@ export async function createHttpServer(options: HttpOptions) {
             files: createNodeFileStore(root, { maxFileBytes: 8 * 1024 * 1024, storageBudget }),
           },
           undefined,
-          { redactErrors: true },
+          { redactErrors: true, widgetDomain: resource.origin },
         );
         sessionKey = randomUUID();
         const transport = new StreamableHTTPServerTransport({

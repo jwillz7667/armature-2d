@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { McpToolError } from './errors';
 import { TOOLS, type ToolDeps } from './tools';
+import { PREVIEW_URI, PREVIEW_TOOL_META, previewHtml } from './preview-widget';
 
 export interface ServerInfo {
   readonly name: string;
@@ -16,9 +17,30 @@ const DEFAULT_INFO: ServerInfo = { name: 'marionette', version: '0.1.0' };
 export function buildMcpServer(
   deps: ToolDeps,
   info: ServerInfo = DEFAULT_INFO,
-  options: { readonly redactErrors?: boolean } = {},
+  options: { readonly redactErrors?: boolean; readonly widgetDomain?: string } = {},
 ): McpServer {
   const server = new McpServer(info);
+  server.registerResource('armature-preview', PREVIEW_URI, {}, async () => ({
+    contents: [
+      {
+        uri: PREVIEW_URI,
+        mimeType: 'text/html;profile=mcp-app',
+        text: previewHtml,
+        _meta: {
+          ui: {
+            prefersBorder: true,
+            csp: { connectDomains: [], resourceDomains: [] },
+            ...(options.widgetDomain ? { domain: options.widgetDomain } : {}),
+          },
+          'openai/widgetDescription':
+            'Displays the exact rendered PNG and whether placeholder textures were used.',
+          'openai/widgetPrefersBorder': true,
+          'openai/widgetCSP': { connect_domains: [], resource_domains: [] },
+          ...(options.widgetDomain ? { 'openai/widgetDomain': options.widgetDomain } : {}),
+        },
+      },
+    ],
+  }));
   for (const tool of TOOLS) {
     server.registerTool(
       tool.name,
@@ -28,6 +50,7 @@ export function buildMcpServer(
         inputSchema: tool.inputSchema.shape,
         outputSchema: tool.outputSchema,
         annotations: tool.annotations,
+        ...(tool.name === 'render_frame' ? { _meta: PREVIEW_TOOL_META } : {}),
       },
       async (args: unknown) => {
         try {
