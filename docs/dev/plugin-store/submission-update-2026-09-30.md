@@ -35,7 +35,7 @@ A dedicated non-admin reviewer account was created and authenticated through the
 
 The 95-second `armature-reviewer-walkthrough.mp4` contains cropped actual Safari/ChatGPT screen captures with captions; waiting time is omitted. It is a screen-capture walkthrough, not an uninterrupted recording. No replacement preview image or simulated results are used. It excludes credentials and unrelated browser content.
 
-The portal reports only two remaining issues: the demo URL and the six legal/policy confirmations. MCP and authoring-skill validation previously passed; the private developer app's tools were refreshed after deploying the widget. The final submit action has not been performed.
+The [walkthrough](https://raw.githubusercontent.com/jwillz7667/armature-2d/564d3737b576888ba3df051b8b70a155869cc271/docs/dev/plugin-store/armature-reviewer-walkthrough.mp4) is publicly accessible without authentication (HTTP 200) and its URL is saved in the draft. The portal now reports only the six legal/policy confirmations as incomplete. MCP and authoring-skill validation previously passed; the private developer app tools were refreshed after deploying the widget. The final submit action has not been performed.
 
 ## Scope and operational notes
 
