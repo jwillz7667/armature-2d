@@ -752,6 +752,50 @@ function exportOrThrow(model: DocumentReadModel): SkeletonDocument {
   }
 }
 
+// Preview-only atlas metadata makes an unfinished, atlas-less region drawable without
+// changing the user's document or relaxing export validation. No synthetic file is read.
+function exportPreviewOrThrow(model: DocumentReadModel): SkeletonDocument {
+  if (model.preserved().atlas.pages.length !== 0) return exportOrThrow(model);
+  try {
+    return exportDocument(model);
+  } catch (error) {
+    if (!(error instanceof ExportValidationError)) return exportOrThrow(model);
+    const missing = error.report.errors;
+    if (
+      !missing.length ||
+      missing.some(
+        (item) =>
+          item.code !== 'ATTACHMENT_REGION_MISSING' || typeof item.detail?.path !== 'string',
+      )
+    ) {
+      return exportOrThrow(model);
+    }
+    const names = [...new Set(missing.map((item) => String(item.detail!.path)))];
+    const atlas: AtlasRef = {
+      pages: [
+        {
+          file: '__armature_preview_only__.png',
+          width: 1,
+          height: 1,
+          regions: names.map((name) => ({
+            name,
+            x: 0,
+            y: 0,
+            w: 1,
+            h: 1,
+            rotated: false,
+            offsetX: 0,
+            offsetY: 0,
+            originalW: 1,
+            originalH: 1,
+          })),
+        },
+      ],
+    };
+    return exportOrThrow({ ...model, preserved: () => ({ ...model.preserved(), atlas }) });
+  }
+}
+
 function boneView(bone: BoneEntity) {
   return {
     id: bone.id,
@@ -3348,8 +3392,8 @@ function mapAtlasPackError(error: unknown): never {
 // ============================================================================
 // Headless render feedback (render_frame, ADR-0006): rasterize the CURRENT live document to a PNG so an
 // LLM authoring over MCP can SEE a frame. The render itself is the pure @marionette/render-preview CPU
-// rasterizer; the MCP layer's job is to (1) export the live document through the SAME LAW-3 boundary the
-// other read tools use, (2) resolve and decode the atlas page PNGs the document references from disk, and
+// rasterizer; the MCP layer's job is to (1) export a validated preview projection, synthesizing only
+// atlas-less placeholder metadata, (2) resolve real atlas page PNGs referenced by the document, and
 // (3) map the rasterizer's typed errors onto McpToolError codes. Atlas pages are located relative to the
 // project root the server was launched with: each AtlasPage.file is a project-relative path handed to the
 // host FileStore, which resolves it against the root and rejects traversal (PATH_FORBIDDEN).
@@ -6921,13 +6965,13 @@ export const TOOLS: readonly ToolDefinition[] = [
     },
     async (deps, input) => {
       const session = deps.sessions.get(input.documentId);
-      const document = exportOrThrow(session.document.model);
+      const document = exportPreviewOrThrow(session.document.model);
 
       const pages = await loadAtlasPages(
         projectFiles(session, deps.files, 'skeleton'),
-        document.atlas,
+        session.document.model.preserved().atlas,
       );
-      const placeholders = document.atlas.pages.length === 0;
+      const placeholders = session.document.model.preserved().atlas.pages.length === 0;
 
       let result: RenderFrameResult;
       if (input.effect === undefined) {

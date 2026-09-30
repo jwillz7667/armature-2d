@@ -3014,9 +3014,7 @@ describe('MCP render_frame tool', () => {
     return PNG.sync.write(png);
   }
 
-  // Author a bone + slot riding it. No region attachment: a region attachment requires a matching atlas
-  // region (LAW 3, ATTACHMENT_REGION_MISSING), so the placeholder (atlas-less) path carries no drawable
-  // geometry and is framed with an explicit fit rect.
+  // Author a bone + slot with no drawable attachments to verify explicit empty-scene framing.
   async function authorBareRig(deps: ToolDeps): Promise<string> {
     const { documentId } = asRecord(await call(deps, 'document.new', { name: 'render' }));
     const { boneId } = asRecord(
@@ -3071,6 +3069,45 @@ describe('MCP render_frame tool', () => {
     const decoded = PNG.sync.read(Buffer.from(result.pngBase64 as string, 'base64'));
     expect(decoded.width).toBe(128);
     expect(decoded.height).toBe(96);
+  });
+
+  it('previews an atlas-less region with visible pixels without changing its document or export rules', async () => {
+    const deps = makeDeps();
+    const { documentId } = asRecord(
+      await call(deps, 'document.new', { name: 'Atlas-less region' }),
+    );
+    const { boneId } = asRecord(
+      await call(deps, 'bone.create', { documentId, name: 'root', length: 100 }),
+    );
+    const { slotId } = asRecord(
+      await call(deps, 'slot.create', { documentId, boneId, name: 'body' }),
+    );
+    await call(deps, 'attach.region.add', {
+      documentId,
+      slotId,
+      name: 'rectangle',
+      path: 'rectangle',
+      width: 160,
+      height: 80,
+    });
+    await call(deps, 'slot.activeAttachment', { documentId, slotId, attachment: 'rectangle' });
+    const model = deps.sessions.get(documentId as string).document.model;
+    const before = model.snapshot();
+    const frame = asRecord(
+      await call(deps, 'render_frame', { documentId, width: 128, height: 96 }),
+    );
+    expect(frame.placeholders).toBe(true);
+    const png = PNG.sync.read(Buffer.from(frame.pngBase64 as string, 'base64'));
+    expect(png.width).toBe(128);
+    expect(png.height).toBe(96);
+    expect([...png.data].filter((_, index) => index % 4 === 3).some((alpha) => alpha > 0)).toBe(
+      true,
+    );
+    expect(model.snapshot()).toEqual(before);
+    expect(model.preserved().atlas.pages).toEqual([]);
+    await expectToolError(call(deps, 'document.export', { documentId }), 'INVALID_DOCUMENT');
+    await call(deps, 'bone.create', { documentId, name: 'root', length: 50 });
+    await expectToolError(call(deps, 'render_frame', { documentId }), 'INVALID_DOCUMENT');
   });
 
   it('renders real atlas-page pixels deterministically across two calls', async () => {
