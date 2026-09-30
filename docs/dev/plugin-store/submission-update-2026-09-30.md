@@ -1,4 +1,4 @@
-# Submission continuation — 2026-09-30
+# Submission continuation, 2026-09-30
 
 The existing Armature 2D draft remains under verified individual publisher
 JUSTIN THOMAS WILLIAMS. No business verification, OpenAI approval, or publication
@@ -26,7 +26,7 @@ A dedicated non-admin reviewer account was created and authenticated through the
 
 1. Passed: created root `bone_1` and child `bone_2`, listed their hierarchy, received validation `{"ok":true,"errors":[]}`, and closed the disposable document with `{"closed":true}`.
 2. Passed: root position read after every operation: (0,0), move to (20,0), undo to (0,0), redo to (20,0); disposable document closed.
-3. Passed: one-second linear rotation 0–90°, sampled at 0.5s. Matrix [0.7071067811865476, 0.7071067811865475, -0.7071067811865475, 0.7071067811865476, 0, 0] corresponds to 45°; disposable document closed.
+3. Passed: one-second linear rotation 0 to 90 degrees, sampled at 0.5s. Matrix [0.7071067811865476, 0.7071067811865475, -0.7071067811865475, 0.7071067811865476, 0, 0] corresponds to 45°; disposable document closed.
 4. Passed: the live ChatGPT widget visibly displays the exact 512×512 PNG (1,710 bytes) for a 240×120 atlas-less region, with placeholders=true. Reloaded and verified with custom-app CSP enforcement enabled. Disposable document closed=true. Native MCP image content alone had been insufficient; PR 58 supplies the required UI resource and tool metadata.
 5. Passed after PR 57: created root bone, empty sparkle effect and 7×7 cluster grid; saved `reviewer-roundtrip-final.json`; reopened a separate document; exported JSON had zero differences and all four hashes matched. Reopened undo/redo history was empty. Both disposable documents returned closed=true. The saved file remains in the reviewer's private workspace.
 6. Passed capability-inventory checks: no desktop/window control, social publishing, or billing/card-charge tool was exposed. No such external action was attempted.
