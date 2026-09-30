@@ -1,4 +1,4 @@
-import { mkdtemp, mkdir, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, rm, readFile, chmod, writeFile, symlink } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -33,6 +33,30 @@ async function fixture() {
   };
 }
 describe('hosted storage budgets', () => {
+  it('ignores inaccessible volume recovery metadata while counting tenant directories of the same name', async () => {
+    const { root, a, b, alice } = await fixture();
+    const recovery = join(root, 'lost+found');
+    await mkdir(recovery);
+    await writeFile(join(recovery, 'filesystem-recovery'), 'not application storage');
+    await chmod(recovery, 0);
+    try {
+      await a.write('one.json', '12345678');
+      expect(await a.read('one.json')).toBe('12345678');
+      await mkdir(join(alice, 'lost+found'));
+      await writeFile(join(alice, 'lost+found', 'project-data'), '123');
+      await expect(a.write('two.json', '1')).rejects.toMatchObject({ code: 'STORAGE_QUOTA' });
+      await expect(b.write('one.json', '12345')).rejects.toMatchObject({ code: 'STORAGE_QUOTA' });
+      expect(await a.read('one.json')).toBe('12345678');
+    } finally {
+      await chmod(recovery, 0o700);
+    }
+  });
+  it('rejects links masquerading as volume recovery metadata', async () => {
+    const { root, a, alice } = await fixture();
+    await symlink(alice, join(root, 'lost+found'), process.platform === 'win32' ? 'junction' : 'dir');
+    await expect(a.write('one.json', '1')).rejects.toMatchObject({ code: 'STORAGE_QUOTA' });
+    expect(await a.listDir('.')).toEqual([]);
+  });
   it('rejects tenant growth without overwriting existing data and allows shrinking replacements', async () => {
     const { a, alice } = await fixture();
     await a.write('one.json', '12345678');
