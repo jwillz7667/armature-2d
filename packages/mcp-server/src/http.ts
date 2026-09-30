@@ -22,6 +22,7 @@ export interface HttpOptions {
   readonly jwksUrl: string;
   readonly allowedOrigins?: readonly string[];
   readonly maxSessions?: number;
+  readonly maxSessionsPerOwner?: number;
   readonly idleMs?: number;
   readonly openaiChallengeToken?: string;
   readonly storageLimits?: StorageLimits;
@@ -50,10 +51,13 @@ export async function createHttpServer(options: HttpOptions) {
     throw new Error('Invalid OpenAI domain challenge token');
   }
   const maxSessions = options.maxSessions ?? 32;
+  const maxSessionsPerOwner = options.maxSessionsPerOwner ?? 4;
   const idleMs = options.idleMs ?? 30 * 60_000;
   if (
     !Number.isSafeInteger(maxSessions) ||
     maxSessions < 1 ||
+    !Number.isSafeInteger(maxSessionsPerOwner) ||
+    maxSessionsPerOwner < 1 ||
     !Number.isSafeInteger(idleMs) ||
     idleMs < 1
   ) {
@@ -299,7 +303,9 @@ export async function createHttpServer(options: HttpOptions) {
         send(res, 404, 'Session expired');
         return;
       }
-      if (existing.busy) {
+      // Connections share tenant files. Preserve one active request per owner
+      // even when discovery and conversation use separate transport sessions.
+      if ([...sessions.values()].some((session) => session.owner === owner && session.busy)) {
         send(res, 409, 'Session is busy; retry after the current request');
         return;
       }
@@ -314,7 +320,8 @@ export async function createHttpServer(options: HttpOptions) {
       if (
         sessions.size + pendingOwners.size >= maxSessions ||
         pendingOwners.has(owner) ||
-        [...sessions.values()].some((session) => session.owner === owner)
+        [...sessions.values()].filter((session) => session.owner === owner).length >=
+          maxSessionsPerOwner
       ) {
         send(res, 429, 'Session capacity reached');
         return;

@@ -6,6 +6,7 @@ import { generateKeyPair, exportJWK, SignJWT } from 'jose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHttpServer } from '../src/http';
 import { toolCatalog } from '../src/catalog';
+import * as nodeFiles from '../src/node-files';
 
 const issuer = 'https://identity.example.test/';
 const resource = 'https://armature.example.test/mcp';
@@ -70,6 +71,7 @@ beforeEach(async () => {
     issuer,
     jwksUrl: `${issuer}jwks`,
     maxSessions: 2,
+    maxSessionsPerOwner: 1,
   });
   await new Promise<void>((resolve) => app.server.listen(0, '127.0.0.1', resolve));
   const address = app.server.address();
@@ -257,6 +259,82 @@ describe('authenticated HTTP MCP', () => {
     const access = await token();
     const results = await Promise.all([initialize(access), initialize(access)]);
     expect(results.map((result) => result.status).sort()).toEqual([200, 429]);
+  });
+  it('allows bounded discovery and conversation connections for one account', async () => {
+    const createStore = nodeFiles.createNodeFileStore;
+    let releaseWrite!: () => void;
+    let startedWrite!: () => void;
+    const writeStarted = new Promise<void>((resolve) => {
+      startedWrite = resolve;
+    });
+    const writeReleased = new Promise<void>((resolve) => {
+      releaseWrite = resolve;
+    });
+    vi.spyOn(nodeFiles, 'createNodeFileStore').mockImplementation((...args) => {
+      const store = createStore(...args);
+      return {
+        ...store,
+        async write(path, content) {
+          startedWrite();
+          await writeReleased;
+          await store.write(path, content);
+        },
+      };
+    });
+    await app.close();
+    app = await createHttpServer({
+      dataRoot: root,
+      publicUrl: resource,
+      issuer,
+      jwksUrl: `${issuer}jwks`,
+      maxSessions: 3,
+      maxSessionsPerOwner: 2,
+    });
+    await new Promise<void>((resolve) => app.server.listen(0, '127.0.0.1', resolve));
+    const address = app.server.address();
+    if (!address || typeof address === 'string') throw new Error('No listening address');
+    base = `http://127.0.0.1:${address.port}`;
+    const alice = await token();
+    const first = await initialize(alice);
+    const second = await initialize(alice);
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    const firstId = first.headers.get('mcp-session-id')!;
+    const secondId = second.headers.get('mcp-session-id')!;
+    expect(secondId).not.toBe(firstId);
+    expect((await rpc(alice, secondId, 'tools/list')).tools).toHaveLength(toolCatalog().length);
+    expect((await initialize(alice)).status).toBe(429);
+    const bob = await token('bob');
+    expect((await initialize(bob)).status).toBe(200);
+    expect(
+      (await request(bob, { jsonrpc: '2.0', id: 1, method: 'tools/list' }, firstId)).status,
+    ).toBe(404);
+    expect((await initialize(await token('charlie'))).status).toBe(429);
+    const { documentId } = await call(alice, firstId, 'document.new', { name: 'Shared storage' });
+    await call(alice, firstId, 'bone.create', { documentId, name: 'root', length: 10 });
+    const saving = request(
+      alice,
+      {
+        jsonrpc: '2.0',
+        id: ++nextId,
+        method: 'tools/call',
+        params: { name: 'document.save', arguments: { documentId, path: 'shared.json' } },
+      },
+      firstId,
+    );
+    await writeStarted;
+    try {
+      expect(
+        (await request(alice, { jsonrpc: '2.0', id: ++nextId, method: 'tools/list' }, secondId))
+          .status,
+      ).toBe(409);
+    } finally {
+      releaseWrite();
+    }
+    expect((await saving).status).toBe(200);
+    expect(
+      (await call(alice, secondId, 'document.open', { path: 'shared.json' })).documentId,
+    ).toBeTruthy();
   });
   it('expires idle sessions and permits a fresh session', async () => {
     const access = await token();

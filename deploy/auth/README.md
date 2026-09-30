@@ -21,7 +21,14 @@ with `ifResourceExists=SKIP`, verifies the resulting settings, and removes its p
 temporary token/config files. It never replaces the realm or changes users. A failed
 configuration task logs failure while the existing auth service continues to run;
 a successful health check alone therefore does not prove the client is configured.
-Check for the explicit `Armature OAuth verified` log before beginning the tool scan.
+Check for the explicit `Armature OAuth verified` and `Armature user subject mapper configured` logs before beginning the tool scan.
+
+The OpenAI client has an explicit `oidc-sub-mapper` so access tokens include the
+stable user `sub` claim required by the MCP verifier. Existing clients are preserved
+by partial import, so the startup migration also creates or updates that mapper by
+a fixed ID. It does not enable broader scopes, password grants, or admin access.
+After upgrading, reconnect OAuth to obtain a fresh token; old tokens do not gain
+the missing claim. See [Keycloak protocol mappers](https://www.keycloak.org/admin-api/protocol-mappers).
 
 The callback is the exact one shown for the existing OpenAI Platform draft, which
 uses issuer identification in the authorization response. Do not add wildcard
