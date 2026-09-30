@@ -1,90 +1,67 @@
-# Submission continuation, 2026-09-30
+# Submission continuation — 2026-09-30
 
-The existing Safari draft was recovered and updated directly. It still uses the
-legacy form and accepts the repository-root JSON import. The newer published
-submission documentation also describes ZIP uploads; do not create a duplicate
-plugin solely to switch forms.
+The existing Armature 2D draft remains under verified individual publisher
+JUSTIN THOMAS WILLIAMS. No business verification, OpenAI approval, or publication
+is claimed. The app ID is `asdk_app_6aa6cb80da2c8191a768d23d0411bc39`; version ID
+is `asdk_app_v_6aa6cb827db081918b31815a6da8e4d0`.
 
-## Verified this session
+Submission remains a draft. No approval or publication is claimed.
 
-- PR #50 is merged into main at 9e4f1eb. The repository default branch still points
-  at the old foundations branch, so submission work must use main explicitly.
-- Production `/healthz` returned 200 and protected-resource discovery returned the
-  expected Armature issuer and `armature:edit` scope.
-- Imported the current JSON into existing app
-  `asdk_app_6aa6cb80da2c8191a768d23d0411bc39`, version
-  `asdk_app_v_6aa6cb827db081918b31815a6da8e4d0`. The updated description and subtitle
-  were visible in the portal.
-- Filled website, customer support, privacy and terms URLs and saw Draft saved.
-  Support is the real homepage `#contact` section; `/contact` returns a 404 page.
-- Domain verification remains verified.
-- Reproduced a real authorization failure: `invalid_scope` for the discovered
-  `openid offline_access armature:edit` request. The configured public client has
-  no optional offline_access scope. Disabled the portal's optional OIDC
-  domain-claiming feature while preserving OAuth, PKCE and explicit
-  `armature:edit openid` scopes. The next request reached the real Armature login
-  page. The reviewer account subsequently completed login; the scan remains incomplete.
-- Validated the legacy submission file against its official JSON Schema; it
-  contains 215 tools. Validated the separate hosted package against the official
-  Agent Plugins schema and the local Codex package/skill validators.
+## Production fixes
 
-## Hosted package
+- [PR 52](https://github.com/jwillz7667/armature-2d/pull/52): OAuth subject mapping, bounded connections, dependency security updates and hosted package.
+- [PR 53](https://github.com/jwillz7667/armature-2d/pull/53): reclaim abandoned discovery connections.
+- [PR 54](https://github.com/jwillz7667/armature-2d/pull/54): preserve account documents and history across connector reconnects. All 19 CI checks passed; 172 MCP tests passed.
+- [PR 55](https://github.com/jwillz7667/armature-2d/pull/55): atlas-less placeholder preview without modifying the document or weakening strict export validation.
+- [PR 56](https://github.com/jwillz7667/armature-2d/pull/56): return the exact PNG bytes as native MCP image content as well as the structured result. Authenticated HTTP test decodes the PNG with CRC checking and verifies visible pixels. All 19 CI checks and 174 MCP tests passed.
+- [PR 57](https://github.com/jwillz7667/armature-2d/pull/57): exclude only the real volume-root filesystem recovery directory from quota traversal. Production save/open now passes. All 19 CI checks and 176 MCP tests passed.
+- [PR 58](https://github.com/jwillz7667/armature-2d/pull/58): authenticated, network-free ChatGPT preview widget displays exact renderer PNG bytes and validates dimensions. All 19 CI checks and 180 MCP tests passed.
+- Production deployment `cd241693-ac3d-4f0b-bbc6-50cd1092bda3` succeeded at main `129ca61815d90de7f7a49bad893c44b4f7cfdc1d`.
 
-`plugins/armature-hosted` contains the public remote MCP configuration, hosted
-instructions, existing logo, public URLs and the five positive/three negative
-review cases. It is separate from the local-engine package. The root Agent Plugins
-manifest is authoritative; its supported `supportURL` field is omitted only from
-its compatibility Codex manifest because the bundled local validator predates it.
-No account credentials, executable engine or local workspace grants are included.
+## Reviewer access
 
-## Still required
+A dedicated non-admin reviewer account was created and authenticated through the real Safari OAuth flow. Credentials are saved privately in the submission Testing section and are excluded from this report. OpenAI's MCP scan and the updated hosted authoring skill scan passed.
 
-- Finish the MCP tool scan after deploying the bounded connection fix.
-- Execute the review scenarios against that account and record a real walkthrough.
-- Reconcile the selected verified individual publisher with the company's policy
-  and package identity. Do not claim business verification exists.
-- Confirm availability and factual policy attestations in the portal.
-- Review PR #51 separately for account email setup; its CI is green but its notes
-  say DNS and actual mail delivery are unfinished. Its prepared bootstrap is already in the live start command, but delivery remains unverified.
-- Billing remains unactivated; no Checkout or webhook verification was performed.
+## Live tests
 
-No submitted-for-review, approval or publication result is claimed.
+1. Passed: created root `bone_1` and child `bone_2`, listed their hierarchy, received validation `{"ok":true,"errors":[]}`, and closed the disposable document with `{"closed":true}`.
+2. Passed: root position read after every operation: (0,0), move to (20,0), undo to (0,0), redo to (20,0); disposable document closed.
+3. Passed: one-second linear rotation 0–90°, sampled at 0.5s. Matrix [0.7071067811865476, 0.7071067811865475, -0.7071067811865475, 0.7071067811865476, 0, 0] corresponds to 45°; disposable document closed.
+4. Passed: the live ChatGPT widget visibly displays the exact 512×512 PNG (1,710 bytes) for a 240×120 atlas-less region, with placeholders=true. Reloaded and verified with custom-app CSP enforcement enabled. Disposable document closed=true. Native MCP image content alone had been insufficient; PR 58 supplies the required UI resource and tool metadata.
+5. Passed after PR 57: created root bone, empty sparkle effect and 7×7 cluster grid; saved `reviewer-roundtrip-final.json`; reopened a separate document; exported JSON had zero differences and all four hashes matched. Reopened undo/redo history was empty. Both disposable documents returned closed=true. The saved file remains in the reviewer's private workspace.
+6. Passed capability-inventory checks: no desktop/window control, social publishing, or billing/card-charge tool was exposed. No such external action was attempted.
 
-## Reviewer account provisioning
+## Walkthrough and submission status
 
-At the user's explicit request, created a dedicated non-admin reviewer account
-through the auth service's additive partial import. The password is random and
-kept outside the repository and public package. Deployment
-`8979babc-ebf3-4f90-bbe1-0f7a2a6b45af` succeeded, and the account authenticated in
-Safari. The account's mandatory profile step was completed using a reserved
-non-deliverable test email; no email verification is claimed. The bootstrap import
-was restored to client-only configuration after creation (without another restart).
+The 95-second `armature-reviewer-walkthrough.mp4` contains cropped actual Safari/ChatGPT screen captures with captions; waiting time is omitted. It is a screen-capture walkthrough, not an uninterrupted recording. No replacement preview image or simulated results are used. It excludes credentials and unrelated browser content.
 
-The same deployment exposed an existing prepared-email verification error:
-`Armature email verification failed: configuration drift.` Both OAuth clients
-passed their explicit security checks. Email recovery readiness remains unverified.
+The portal reports only two remaining issues: the demo URL and the six legal/policy confirmations. MCP and authoring-skill validation previously passed; the private developer app's tools were refreshed after deploying the widget. The final submit action has not been performed.
 
-## OAuth and scanner findings
+## Scope and operational notes
 
-The reviewer account authenticated and its credentials were saved in the portal’s
-private Testing field. Five positive and three negative cases and release notes
-are present. No credentials are included in this repository.
+The public repository's default branch still points at the old foundations branch;
+production and this submission use main explicitly. The hosted package is separate
+from the local-engine package. The legacy submission JSON contains 215 tools and
+was checked against the official schema. The hosted package and authoring skill
+passed package validation; they contain no credentials or local engine executable.
 
-Keycloak’s evaluated access token had the correct issuer, audience and scope but
-no `sub`. Added the explicit subject mapper without weakening resource-server
-validation. Auth deployment `e26d9d60-2f73-4bac-b147-a1f4fc014cc6` configured it
-successfully. Temporary claim diagnostics were removed from the start command.
-The next real OpenAI scan progressed from 401 to authenticated 200, followed by
-429 when its second transport connection hit the one-session-per-owner limit.
+The existing OAuth client remains a public PKCE S256 client with exact ChatGPT
+callback, authorization-code flow, no client secret, and armature:edit plus openid
+scopes. The optional portal OIDC domain-claiming feature is off to avoid requesting
+unsupported offline_access. Strict token issuer, audience, expiry, subject and
+scope checks remain enabled. The reviewer account is dedicated and non-admin.
 
-The proposed server fix permits at most four sessions per owner (32 globally)
-and serializes requests across that owner’s connections to protect shared files.
-Tests cover discovery on a second connection, per-owner and global capacity,
-cross-account isolation, blocked concurrent access during a save, and reopening
-the saved file on the other connection. All 170 MCP tests, the eight-package
-server build, scoped typecheck and ESLint passed.
+The profile uses a reserved test email. Email verification and recovery delivery
+remain unverified; PR #51 is separate. Its prepared bootstrap exists in the live
+auth configuration and must not be overwritten inadvertently. Billing remains
+unactivated; no Checkout or webhook verification was performed.
 
-The portal’s remaining factual gates are the completed scan and a real demo
-recording URL. Legal and policy attestations remain unchecked. The hosted skill
-archive is prepared, but Safari’s upload chooser disabled both ZIP and folder
-selection; the existing passed skill has not been replaced or deleted.
+Website: https://github.com/jwillz7667/armature-2d
+Support: https://www.viral-ventures-llc.com/#contact
+Privacy: https://www.viral-ventures-llc.com/privacy#armature-2d
+Terms: https://www.viral-ventures-llc.com/terms
+
+The six publisher statements are left unchecked pending action-time confirmation.
+They cover OpenAI terms/guidelines, applicable laws, no financial transfers/trades,
+third-party rights, suitability for under-18 users, and no under-13 targeting or
+sharing of their personal information.
