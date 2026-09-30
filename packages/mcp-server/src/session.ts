@@ -39,7 +39,10 @@ export class SessionRegistry {
   private readonly sessions = new Map<string, Session>();
   private counter = 0;
 
-  constructor(private readonly capacity = 16) {}
+  constructor(
+    private readonly capacity = 16,
+    private readonly idPrefix = 'doc',
+  ) {}
 
   create(name: string): Session {
     return this.register(createDocument(newDocState(name), makeEnvironment()));
@@ -79,7 +82,7 @@ export class SessionRegistry {
       throw new McpToolError('SESSION_LIMIT', `too many open documents (max ${this.capacity})`);
     }
     this.counter += 1;
-    const id = `doc_${this.counter}`;
+    const id = `${this.idPrefix}_${this.counter}`;
     const session: Session = { id, document, assets };
     this.sessions.set(id, session);
     return session;

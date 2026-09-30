@@ -62,9 +62,13 @@ CORS is not enabled; the intended client is a server-side MCP connector.
 
 Each issuer/subject pair hashes to a private directory. Clients cannot choose that
 root. Existing traversal and symlink protections remain active. A transport session
-belongs to one user, with at most four open documents. There is one transport session
-per user, at most 32 per process, a 30-minute idle timeout, and a 1 MiB request limit.
-Parallel operations on one session receive 409 and must be retried sequentially.
+belongs to one user. Up to four transports share that account's four-document registry,
+including undo history. Idle transports can be replaced on reconnect without discarding
+work. Transport deletion closes only the connection; `document.close` closes a document.
+There are at most 32 transports and 32 retained accounts per process, a 30-minute account
+idle timeout, and a 1 MiB request limit. Account expiry or process restart discards unsaved
+work. Parallel operations across an account's connections receive 409 and must be retried
+sequentially. Idle document identifiers are never reused after account expiry.
 No standalone server-event stream or batch JSON-RPC is supported. Session IDs are
 random, checked against ownership, and are not authentication credentials.
 

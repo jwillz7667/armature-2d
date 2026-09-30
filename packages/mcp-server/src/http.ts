@@ -94,10 +94,11 @@ export async function createHttpServer(options: HttpOptions) {
     transport: StreamableHTTPServerTransport;
     server: ReturnType<typeof buildMcpServer>;
     busy: boolean;
-    hasToolCalls: boolean;
     used: number;
   };
   const sessions = new Map<string, Entry>();
+  // Documents belong to the authenticated account, not an ephemeral MCP connection.
+  const owners = new Map<string, { documents: SessionRegistry; used: number }>();
   // Reserve capacity before asynchronous filesystem operations.
   const pendingOwners = new Set<string>();
   let closing = false;
@@ -110,8 +111,24 @@ export async function createHttpServer(options: HttpOptions) {
     sessions.delete(id);
     await entry.server.close();
   };
+  const expireOwners = () => {
+    const now = Date.now();
+    for (const [owner, state] of owners) {
+      if (
+        now - state.used > idleMs &&
+        !pendingOwners.has(owner) &&
+        ![...sessions.values()].some((entry) => entry.owner === owner && entry.busy)
+      ) {
+        owners.delete(owner);
+        for (const [id, entry] of sessions) {
+          if (entry.owner === owner) void dispose(id, entry).catch(() => {});
+        }
+      }
+    }
+  };
   const timer = setInterval(
     () => {
+      expireOwners();
       const now = Date.now();
       for (const [id, entry] of sessions) {
         if (!entry.busy && now - entry.used > idleMs) void dispose(id, entry).catch(() => {});
@@ -290,6 +307,7 @@ export async function createHttpServer(options: HttpOptions) {
         }
       }
     }
+    expireOwners();
     const id = req.headers['mcp-session-id'];
     let entry: Entry;
     let sessionKey: string;
@@ -306,51 +324,52 @@ export async function createHttpServer(options: HttpOptions) {
       }
       // Connections share tenant files. Preserve one active request per owner
       // even when discovery and conversation use separate transport sessions.
-      if ([...sessions.values()].some((session) => session.owner === owner && session.busy)) {
+      if (
+        pendingOwners.has(owner) ||
+        [...sessions.values()].some((session) => session.owner === owner && session.busy)
+      ) {
         send(res, 409, 'Session is busy; retry after the current request');
         return;
       }
       sessionKey = id as string;
       entry = existing;
       entry.busy = true;
-      if (body && typeof body === 'object' && 'method' in body && body.method === 'tools/call') {
-        entry.hasToolCalls = true;
-      }
     } else {
       if (req.method !== 'POST' || !isInitializeRequest(body)) {
         send(res, 400, 'Initialize a session first');
         return;
       }
-      // Discovery clients may abandon initialized connections without DELETE.
-      // Reclaim only idle connections that never ran a tool, so documents and
-      // user work remain untouched. Reserve the entry before awaiting its close.
       if (
-        !pendingOwners.has(owner) &&
-        (sessions.size + pendingOwners.size >= maxSessions ||
-          [...sessions.values()].filter((session) => session.owner === owner).length >=
-            maxSessionsPerOwner)
-      ) {
-        const unused = [...sessions.entries()]
-          .filter(
-            ([, session]) => session.owner === owner && !session.busy && !session.hasToolCalls,
-          )
-          .sort((a, b) => a[1].used - b[1].used)[0];
-        if (unused) {
-          unused[1].busy = true;
-          await dispose(unused[0], unused[1]);
-        }
-      }
-      if (
-        sessions.size + pendingOwners.size >= maxSessions ||
         pendingOwners.has(owner) ||
-        [...sessions.values()].filter((session) => session.owner === owner).length >=
-          maxSessionsPerOwner
+        [...sessions.values()].some((session) => session.owner === owner && session.busy)
       ) {
         send(res, 429, 'Session capacity reached');
         return;
       }
+      // Reserve the account before asynchronous eviction/creation. Replacing an idle
+      // transport never discards its account's open documents or undo history.
       pendingOwners.add(owner);
       try {
+        if (
+          sessions.size + pendingOwners.size - 1 >= maxSessions ||
+          [...sessions.values()].filter((session) => session.owner === owner).length >=
+            maxSessionsPerOwner
+        ) {
+          const oldest = [...sessions.entries()]
+            .filter(([, session]) => session.owner === owner && !session.busy)
+            .sort((a, b) => a[1].used - b[1].used)[0];
+          if (oldest) await dispose(oldest[0], oldest[1]);
+        }
+        const pendingNewOwners = [...pendingOwners].filter((key) => !owners.has(key)).length;
+        if (
+          sessions.size + pendingOwners.size > maxSessions ||
+          owners.size + pendingNewOwners > maxSessions ||
+          [...sessions.values()].filter((session) => session.owner === owner).length >=
+            maxSessionsPerOwner
+        ) {
+          send(res, 429, 'Session capacity reached');
+          return;
+        }
         const root = join(dataRoot, owner);
         await mkdir(root, { recursive: true, mode: 0o700 });
         if (!(await lstat(root)).isDirectory() || (await realpath(root)) !== root)
@@ -359,9 +378,14 @@ export async function createHttpServer(options: HttpOptions) {
           send(res, 503, 'Stopping');
           return;
         }
+        let state = owners.get(owner);
+        if (!state) {
+          state = { documents: new SessionRegistry(4, `doc_${randomUUID()}`), used: Date.now() };
+          owners.set(owner, state);
+        }
         const server = buildMcpServer(
           {
-            sessions: new SessionRegistry(4),
+            sessions: state.documents,
             files: createNodeFileStore(root, { maxFileBytes: 8 * 1024 * 1024, storageBudget }),
           },
           undefined,
@@ -372,7 +396,7 @@ export async function createHttpServer(options: HttpOptions) {
           sessionIdGenerator: () => sessionKey,
           enableJsonResponse: true,
         });
-        entry = { owner, server, transport, busy: true, hasToolCalls: false, used: Date.now() };
+        entry = { owner, server, transport, busy: true, used: Date.now() };
         // SDK 1.30 declares the same optional callbacks differently on these interfaces.
         await server.connect(transport as Transport);
         sessions.set(sessionKey, entry);
@@ -395,6 +419,8 @@ export async function createHttpServer(options: HttpOptions) {
     } finally {
       entry.busy = false;
       entry.used = Date.now();
+      const state = owners.get(owner);
+      if (state) state.used = entry.used;
       if (req.method === 'DELETE' || !entry.transport.sessionId) {
         sessions.delete(sessionKey);
         await entry.server.close();
@@ -415,6 +441,7 @@ export async function createHttpServer(options: HttpOptions) {
       closing = true;
       clearInterval(timer);
       await Promise.all([...sessions.entries()].map(([id, entry]) => dispose(id, entry)));
+      owners.clear();
       server.closeAllConnections();
       await billing?.close();
       if (server.listening)
