@@ -1,0 +1,88 @@
+{
+  "name": "armature-hosted",
+  "version": "0.1.1",
+  "description": "Create, animate, render and save private Armature 2D projects through the hosted MCP server.",
+  "author": {
+    "name": "Viral Ventures LLC"
+  },
+  "repository": "https://github.com/jwillz7667/armature-2d",
+  "license": "SEE LICENSE IN LICENSE",
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Armature 2D",
+        "shortDescription": "Rig, animate and render 2D",
+        "longDescription": "Armature 2D helps you create and edit skeletal rigs through ChatGPT. Build bones, slots and attachments; author animation keyframes and constraints; inspect solved poses and meshes; and render PNG previews. Create effects and slot scenes, then save and reopen complete Armature projects with embedded textures. Upload bounded JSON and PNG assets, list and download private project files, or explicitly delete files you no longer need. Document editing uses the application command system with undo and redo; file overwrites and deletions are separate from document history. Legacy skeleton export remains available for runtime use. The app operates in independent headless sessions and does not control a running desktop editor. Spine JSON imports may be lossy and include a report; real Spine binary imports are not supported. Rendering without usable textures can return a placeholder preview.",
+        "developerName": "Viral Ventures LLC",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write"],
+        "websiteURL": "https://github.com/jwillz7667/armature-2d",
+        "supportURL": "https://www.viral-ventures-llc.com/#contact",
+        "privacyPolicyURL": "https://www.viral-ventures-llc.com/privacy#armature-2d",
+        "termsOfServiceURL": "https://www.viral-ventures-llc.com/terms",
+        "defaultPrompt": [
+          "Create and validate a two-bone Armature skeleton.",
+          "Animate a root bone rotating over one second.",
+          "Save and reopen my complete Armature project."
+        ],
+        "composerIcon": "./assets/icon.png",
+        "logo": "./assets/icon.png"
+      },
+      "onboardingSkill": "./skills/armature-authoring/SKILL.md",
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Create and validate a minimal bone hierarchy.",
+              "prompt": "Create a new Armature skeleton with a root bone and one child, then list the bones and validate it.",
+              "tools_triggered": "document.new, bone.create, bone.list, document.validate",
+              "expected_behavior": "Returns document and bone identifiers, shows the child parent relationship, and reports validation results."
+            },
+            {
+              "description": "Verify reversible edits on a newly created skeleton.",
+              "prompt": "Create a new Armature skeleton with one root bone, move the root 20 units to the right, undo that move, then redo it and inspect the root after each step.",
+              "tools_triggered": "document.new, bone.create, bone.move, bone.get, history.undo, history.redo",
+              "expected_behavior": "The inspected root position returns to its initial value after undo and to the edited value after redo."
+            },
+            {
+              "description": "Author and inspect an animated pose.",
+              "prompt": "Create a new Armature skeleton with a root bone and a one-second animation that rotates the root from zero to 90 degrees, then sample its world transform halfway through.",
+              "tools_triggered": "document.new, bone.create, anim.create, kf.set, document.getWorldTransforms",
+              "expected_behavior": "Creates rotation keyframes and returns the solved transform at the requested animation time without changing the setup pose."
+            },
+            {
+              "description": "Render a rig without texture assets and explain the preview limitation.",
+              "prompt": "Create a new Armature skeleton with a root, a slot and a rectangular region attachment, then render a PNG preview without adding a texture atlas. Tell me whether placeholders were used.",
+              "tools_triggered": "document.new, bone.create, slot.create, attach.region.add, render_frame",
+              "expected_behavior": "Returns a PNG preview and reports placeholder use instead of claiming the attachment is textured."
+            },
+            {
+              "description": "Save and reopen a complete project including effects and a slot scene.",
+              "prompt": "Create a new Armature project with a root bone, an empty sparkle effect and a seven-by-seven cluster grid. Save the complete project, reopen it, and compare the exported project content.",
+              "tools_triggered": "document.new, bone.create, effect.create, slot.grid.preset, project.export, project.save, project.open",
+              "expected_behavior": "Restores the skeleton, effects and slot grid in a fresh session with matching exported content and cleared undo history."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Do not invoke tools for desktop window control. Explains that Armature tools operate in headless sessions and cannot control desktop windows.",
+              "prompt": "Click the animation timeline in my running desktop editor and drag its window to my other monitor."
+            },
+            {
+              "description": "Do not invoke tools for unrelated public publishing. Does not invoke Armature because the app has no social publishing tools.",
+              "prompt": "Publish a marketing announcement to my social media accounts."
+            },
+            {
+              "description": "Do not invoke project tools to modify billing. Does not invoke Armature project tools because subscription and payment management are outside their capabilities.",
+              "prompt": "Change my Armature subscription and charge a different credit card."
+            }
+          ]
+        }
+      },
+      "publication": {
+        "release_notes": "Hosted Armature 2D package with OAuth-protected project tools, complete-project persistence and structured output contracts. Billing activation is not included. Review cases require execution with the dedicated reviewer account."
+      }
+    }
+  }
+}

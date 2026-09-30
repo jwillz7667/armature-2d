@@ -77,6 +77,25 @@ if [[ -n "${ARMATURE_OPENAI_CLIENT_JSON:-}${ARMATURE_BILLING_CLIENT_JSON:-}" ]];
       unset client_config
       printf '%s\n' "Armature OAuth verified: armature-$client_kind, exact callback, PKCE S256, consent, code flow only."
     done
+
+    if [[ -n "${ARMATURE_OPENAI_CLIENT_JSON:-}" ]]; then
+      # Tokens must carry the stable user subject required by the MCP verifier.
+      openai_lookup=$(/opt/keycloak/bin/kcadm.sh get clients --config "$task_dir/admin.config" -r armature -q clientId=armature-openai --fields id)
+      if [[ ! "$openai_lookup" =~ [a-f0-9]{8}-[a-f0-9-]{27} ]]; then
+        printf '%s\n' 'Armature subject mapper failed: client unavailable.' >&2
+        exit 1
+      fi
+      openai_id=${BASH_REMATCH[0]}
+      subject_id=6d975bcd-3b5e-4e65-9f20-b134826a25ef
+      printf '%s' '{"id":"6d975bcd-3b5e-4e65-9f20-b134826a25ef","name":"armature-user-subject","protocol":"openid-connect","protocolMapper":"oidc-sub-mapper","consentRequired":false,"config":{"access.token.claim":"true","introspection.token.claim":"true"}}' > "$task_dir/subject.json"
+      mapper_path="clients/$openai_id/protocol-mappers/models"
+      if /opt/keycloak/bin/kcadm.sh get "$mapper_path/$subject_id" --config "$task_dir/admin.config" -r armature > "$task_dir/subject-check.json" 2>/dev/null; then
+        /opt/keycloak/bin/kcadm.sh update "$mapper_path/$subject_id" --config "$task_dir/admin.config" -r armature -f "$task_dir/subject.json"
+      else
+        /opt/keycloak/bin/kcadm.sh create "$mapper_path" --config "$task_dir/admin.config" -r armature -f "$task_dir/subject.json"
+      fi
+      printf '%s\n' 'Armature user subject mapper configured.'
+    fi
   ) &
 fi
 

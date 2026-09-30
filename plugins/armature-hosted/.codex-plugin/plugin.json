@@ -1,0 +1,26 @@
+{
+  "name": "armature-hosted",
+  "version": "0.1.1",
+  "description": "Create, animate, render and save private Armature 2D projects through the hosted MCP server.",
+  "author": {
+    "name": "Viral Ventures LLC"
+  },
+  "repository": "https://github.com/jwillz7667/armature-2d",
+  "license": "SEE LICENSE IN LICENSE",
+  "skills": "./skills/",
+  "mcpServers": "./.mcp.json",
+  "interface": {
+    "displayName": "Armature 2D",
+    "shortDescription": "Rig, animate and render 2D",
+    "longDescription": "Armature 2D helps you create and edit skeletal rigs through ChatGPT. Build bones, slots and attachments; author animation keyframes and constraints; inspect solved poses and meshes; and render PNG previews. Create effects and slot scenes, then save and reopen complete Armature projects with embedded textures. Upload bounded JSON and PNG assets, list and download private project files, or explicitly delete files you no longer need. Document editing uses the application command system with undo and redo; file overwrites and deletions are separate from document history. Legacy skeleton export remains available for runtime use. The app operates in independent headless sessions and does not control a running desktop editor. Spine JSON imports may be lossy and include a report; real Spine binary imports are not supported. Rendering without usable textures can return a placeholder preview.",
+    "developerName": "Viral Ventures LLC",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "websiteURL": "https://github.com/jwillz7667/armature-2d",
+    "privacyPolicyURL": "https://www.viral-ventures-llc.com/privacy#armature-2d",
+    "termsOfServiceURL": "https://www.viral-ventures-llc.com/terms",
+    "defaultPrompt": "Create and validate a two-bone Armature skeleton.",
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/icon.png"
+  }
+}

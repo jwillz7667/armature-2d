@@ -22,7 +22,20 @@
         "oidc.ciba.grant.enabled": "false",
         "post.logout.redirect.uris": "",
         "exclude.issuer.from.auth.response": "false"
-      }
+      },
+      "protocolMappers": [
+        {
+          "id": "6d975bcd-3b5e-4e65-9f20-b134826a25ef",
+          "name": "armature-user-subject",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": {
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
     }
   ]
 }
