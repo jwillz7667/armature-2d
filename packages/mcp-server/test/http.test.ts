@@ -242,7 +242,6 @@ describe('authenticated HTTP MCP', () => {
     ).toBe(404);
     expect((await request(await token('alice', { expiry: 1 }), {}, session)).status).toBe(401);
     await call(alice, session, 'document.new', { name: 'Keep this work' });
-    expect((await initialize(alice)).status).toBe(429);
     expect((await initialize(bob)).status).toBe(200);
     expect((await initialize(await token('charlie'))).status).toBe(429);
     const deleted = await localFetch(`${base}/mcp`, {
@@ -306,7 +305,6 @@ describe('authenticated HTTP MCP', () => {
     expect((await rpc(alice, secondId, 'tools/list')).tools).toHaveLength(toolCatalog().length);
     await call(alice, firstId, 'document.new', { name: 'First connection' });
     await call(alice, secondId, 'document.new', { name: 'Second connection' });
-    expect((await initialize(alice)).status).toBe(429);
     const bob = await token('bob');
     expect((await initialize(bob)).status).toBe(200);
     expect(
@@ -327,6 +325,7 @@ describe('authenticated HTTP MCP', () => {
     );
     await writeStarted;
     try {
+      expect((await initialize(alice)).status).toBe(429);
       expect(
         (await request(alice, { jsonrpc: '2.0', id: ++nextId, method: 'tools/list' }, secondId))
           .status,
@@ -339,7 +338,7 @@ describe('authenticated HTTP MCP', () => {
       (await call(alice, secondId, 'document.open', { path: 'shared.json' })).documentId,
     ).toBeTruthy();
   });
-  it('reclaims abandoned discovery sessions without discarding sessions that ran tools', async () => {
+  it('preserves documents and history across repeated transport replacement without crossing accounts', async () => {
     const access = await token();
     const firstId = (await initialize(access)).headers.get('mcp-session-id')!;
     await rpc(access, firstId, 'tools/list');
@@ -352,15 +351,43 @@ describe('authenticated HTTP MCP', () => {
         .status,
     ).toBe(404);
     const { documentId } = await call(access, replacementId, 'document.new', { name: 'Preserved' });
-    expect((await initialize(access)).status).toBe(429);
-    expect(
-      (
-        await rpc(access, replacementId, 'tools/call', {
-          name: 'bone.list',
-          arguments: { documentId },
-        })
-      ).isError,
-    ).not.toBe(true);
+    const { boneId } = await call(access, replacementId, 'bone.create', {
+      documentId,
+      name: 'root',
+      length: 10,
+    });
+    let current = replacementId;
+    for (let i = 0; i < 6; i += 1) {
+      const fresh = await initialize(access);
+      expect(fresh.status).toBe(200);
+      current = fresh.headers.get('mcp-session-id')!;
+      const bones = await call(access, current, 'bone.list', { documentId });
+      expect(JSON.stringify(bones)).toContain(boneId);
+    }
+    await call(access, current, 'history.undo', { documentId });
+    const undone = await call(access, current, 'bone.list', { documentId });
+    expect(JSON.stringify(undone)).not.toContain(boneId);
+    current = (await initialize(access)).headers.get('mcp-session-id')!;
+    await call(access, current, 'history.redo', { documentId });
+    expect(JSON.stringify(await call(access, current, 'bone.list', { documentId }))).toContain(
+      boneId,
+    );
+    const bob = await token('bob');
+    const other = (await initialize(bob)).headers.get('mcp-session-id')!;
+    const foreign = await rpc(bob, other, 'tools/call', {
+      name: 'bone.list',
+      arguments: { documentId },
+    });
+    expect(foreign.isError).toBe(true);
+    expect(JSON.stringify(foreign)).toContain('DOCUMENT_NOT_FOUND');
+    for (let i = 0; i < 3; i += 1) await call(access, current, 'document.new', { name: 'Bounded' });
+    current = (await initialize(access)).headers.get('mcp-session-id')!;
+    const full = await rpc(access, current, 'tools/call', {
+      name: 'document.new',
+      arguments: { name: 'Over limit' },
+    });
+    expect(full.isError).toBe(true);
+    expect(JSON.stringify(full)).toContain('SESSION_LIMIT');
   });
   it('expires idle sessions and permits a fresh session', async () => {
     const access = await token();
@@ -372,6 +399,36 @@ describe('authenticated HTTP MCP', () => {
     ).toBe(404);
     clock.mockRestore();
     expect((await initialize(access)).status).toBe(200);
+  });
+  it('bounds retained accounts, expires idle documents and never reuses their identifiers', async () => {
+    const alice = await token();
+    const session = (await initialize(alice)).headers.get('mcp-session-id')!;
+    const { documentId } = await call(alice, session, 'document.new', { name: 'Unsaved' });
+    await localFetch(`${base}/mcp`, {
+      method: 'DELETE',
+      headers: {
+        host: 'armature.example.test',
+        authorization: `Bearer ${alice}`,
+        'mcp-session-id': session,
+      },
+    });
+    const reconnected = (await initialize(alice)).headers.get('mcp-session-id')!;
+    await call(alice, reconnected, 'bone.list', { documentId });
+    await initialize(await token('bob'));
+    expect((await initialize(await token('charlie'))).status).toBe(429);
+    const now = Date.now();
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 31 * 60_000);
+    const fresh = (await initialize(alice)).headers.get('mcp-session-id')!;
+    const newDocument = await call(alice, fresh, 'document.new', { name: 'After expiry' });
+    expect(newDocument.documentId).not.toBe(documentId);
+    const stale = await rpc(alice, fresh, 'tools/call', {
+      name: 'bone.list',
+      arguments: { documentId },
+    });
+    expect(stale.isError).toBe(true);
+    expect(JSON.stringify(stale)).toContain('DOCUMENT_NOT_FOUND');
+    expect((await initialize(await token('charlie'))).status).toBe(200);
+    clock.mockRestore();
   });
   it('preserves saved files after deleting a transport session', async () => {
     const access = await token();
