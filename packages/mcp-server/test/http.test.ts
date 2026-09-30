@@ -241,6 +241,7 @@ describe('authenticated HTTP MCP', () => {
       (await request(bob, { jsonrpc: '2.0', id: 3, method: 'tools/list' }, session)).status,
     ).toBe(404);
     expect((await request(await token('alice', { expiry: 1 }), {}, session)).status).toBe(401);
+    await call(alice, session, 'document.new', { name: 'Keep this work' });
     expect((await initialize(alice)).status).toBe(429);
     expect((await initialize(bob)).status).toBe(200);
     expect((await initialize(await token('charlie'))).status).toBe(429);
@@ -303,6 +304,8 @@ describe('authenticated HTTP MCP', () => {
     const secondId = second.headers.get('mcp-session-id')!;
     expect(secondId).not.toBe(firstId);
     expect((await rpc(alice, secondId, 'tools/list')).tools).toHaveLength(toolCatalog().length);
+    await call(alice, firstId, 'document.new', { name: 'First connection' });
+    await call(alice, secondId, 'document.new', { name: 'Second connection' });
     expect((await initialize(alice)).status).toBe(429);
     const bob = await token('bob');
     expect((await initialize(bob)).status).toBe(200);
@@ -335,6 +338,29 @@ describe('authenticated HTTP MCP', () => {
     expect(
       (await call(alice, secondId, 'document.open', { path: 'shared.json' })).documentId,
     ).toBeTruthy();
+  });
+  it('reclaims abandoned discovery sessions without discarding sessions that ran tools', async () => {
+    const access = await token();
+    const firstId = (await initialize(access)).headers.get('mcp-session-id')!;
+    await rpc(access, firstId, 'tools/list');
+    const replacement = await initialize(access);
+    expect(replacement.status).toBe(200);
+    const replacementId = replacement.headers.get('mcp-session-id')!;
+    expect(replacementId).not.toBe(firstId);
+    expect(
+      (await request(access, { jsonrpc: '2.0', id: ++nextId, method: 'tools/list' }, firstId))
+        .status,
+    ).toBe(404);
+    const { documentId } = await call(access, replacementId, 'document.new', { name: 'Preserved' });
+    expect((await initialize(access)).status).toBe(429);
+    expect(
+      (
+        await rpc(access, replacementId, 'tools/call', {
+          name: 'bone.list',
+          arguments: { documentId },
+        })
+      ).isError,
+    ).not.toBe(true);
   });
   it('expires idle sessions and permits a fresh session', async () => {
     const access = await token();
