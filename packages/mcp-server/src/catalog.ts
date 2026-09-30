@@ -1,5 +1,6 @@
 import { toJsonSchemaCompat } from '@modelcontextprotocol/sdk/server/zod-json-schema-compat.js';
 import { TOOLS } from './tools';
+import { PREVIEW_TOOL_META } from './preview-widget';
 
 // A generated capability contract, using the same schema converter as the MCP SDK transport.
 export function toolCatalog() {
@@ -10,6 +11,7 @@ export function toolCatalog() {
       title: tool.title,
       description: tool.description,
       annotations: tool.annotations,
+      ...(tool.name === 'render_frame' ? { _meta: PREVIEW_TOOL_META } : {}),
       inputSchema: toJsonSchemaCompat(tool.inputSchema),
       outputSchema: toJsonSchemaCompat(tool.outputSchema, {
         strictUnions: true,

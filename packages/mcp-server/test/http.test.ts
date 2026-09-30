@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHttpServer } from '../src/http';
 import { toolCatalog } from '../src/catalog';
 import { PNG } from 'pngjs';
+import { PREVIEW_URI, PREVIEW_TOOL_META } from '../src/preview-widget';
 import * as nodeFiles from '../src/node-files';
 
 const issuer = 'https://identity.example.test/';
@@ -455,6 +456,23 @@ describe('authenticated HTTP MCP', () => {
   it('returns an exact, decodable native PNG image over authenticated HTTP', async () => {
     const access = await token();
     const session = (await initialize(access)).headers.get('mcp-session-id')!;
+    const catalog = await rpc(access, session, 'tools/list');
+    expect(
+      catalog.tools.find((tool: { name: string }) => tool.name === 'render_frame')._meta,
+    ).toEqual(PREVIEW_TOOL_META);
+    expect(catalog.tools.filter((tool: { _meta?: unknown }) => tool._meta)).toHaveLength(1);
+    const resource = await rpc(access, session, 'resources/read', { uri: PREVIEW_URI });
+    expect(resource.contents[0]).toMatchObject({
+      uri: PREVIEW_URI,
+      mimeType: 'text/html;profile=mcp-app',
+      _meta: {
+        ui: {
+          domain: 'https://armature.example.test',
+          csp: { connectDomains: [], resourceDomains: [] },
+        },
+      },
+    });
+    expect(resource.contents[0].text).toContain('ui/notifications/tool-result');
     const { documentId } = await call(access, session, 'document.new', { name: 'Native image' });
     const { boneId } = await call(access, session, 'bone.create', {
       documentId,

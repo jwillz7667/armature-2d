@@ -17162,6 +17162,12 @@
     "title": "Render frame",
     "description": "Rasterize the current document to a PNG for headless authoring feedback (ADR-0006) and return it base64-encoded. Renders the setup pose, or an animation sampled at `time` (clamped to the animation duration). Atlas page PNGs referenced by the document are loaded from the project root; a referenced page file that is missing on disk is a loud error. When the document has no atlas pages at all, attachments render as tintable white placeholders and `placeholders` is true. Pass `effect` to overlay a solved effect/bundle from the live effects library ON TOP of the skeleton in the same frame (world-space anchors only in this pass; bone anchors are not wired yet).",
     "annotations": { "readOnlyHint": true, "destructiveHint": false, "openWorldHint": false },
+    "_meta": {
+      "ui": { "resourceUri": "ui://armature/preview-v1.html" },
+      "openai/outputTemplate": "ui://armature/preview-v1.html",
+      "openai/toolInvocation/invoking": "Rendering preview",
+      "openai/toolInvocation/invoked": "Preview ready"
+    },
     "inputSchema": {
       "type": "object",
       "properties": {
