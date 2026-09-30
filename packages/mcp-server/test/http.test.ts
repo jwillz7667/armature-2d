@@ -6,6 +6,7 @@ import { generateKeyPair, exportJWK, SignJWT } from 'jose';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createHttpServer } from '../src/http';
 import { toolCatalog } from '../src/catalog';
+import { PNG } from 'pngjs';
 import * as nodeFiles from '../src/node-files';
 
 const issuer = 'https://identity.example.test/';
@@ -450,6 +451,53 @@ describe('authenticated HTTP MCP', () => {
     expect(await call(access, fresh, 'document.export', { documentId: opened.documentId })).toEqual(
       saved,
     );
+  });
+  it('returns an exact, decodable native PNG image over authenticated HTTP', async () => {
+    const access = await token();
+    const session = (await initialize(access)).headers.get('mcp-session-id')!;
+    const { documentId } = await call(access, session, 'document.new', { name: 'Native image' });
+    const { boneId } = await call(access, session, 'bone.create', {
+      documentId,
+      name: 'root',
+      length: 100,
+    });
+    const { slotId } = await call(access, session, 'slot.create', {
+      documentId,
+      boneId,
+      name: 'body',
+    });
+    await call(access, session, 'attach.region.add', {
+      documentId,
+      slotId,
+      name: 'rectangle',
+      path: 'rectangle',
+      width: 240,
+      height: 120,
+    });
+    await call(access, session, 'slot.activeAttachment', {
+      documentId,
+      slotId,
+      attachment: 'rectangle',
+    });
+    const result = await rpc(access, session, 'tools/call', {
+      name: 'render_frame',
+      arguments: { documentId, width: 512, height: 512 },
+    });
+    expect(result.isError).not.toBe(true);
+    expect(result.content).toHaveLength(2);
+    const text = JSON.parse(result.content[0].text);
+    expect(result.structuredContent).toEqual(text);
+    expect(result.content[1]).toEqual({
+      type: 'image',
+      mimeType: 'image/png',
+      data: text.pngBase64,
+    });
+    const bytes = Buffer.from(result.content[1].data, 'base64');
+    expect(bytes.length).toBe(text.bytes);
+    const png = PNG.sync.read(bytes, { checkCRC: true });
+    expect([png.width, png.height]).toEqual([512, 512]);
+    expect([...png.data].some((value, index) => index % 4 === 3 && value > 0)).toBe(true);
+    expect(text.placeholders).toBe(true);
   });
   it('edits, undoes, redoes, saves and reopens without leaking tenant files', async () => {
     const alice = await token();
