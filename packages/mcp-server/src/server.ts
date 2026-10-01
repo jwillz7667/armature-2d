@@ -1,4 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import { toolCatalog } from './catalog';
+import { OAUTH_SECURITY_SCHEMES } from './oauth';
 import { McpToolError } from './errors';
 import { TOOLS, type ToolDeps } from './tools';
 import { PREVIEW_URI, PREVIEW_TOOL_META, previewHtml } from './preview-widget';
@@ -17,7 +20,11 @@ const DEFAULT_INFO: ServerInfo = { name: 'marionette', version: '0.1.0' };
 export function buildMcpServer(
   deps: ToolDeps,
   info: ServerInfo = DEFAULT_INFO,
-  options: { readonly redactErrors?: boolean; readonly widgetDomain?: string } = {},
+  options: {
+    readonly redactErrors?: boolean;
+    readonly widgetDomain?: string;
+    readonly requiresOAuth?: boolean;
+  } = {},
 ): McpServer {
   const server = new McpServer(info);
   server.registerResource('armature-preview', PREVIEW_URI, {}, async () => ({
@@ -50,7 +57,14 @@ export function buildMcpServer(
         inputSchema: tool.inputSchema.shape,
         outputSchema: tool.outputSchema,
         annotations: tool.annotations,
-        ...(tool.name === 'render_frame' ? { _meta: PREVIEW_TOOL_META } : {}),
+        ...(options.requiresOAuth || tool.name === 'render_frame'
+          ? {
+              _meta: {
+                ...(options.requiresOAuth ? { securitySchemes: OAUTH_SECURITY_SCHEMES } : {}),
+                ...(tool.name === 'render_frame' ? PREVIEW_TOOL_META : {}),
+              },
+            }
+          : {}),
       },
       async (args: unknown) => {
         try {
@@ -96,6 +110,13 @@ export function buildMcpServer(
         }
       },
     );
+  }
+  if (options.requiresOAuth) {
+    // SDK 1.30 drops top-level securitySchemes from registerTool configs. Publish
+    // the same validated registry through its public low-level request API instead.
+    server.server.setRequestHandler(ListToolsRequestSchema, async () => ({
+      tools: toolCatalog({ requiresOAuth: true }),
+    }));
   }
   return server;
 }

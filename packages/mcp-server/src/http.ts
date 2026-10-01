@@ -5,9 +5,14 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { join } from 'node:path';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { Transport } from '@modelcontextprotocol/sdk/shared/transport.js';
-import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
+import {
+  CallToolRequestSchema,
+  JSONRPCRequestSchema,
+  isInitializeRequest,
+} from '@modelcontextprotocol/sdk/types.js';
 import { createRemoteJWKSet, jwtVerify } from 'jose';
 import { buildMcpServer } from './server';
+import { oauthChallenge } from './oauth';
 import { createNodeFileStore } from './node-files';
 import { SessionRegistry } from './session';
 import { createStorageBudget, type StorageLimits } from './storage-budget';
@@ -214,49 +219,6 @@ export async function createHttpServer(options: HttpOptions) {
       send(res, 503, 'Stopping');
       return;
     }
-    let owner: string;
-    try {
-      const match = /^Bearer ([^\s]+)$/i.exec(req.headers.authorization ?? '');
-      if (!match?.[1]) throw new Error('Missing token');
-      const { payload } = await jwtVerify(match[1], keys, {
-        issuer: options.issuer,
-        audience: resource.href,
-        algorithms: ['RS256', 'ES256'],
-        requiredClaims: ['exp', 'sub', 'iat'],
-      });
-      if (typeof payload.sub !== 'string' || !payload.sub.trim())
-        throw new Error('Missing subject');
-      if (
-        typeof payload.scope !== 'string' ||
-        !payload.scope.split(' ').includes('armature:edit')
-      ) {
-        res.setHeader(
-          'WWW-Authenticate',
-          'Bearer error="insufficient_scope", scope="armature:edit"',
-        );
-        send(res, 403, 'Insufficient scope');
-        return;
-      }
-      owner = createHash('sha256')
-        .update(JSON.stringify([options.issuer, payload.sub]))
-        .digest('hex');
-    } catch {
-      res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${metadataUrl}"`);
-      send(res, 401, 'Authentication required');
-      return;
-    }
-    const userRetry = userBudget(owner);
-    if (userRetry) {
-      res.setHeader('Retry-After', userRetry);
-      send(res, 429, 'Account request limit reached; retry shortly');
-      return;
-    }
-    // There are no server-initiated notifications, so standalone SSE is intentionally unsupported.
-    if (req.method !== 'POST' && req.method !== 'DELETE') {
-      res.setHeader('Allow', 'POST, DELETE');
-      send(res, 405, 'Method not allowed');
-      return;
-    }
     let body: unknown;
     if (req.method === 'POST') {
       if (!/^application\/json(?:\s*;|$)/i.test(req.headers['content-type'] ?? '')) {
@@ -284,6 +246,74 @@ export async function createHttpServer(options: HttpOptions) {
         send(res, 400, 'Batch requests are not supported');
         return;
       }
+    }
+    const rejectAuthentication = (insufficientScope = false) => {
+      const challenge = oauthChallenge(metadataUrl, insufficientScope);
+      res.setHeader('WWW-Authenticate', challenge);
+      // A tool error result carries the host's inline OAuth trigger. Nothing is
+      // executed, and no account storage or transport is opened before validation.
+      const envelope = JSONRPCRequestSchema.safeParse(body);
+      const toolCall = CallToolRequestSchema.safeParse(body);
+      if (req.method === 'POST' && envelope.success && toolCall.success) {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(
+          JSON.stringify({
+            jsonrpc: '2.0',
+            id: envelope.data.id,
+            result: {
+              isError: true,
+              content: [{ type: 'text', text: 'Sign in to Armature to continue.' }],
+              _meta: { 'mcp/www_authenticate': [challenge] },
+            },
+          }),
+        );
+      } else {
+        send(
+          res,
+          insufficientScope ? 403 : 401,
+          insufficientScope ? 'Insufficient scope' : 'Authentication required',
+        );
+      }
+    };
+    let owner: string;
+    try {
+      const match = /^Bearer ([^\s]+)$/i.exec(req.headers.authorization ?? '');
+      if (!match?.[1]) throw new Error('Missing token');
+      const { payload } = await jwtVerify(match[1], keys, {
+        issuer: options.issuer,
+        audience: resource.href,
+        algorithms: ['RS256', 'ES256'],
+        requiredClaims: ['exp', 'sub', 'iat'],
+      });
+      if (typeof payload.sub !== 'string' || !payload.sub.trim())
+        throw new Error('Missing subject');
+      if (
+        typeof payload.scope !== 'string' ||
+        !payload.scope.split(' ').includes('armature:edit')
+      ) {
+        rejectAuthentication(true);
+        return;
+      }
+      owner = createHash('sha256')
+        .update(JSON.stringify([options.issuer, payload.sub]))
+        .digest('hex');
+    } catch {
+      rejectAuthentication();
+      return;
+    }
+    const userRetry = userBudget(owner);
+    if (userRetry) {
+      res.setHeader('Retry-After', userRetry);
+      send(res, 429, 'Account request limit reached; retry shortly');
+      return;
+    }
+    // There are no server-initiated notifications, so standalone SSE is intentionally unsupported.
+    if (req.method !== 'POST' && req.method !== 'DELETE') {
+      res.setHeader('Allow', 'POST, DELETE');
+      send(res, 405, 'Method not allowed');
+      return;
+    }
+    if (req.method === 'POST') {
       if (
         billing &&
         body &&
@@ -389,7 +419,7 @@ export async function createHttpServer(options: HttpOptions) {
             files: createNodeFileStore(root, { maxFileBytes: 8 * 1024 * 1024, storageBudget }),
           },
           undefined,
-          { redactErrors: true, widgetDomain: resource.origin },
+          { redactErrors: true, widgetDomain: resource.origin, requiresOAuth: true },
         );
         sessionKey = randomUUID();
         const transport = new StreamableHTTPServerTransport({
