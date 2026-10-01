@@ -44,3 +44,22 @@ email and its OIDC scope before claiming enterprise email-domain restrictions.
 
 References: [Keycloak Admin CLI](https://www.keycloak.org/docs/latest/server_admin/index.html#admin-cli)
 and [OpenAI plugin authentication](https://developers.openai.com/plugins/build/auth).
+
+## Expired ChatGPT connections
+
+Access and refresh tokens expire under the authorization server's existing session
+policy. In ChatGPT, an expired connection appears in Settings > Plugins > Armature
+as `Authentication update required`. Use `Reconnect` on that existing account and
+complete the normal sign-in flow; a successful connection removes that warning.
+
+The authenticated HTTP catalog declares `securitySchemes` for all tools and mirrors
+it in `_meta` for older clients. Missing, expired or invalid tool-call credentials
+return an MCP `isError` result with `_meta["mcp/www_authenticate"]`, including resource
+metadata, the required scope, error and error_description. This supplies ChatGPT's
+inline login trigger without executing the tool or opening account storage.
+Discovery and other non-tool requests still return HTTP 401 (or 403 for insufficient
+scope). The local stdio catalog does not advertise remote OAuth requirements.
+Refresh the developer app's tools after deploying this metadata change.
+
+See [OpenAI's authentication UI contract](https://developers.openai.com/plugins/build/auth#triggering-authentication-ui)
+and [tool metadata compatibility](https://developers.openai.com/plugins/reference).

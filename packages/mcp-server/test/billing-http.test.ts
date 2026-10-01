@@ -408,7 +408,10 @@ describe('paid MCP access', () => {
         params: { name: 'document.export', arguments: { documentId } },
       }),
     );
-    expect(anonymous.status).toBe(401);
+    expect(anonymous.status).toBe(200);
+    const authError = await anonymous.json();
+    expect(authError.result.isError).toBe(true);
+    expect(authError.result._meta['mcp/www_authenticate'][0]).toContain('error="invalid_token"');
   });
   it('refuses test billing in production and a Stripe key from the wrong mode', async () => {
     await expect(

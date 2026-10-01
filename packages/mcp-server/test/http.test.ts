@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -209,6 +209,101 @@ describe('authenticated HTTP MCP', () => {
       headers: { host: 'armature.example.test' },
     });
     expect(await metadata.json()).toMatchObject({ resource, authorization_servers: [issuer] });
+  });
+  it('publishes OAuth requirements on every HTTP tool without losing preview metadata', async () => {
+    const access = await token();
+    const first = await initialize(access);
+    const catalog = await rpc(access, first.headers.get('mcp-session-id')!, 'tools/list');
+    expect(catalog.tools).toHaveLength(toolCatalog().length);
+    for (const tool of catalog.tools) {
+      expect(tool.securitySchemes).toEqual([{ type: 'oauth2', scopes: ['armature:edit'] }]);
+      expect(tool._meta.securitySchemes).toEqual(tool.securitySchemes);
+    }
+    expect(
+      catalog.tools.find((tool: { name: string }) => tool.name === 'render_frame')._meta,
+    ).toMatchObject(PREVIEW_TOOL_META);
+    expect(toolCatalog().every((tool) => !('securitySchemes' in tool))).toBe(true);
+  });
+  it.each(['missing', 'expired', 'wrong-audience', 'wrong-scope'])(
+    'returns the inline OAuth challenge for %s credentials without executing a mutation',
+    async (failure) => {
+      const access =
+        failure === 'missing'
+          ? ''
+          : await token(
+              'alice',
+              failure === 'expired'
+                ? { expiry: 1 }
+                : failure === 'wrong-audience'
+                  ? { audience: 'https://other.test/mcp' }
+                  : { scope: 'unrelated' },
+            );
+      const response = await request(access, {
+        jsonrpc: '2.0',
+        id: 'reconnect-1',
+        method: 'tools/call',
+        params: { name: 'document.new', arguments: {} },
+      });
+      expect(response.status).toBe(200);
+      expect(response.headers.get('cache-control')).toBe('no-store');
+      const body = await response.json();
+      expect(body).toMatchObject({ jsonrpc: '2.0', id: 'reconnect-1', result: { isError: true } });
+      const challenge = body.result._meta['mcp/www_authenticate'][0];
+      expect(challenge).toBe(response.headers.get('www-authenticate'));
+      expect(challenge).toContain(
+        `resource_metadata="${new URL(resource).origin}/.well-known/oauth-protected-resource/mcp"`,
+      );
+      expect(challenge).toContain(
+        `error="${failure === 'wrong-scope' ? 'insufficient_scope' : 'invalid_token'}"`,
+      );
+      expect(challenge).toContain('error_description="Sign in to Armature to continue"');
+      expect(challenge).toContain('scope="armature:edit"');
+      expect(await readdir(root)).toEqual([]);
+    },
+  );
+  it('does not execute an expired-token request on an existing account transport', async () => {
+    const access = await token();
+    const first = await initialize(access);
+    const session = first.headers.get('mcp-session-id')!;
+    const created = await call(access, session, 'document.new', { name: 'Still open' });
+    const response = await request(
+      await token('alice', { expiry: 1 }),
+      {
+        jsonrpc: '2.0',
+        id: 9,
+        method: 'tools/call',
+        params: { name: 'document.close', arguments: { documentId: created.documentId } },
+      },
+      session,
+    );
+    expect((await response.json()).result.isError).toBe(true);
+    const snapshot = await call(access, session, 'document.getSnapshot', {
+      documentId: created.documentId,
+    });
+    expect(snapshot.snapshot.name).toBe('Still open');
+  });
+  it('bounds unauthenticated bodies and rejects invalid tool-call envelopes', async () => {
+    expect(
+      (
+        await request('', {
+          jsonrpc: '2.0',
+          method: 'tools/call',
+          params: { name: 'document.new' },
+        })
+      ).status,
+    ).toBe(401);
+    expect(
+      (
+        await request('', {
+          jsonrpc: '2.0',
+          id: {},
+          method: 'tools/call',
+          params: { name: 'document.new' },
+        })
+      ).status,
+    ).toBe(401);
+    expect((await request('', { value: 'a'.repeat(1024 * 1024) })).status).toBe(413);
+    expect(await readdir(root)).toEqual([]);
   });
   it.each([
     { audience: 'https://other.test/mcp' },
@@ -459,8 +554,12 @@ describe('authenticated HTTP MCP', () => {
     const catalog = await rpc(access, session, 'tools/list');
     expect(
       catalog.tools.find((tool: { name: string }) => tool.name === 'render_frame')._meta,
-    ).toEqual(PREVIEW_TOOL_META);
-    expect(catalog.tools.filter((tool: { _meta?: unknown }) => tool._meta)).toHaveLength(1);
+    ).toMatchObject(PREVIEW_TOOL_META);
+    expect(
+      catalog.tools.filter(
+        (tool: { _meta?: { ui?: { resourceUri?: string } } }) => tool._meta?.ui?.resourceUri,
+      ),
+    ).toHaveLength(1);
     const resource = await rpc(access, session, 'resources/read', { uri: PREVIEW_URI });
     expect(resource.contents[0]).toMatchObject({
       uri: PREVIEW_URI,

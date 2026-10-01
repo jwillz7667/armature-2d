@@ -1,9 +1,10 @@
 import { toJsonSchemaCompat } from '@modelcontextprotocol/sdk/server/zod-json-schema-compat.js';
 import { TOOLS } from './tools';
 import { PREVIEW_TOOL_META } from './preview-widget';
+import { OAUTH_SECURITY_SCHEMES } from './oauth';
 
 // A generated capability contract, using the same schema converter as the MCP SDK transport.
-export function toolCatalog() {
+export function toolCatalog(options: { readonly requiresOAuth?: boolean } = {}) {
   return [...TOOLS]
     .sort((a, b) => a.name.localeCompare(b.name, 'en'))
     .map((tool) => ({
@@ -11,7 +12,15 @@ export function toolCatalog() {
       title: tool.title,
       description: tool.description,
       annotations: tool.annotations,
-      ...(tool.name === 'render_frame' ? { _meta: PREVIEW_TOOL_META } : {}),
+      ...(options.requiresOAuth ? { securitySchemes: OAUTH_SECURITY_SCHEMES } : {}),
+      ...(options.requiresOAuth || tool.name === 'render_frame'
+        ? {
+            _meta: {
+              ...(options.requiresOAuth ? { securitySchemes: OAUTH_SECURITY_SCHEMES } : {}),
+              ...(tool.name === 'render_frame' ? PREVIEW_TOOL_META : {}),
+            },
+          }
+        : {}),
       inputSchema: toJsonSchemaCompat(tool.inputSchema),
       outputSchema: toJsonSchemaCompat(tool.outputSchema, {
         strictUnions: true,
